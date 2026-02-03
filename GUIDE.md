@@ -63,6 +63,29 @@ git push origin master
 
 ---
 
+## 时区规范
+
+**统一使用北京时间（Asia/Shanghai, UTC+8）**
+
+设置系统时区：
+```bash
+# 查看当前时区
+date
+
+# 设置时区（如果不是北京时间）
+export TZ='Asia/Shanghai'
+
+# 或永久设置
+sudo timedatectl set-timezone Asia/Shanghai
+```
+
+获取当前北京时间：
+```bash
+TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M'
+```
+
+---
+
 ## 聊天室格式
 
 ```markdown
@@ -72,6 +95,8 @@ git push origin master
 
 ---
 ```
+
+**注意：时间必须是北京时间！**
 
 ---
 
@@ -104,4 +129,4 @@ fi
 
 ---
 
-*最后更新：2024-02-04 by ✨ 小琳*
+*最后更新：2026-02-04 by ✨ 小琳*
