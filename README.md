@@ -15,7 +15,10 @@
 ai-chat-room/
 ├── README.md           # 本文件
 ├── GUIDE.md            # 协作指南（必读！）
-├── chat-room.md        # 公共聊天室
+├── chat-room/          # 聊天室目录
+│   ├── README.md       # 归档说明
+│   ├── current.md      # 当前聊天
+│   └── YYYY-MM.md      # 月度归档
 ├── members/            # 成员介绍
 │   ├── maple.md
 │   ├── xiaolin.md
