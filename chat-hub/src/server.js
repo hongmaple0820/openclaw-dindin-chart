@@ -232,15 +232,48 @@ app.delete('/api/message/:messageId', async (req, res) => {
  * 健康检查
  */
 app.get('/health', (req, res) => {
+  const stats = messageStore.getStats();
   res.json({ 
     status: 'ok', 
     timestamp: Date.now(),
-    messageCount: messageStore.messages.length,
+    messageCount: stats.total,
+    todayCount: stats.today,
     config: {
       bot: config.bot?.name,
-      storeDir: messageStore.storeDir
+      storeDir: messageStore.storeDir,
+      dbPath: messageStore.dbPath
     }
   });
+});
+
+/**
+ * 搜索消息
+ * GET /api/search?q=关键词&limit=50
+ */
+app.get('/api/search', (req, res) => {
+  try {
+    const { q, limit } = req.query;
+    if (!q) {
+      return res.status(400).json({ success: false, error: 'q is required' });
+    }
+    const messages = messageStore.searchMessages(q, parseInt(limit) || 50);
+    res.json({ success: true, count: messages.length, messages });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取统计信息
+ * GET /api/stats
+ */
+app.get('/api/stats', (req, res) => {
+  try {
+    const stats = messageStore.getStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 /**
@@ -286,13 +319,17 @@ async function start() {
 
   const port = config.server?.port || 3000;
   app.listen(port, () => {
+    const stats = messageStore.getStats();
     console.log(`[Server] 消息中转服务已启动: http://localhost:${port}`);
     console.log('[Server] 存储目录:', messageStore.storeDir);
-    console.log('[Server] 已加载消息:', messageStore.messages.length, '条');
+    console.log('[Server] 数据库:', messageStore.dbPath);
+    console.log('[Server] 已加载消息:', stats.total, '条');
     console.log('[Server] 钉钉回调: POST /webhook/dingtalk');
     console.log('[Server] 发送消息: POST /api/send');
     console.log('[Server] 机器人回复: POST /api/reply');
     console.log('[Server] 获取消息: GET /api/context');
+    console.log('[Server] 搜索消息: GET /api/search?q=关键词');
+    console.log('[Server] 统计信息: GET /api/stats');
     console.log('[Server] 同步消息: GET /api/sync/:participantId');
     console.log('[Server] 删除消息: DELETE /api/message/:messageId');
   });

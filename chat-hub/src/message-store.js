@@ -1,27 +1,23 @@
-const fs = require('fs');
+const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config');
 
 /**
- * 本地消息存储
- * 消息持久化到 JSON 文件，Redis 只做中转
+ * SQLite 消息存储
+ * 消息持久化到 SQLite 数据库
  */
 class MessageStore {
   constructor() {
-    // 存储目录：机器人工作空间
+    // 存储目录
     this.storeDir = config.store?.dir || path.join(process.env.HOME, '.openclaw', 'chat-data');
-    this.messagesFile = path.join(this.storeDir, 'messages.json');
-    this.syncStateFile = path.join(this.storeDir, 'sync-state.json');
-    this.maxMessages = config.store?.maxMessages || 1000;  // 最多保留消息数
-    
-    this.messages = [];
-    this.syncState = {};  // 每个参与者的同步状态 { participantId: lastSyncTimestamp }
+    this.dbPath = path.join(this.storeDir, 'messages.db');
     
     this.init();
   }
 
   /**
-   * 初始化存储
+   * 初始化数据库
    */
   init() {
     // 创建目录
@@ -30,140 +26,273 @@ class MessageStore {
       console.log('[Store] 创建存储目录:', this.storeDir);
     }
 
-    // 加载消息
-    if (fs.existsSync(this.messagesFile)) {
-      try {
-        const data = fs.readFileSync(this.messagesFile, 'utf-8');
-        this.messages = JSON.parse(data);
-        console.log('[Store] 加载了', this.messages.length, '条历史消息');
-      } catch (error) {
-        console.error('[Store] 加载消息失败:', error.message);
-        this.messages = [];
-      }
-    }
+    // 连接数据库
+    this.db = new Database(this.dbPath);
+    console.log('[Store] 数据库:', this.dbPath);
 
-    // 加载同步状态
-    if (fs.existsSync(this.syncStateFile)) {
-      try {
-        const data = fs.readFileSync(this.syncStateFile, 'utf-8');
-        this.syncState = JSON.parse(data);
-        console.log('[Store] 加载同步状态:', Object.keys(this.syncState).length, '个参与者');
-      } catch (error) {
-        console.error('[Store] 加载同步状态失败:', error.message);
-        this.syncState = {};
-      }
-    }
-  }
+    // 创建表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        source TEXT,
+        at_targets TEXT,
+        reply_to TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+      );
 
-  /**
-   * 保存消息到文件
-   */
-  save() {
-    try {
-      fs.writeFileSync(this.messagesFile, JSON.stringify(this.messages, null, 2));
-    } catch (error) {
-      console.error('[Store] 保存消息失败:', error.message);
-    }
-  }
+      CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender);
 
-  /**
-   * 保存同步状态
-   */
-  saveSyncState() {
-    try {
-      fs.writeFileSync(this.syncStateFile, JSON.stringify(this.syncState, null, 2));
-    } catch (error) {
-      console.error('[Store] 保存同步状态失败:', error.message);
-    }
+      CREATE TABLE IF NOT EXISTS sync_state (
+        participant_id TEXT PRIMARY KEY,
+        last_sync INTEGER NOT NULL,
+        updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+      );
+    `);
+
+    // 统计消息数量
+    const count = this.db.prepare('SELECT COUNT(*) as count FROM messages').get();
+    console.log('[Store] 已加载消息:', count.count, '条');
   }
 
   /**
    * 添加消息
    */
   addMessage(message) {
-    // 检查重复
-    if (this.messages.some(m => m.id === message.id)) {
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR IGNORE INTO messages (id, type, sender, content, timestamp, source, at_targets, reply_to)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      const result = stmt.run(
+        message.id,
+        message.type,
+        message.sender,
+        message.content,
+        message.timestamp,
+        message.source || null,
+        message.atTargets ? JSON.stringify(message.atTargets) : null,
+        message.replyTo || null
+      );
+      
+      return result.changes > 0;
+    } catch (error) {
+      console.error('[Store] 添加消息失败:', error.message);
       return false;
     }
-
-    this.messages.push(message);
-
-    // 超过最大数量时删除旧消息
-    if (this.messages.length > this.maxMessages) {
-      this.messages = this.messages.slice(-this.maxMessages);
-    }
-
-    this.save();
-    return true;
   }
 
   /**
    * 删除消息
    */
   deleteMessage(messageId) {
-    const index = this.messages.findIndex(m => m.id === messageId);
-    if (index === -1) {
+    try {
+      const stmt = this.db.prepare('DELETE FROM messages WHERE id = ?');
+      const result = stmt.run(messageId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('[Store] 删除消息失败:', error.message);
       return false;
     }
-    this.messages.splice(index, 1);
-    this.save();
-    return true;
   }
 
   /**
    * 获取最近消息
    */
   getMessages(limit = 50) {
-    return this.messages.slice(-limit);
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?
+      `);
+      const rows = stmt.all(limit);
+      
+      // 转换格式并反转顺序（最新的在后面）
+      return rows.reverse().map(row => ({
+        id: row.id,
+        type: row.type,
+        sender: row.sender,
+        content: row.content,
+        timestamp: row.timestamp,
+        source: row.source,
+        atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+        replyTo: row.reply_to
+      }));
+    } catch (error) {
+      console.error('[Store] 获取消息失败:', error.message);
+      return [];
+    }
   }
 
   /**
    * 获取参与者未同步的消息
-   * @param {string} participantId - 参与者标识
-   * @returns {Array} 未同步的消息
    */
   getUnsyncedMessages(participantId) {
-    const lastSync = this.syncState[participantId] || 0;
-    return this.messages.filter(m => m.timestamp > lastSync);
+    try {
+      // 获取上次同步时间
+      const syncStmt = this.db.prepare('SELECT last_sync FROM sync_state WHERE participant_id = ?');
+      const syncRow = syncStmt.get(participantId);
+      const lastSync = syncRow?.last_sync || 0;
+
+      // 获取未同步消息
+      const msgStmt = this.db.prepare(`
+        SELECT * FROM messages WHERE timestamp > ? ORDER BY timestamp ASC
+      `);
+      const rows = msgStmt.all(lastSync);
+
+      return rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        sender: row.sender,
+        content: row.content,
+        timestamp: row.timestamp,
+        source: row.source,
+        atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+        replyTo: row.reply_to
+      }));
+    } catch (error) {
+      console.error('[Store] 获取未同步消息失败:', error.message);
+      return [];
+    }
   }
 
   /**
-   * 标记参与者已同步到某个时间点
+   * 标记参与者已同步
    */
   markSynced(participantId, timestamp = Date.now()) {
-    this.syncState[participantId] = timestamp;
-    this.saveSyncState();
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO sync_state (participant_id, last_sync, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(participant_id) DO UPDATE SET last_sync = ?, updated_at = ?
+      `);
+      stmt.run(participantId, timestamp, Date.now(), timestamp, Date.now());
+      return true;
+    } catch (error) {
+      console.error('[Store] 标记同步失败:', error.message);
+      return false;
+    }
   }
 
   /**
-   * 获取所有参与者的同步状态
+   * 获取同步状态
    */
   getSyncStatus() {
-    const status = {};
-    for (const [id, lastSync] of Object.entries(this.syncState)) {
-      const unsynced = this.messages.filter(m => m.timestamp > lastSync).length;
-      status[id] = {
-        lastSync,
-        lastSyncTime: new Date(lastSync).toISOString(),
-        unsyncedCount: unsynced
-      };
+    try {
+      const stmt = this.db.prepare('SELECT * FROM sync_state');
+      const rows = stmt.all();
+      
+      const status = {};
+      for (const row of rows) {
+        // 计算未同步消息数
+        const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM messages WHERE timestamp > ?');
+        const countRow = countStmt.get(row.last_sync);
+        
+        status[row.participant_id] = {
+          lastSync: row.last_sync,
+          lastSyncTime: new Date(row.last_sync).toISOString(),
+          unsyncedCount: countRow.count
+        };
+      }
+      return status;
+    } catch (error) {
+      console.error('[Store] 获取同步状态失败:', error.message);
+      return {};
     }
-    return status;
-  }
-
-  /**
-   * 清空所有消息
-   */
-  clear() {
-    this.messages = [];
-    this.save();
   }
 
   /**
    * 检查消息是否重复
    */
   isDuplicate(messageId) {
-    return this.messages.some(m => m.id === messageId);
+    try {
+      const stmt = this.db.prepare('SELECT 1 FROM messages WHERE id = ?');
+      return !!stmt.get(messageId);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * 搜索消息
+   */
+  searchMessages(query, limit = 50) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM messages 
+        WHERE content LIKE ? 
+        ORDER BY timestamp DESC 
+        LIMIT ?
+      `);
+      const rows = stmt.all(`%${query}%`, limit);
+      
+      return rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        sender: row.sender,
+        content: row.content,
+        timestamp: row.timestamp,
+        source: row.source,
+        atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+        replyTo: row.reply_to
+      }));
+    } catch (error) {
+      console.error('[Store] 搜索消息失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 获取消息统计
+   */
+  getStats() {
+    try {
+      const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM messages');
+      const total = totalStmt.get().count;
+
+      const bySenderStmt = this.db.prepare(`
+        SELECT sender, COUNT(*) as count FROM messages GROUP BY sender ORDER BY count DESC
+      `);
+      const bySender = bySenderStmt.all();
+
+      const todayStmt = this.db.prepare(`
+        SELECT COUNT(*) as count FROM messages WHERE timestamp > ?
+      `);
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const today = todayStmt.get(todayStart.getTime()).count;
+
+      return { total, today, bySender };
+    } catch (error) {
+      console.error('[Store] 获取统计失败:', error.message);
+      return { total: 0, today: 0, bySender: [] };
+    }
+  }
+
+  /**
+   * 清空所有消息
+   */
+  clear() {
+    try {
+      this.db.exec('DELETE FROM messages');
+      return true;
+    } catch (error) {
+      console.error('[Store] 清空消息失败:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 关闭数据库
+   */
+  close() {
+    if (this.db) {
+      this.db.close();
+    }
   }
 }
 
