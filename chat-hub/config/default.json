@@ -3,24 +3,29 @@
     "port": 3000
   },
   "redis": {
-    "host": "127.0.0.1",
+    "host": "47.96.248.176",
     "port": 6379,
-    "password": "你的Redis密码"
+    "password": "***REMOVED***"
   },
   "dingtalk": {
     "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=***TOKEN_REMOVED***",
     "secret": "***SECRET_REMOVED***"
   },
-  "bots": {
-    "cooldownMs": 5000,
-    "enabled": ["bot-a", "bot-b"]
+  "openclaw": {
+    "baseUrl": "http://127.0.0.1:18789",
+    "token": ""
   },
-  "openclawBots": {
-    "小明": "@小明机器人",
-    "小红": "@小红机器人"
+  "bots": {
+    "cooldownMs": 3000,
+    "contextSize": 10,
+    "names": ["小琳", "小猪"]
   },
   "channels": {
     "messages": "chat:messages",
     "replies": "chat:replies"
+  },
+  "dedup": {
+    "enabled": true,
+    "ttlSeconds": 300
   }
 }
