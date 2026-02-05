@@ -85,18 +85,28 @@ async function storeDM(message) {
 - `DMChat.vue` - 私聊窗口
 - `MessageItem.vue` - 复用现有组件
 
-### 5. 实时通知
+### 5. 实时通知（Redis，不用 WebSocket）
 
-使用 WebSocket 推送新私信：
+和群聊一样的架构：
 
 ```javascript
-// 服务端
-io.to(receiverId).emit('new_dm', message);
+// 发送私信时，同时发 Redis 通知
+redis.publish('dm:notification', JSON.stringify({
+  type: 'new_dm',
+  receiverId: message.receiverId,
+  senderId: message.senderId,
+  messageId: message.id,
+  preview: message.content.substring(0, 50)
+}));
 
-// 客户端
-socket.on('new_dm', (message) => {
-  // 显示通知
-  showNotification(message);
+// 接收方订阅
+redis.subscribe('dm:notification');
+redis.on('message', (channel, data) => {
+  const msg = JSON.parse(data);
+  if (msg.receiverId === myUserId) {
+    // 调 API 拉取完整消息
+    fetchNewMessages();
+  }
 });
 ```
 
@@ -113,10 +123,10 @@ socket.on('new_dm', (message) => {
 - [ ] 存储钉钉私聊记录
 - [ ] 钉钉私聊历史查询
 
-### Phase 3: 实时通知
-- [ ] WebSocket 集成
-- [ ] 新消息推送
-- [ ] 未读数角标
+### Phase 3: 实时通知（Redis）
+- [ ] 发送私信时发 Redis 通知
+- [ ] 接收方订阅 dm:notification 频道
+- [ ] 收到通知后拉取消息
 
 ### Phase 4: AI 私聊
 - [ ] AI 私聊会话管理
