@@ -121,33 +121,58 @@ class OpenClawTrigger {
    * 通过 openclaw system event 触发 OpenClaw
    */
   async triggerOpenClaw(message) {
-    // 构造事件文本
-    const eventText = `[钉钉群消息] ${message.sender}: ${message.content}`;
+    // 构造事件文本，限制长度避免命令行溢出
+    const content = (message.content || '').substring(0, 500);
+    const eventText = `[钉钉群消息] ${message.sender}: ${content}`;
 
-    // 构造命令
-    let cmd = `openclaw system event --text "${eventText.replace(/"/g, '\\"')}" --mode now --timeout 10000`;
-
-    // 如果是远程 Gateway，添加 url 和 token
-    if (this.gatewayUrl) {
-      cmd += ` --url "${this.gatewayUrl}"`;
-    }
-    if (this.gatewayToken) {
-      cmd += ` --token "${this.gatewayToken}"`;
-    }
-
-    try {
-      const { stdout, stderr } = await execAsync(cmd, { timeout: 15000 });
-      if (stdout.trim() === 'ok') {
-        console.log(`[${this.name}] 成功触发 OpenClaw`);
-      } else {
-        console.log(`[${this.name}] OpenClaw 响应:`, stdout.trim());
+    // 使用 spawn 而不是 exec，通过 stdin 传递消息，避免 shell 转义问题
+    const { spawn } = require('child_process');
+    
+    return new Promise((resolve, reject) => {
+      const args = ['system', 'event', '--mode', 'now', '--timeout', '10000'];
+      
+      // 如果是远程 Gateway
+      if (this.gatewayUrl) {
+        args.push('--url', this.gatewayUrl);
       }
-      if (stderr) {
-        console.error(`[${this.name}] 警告:`, stderr);
+      if (this.gatewayToken) {
+        args.push('--token', this.gatewayToken);
       }
-    } catch (error) {
-      console.error(`[${this.name}] 执行命令失败:`, error.message);
-    }
+      
+      // 添加 --text 参数
+      args.push('--text', eventText);
+      
+      const child = spawn('openclaw', args, {
+        timeout: 15000,
+        shell: false  // 不使用 shell，避免特殊字符问题
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      child.on('close', (code) => {
+        if (code === 0) {
+          console.log(`[${this.name}] 成功触发 OpenClaw`);
+          resolve(stdout);
+        } else {
+          console.error(`[${this.name}] 触发失败 (code ${code}):`, stderr || stdout);
+          reject(new Error(stderr || stdout));
+        }
+      });
+      
+      child.on('error', (err) => {
+        console.error(`[${this.name}] 执行命令失败:`, err.message);
+        reject(err);
+      });
+    });
   }
 }
 
