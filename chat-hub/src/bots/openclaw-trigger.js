@@ -15,6 +15,7 @@ class OpenClawTrigger {
     this.gatewayUrl = options.gatewayUrl || null;  // 远程 OpenClaw 的 WebSocket URL
     this.gatewayToken = options.gatewayToken || null;  // 远程 OpenClaw 的 token
     this.cooldownMs = options.cooldownMs || config.bots?.cooldownMs || 3000;
+    this.delayMs = options.delayMs || config.trigger?.delayMs || 3000;  // 触发前延迟
     this.lastTriggerTime = 0;
     this.processing = false;
   }
@@ -73,6 +74,11 @@ class OpenClawTrigger {
     try {
       this.processing = true;
       this.lastTriggerTime = Date.now();
+
+      // 延迟 3 秒再触发，给 OpenClaw 处理时间
+      const delayMs = this.delayMs || 3000;
+      console.log(`[${this.name}] 延迟 ${delayMs}ms 后触发...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
 
       console.log(`[${this.name}] 触发 OpenClaw 处理:`, message.sender, '->', message.content?.substring(0, 50));
       await this.triggerOpenClaw(message);
