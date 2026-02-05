@@ -1,5 +1,6 @@
 const { start: startServer } = require('./server');
 const OpenClawTrigger = require('./bots/openclaw-trigger');
+const Analytics = require('./analytics');
 const config = require('./config');
 
 /**
@@ -10,11 +11,15 @@ async function main() {
   const mode = config.mode || 'storage';
   const triggerEnabled = config.trigger?.enabled ?? false;
 
+  // 初始化使用统计
+  const analytics = new Analytics(config.analytics || {});
+
   console.log('========================================');
   console.log(`  chat-hub 消息中转系统`);
   console.log('----------------------------------------');
   console.log(`  机器人: ${botName}`);
   console.log(`  模式: ${mode === 'hub' ? 'B - 完整中转' : 'A - 存储分析'}`);
+  console.log(`  安装ID: ${analytics.installId.substring(0, 8)}...`);
   console.log('----------------------------------------');
   console.log('  功能状态:');
   console.log(`  - 消息存储: ${config.features?.storage !== false ? '✓' : '✗'}`);
@@ -22,7 +27,12 @@ async function main() {
   console.log(`  - Redis 同步: ${config.features?.redis !== false && config.redis?.enabled !== false ? '✓' : '✗'}`);
   console.log(`  - OpenClaw 触发: ${triggerEnabled ? '✓' : '✗'}`);
   console.log(`  - 钉钉 Webhook: ${config.dingtalk?.enabled !== false && config.dingtalk?.webhookBase ? '✓' : '✗'}`);
+  console.log(`  - 使用统计: ${analytics.enabled ? '✓' : '✗'}`);
   console.log('========================================\n');
+
+  // 记录启动事件
+  analytics.trackStartup();
+  analytics.trackDaily();
 
   try {
     // 1. 启动消息中转服务

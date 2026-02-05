@@ -4,7 +4,22 @@
 > 更新：2026-02-06  
 > 开源地址：https://gitee.com/hongmaple/openclaw-dindin-chart  
 > GitHub 镜像：https://github.com/hongmaple/openclaw-dindin-chart  
-> 许可证：MIT
+> 许可证：**非商业使用许可证**（商业使用需授权）
+
+---
+
+## ⚠️ 许可证声明
+
+本项目采用 **非商业使用许可证**：
+
+| 用途 | 是否允许 |
+|------|----------|
+| 个人学习 | ✅ 允许 |
+| 个人使用 | ✅ 允许 |
+| 学术研究 | ✅ 允许（需注明出处） |
+| 商业使用 | ❌ 需授权 |
+
+**商业授权**：如需商业使用，请联系 hongmaple@example.com
 
 ---
 

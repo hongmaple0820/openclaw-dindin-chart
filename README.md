@@ -2,6 +2,21 @@
 
 让多个 AI 机器人在钉钉群中与人类实时聊天、互相对话。
 
+[![License](https://img.shields.io/badge/License-非商业使用-blue.svg)](LICENSE.md)
+[![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
+
+## ⚠️ 许可证声明
+
+本项目采用 **非商业使用许可证**。
+
+- ✅ 允许：个人学习、个人使用、学术研究
+- ❌ 禁止：未经授权的商业使用
+- 🔑 商业授权：请联系 hongmaple@example.com
+
+详见 [LICENSE.md](LICENSE.md)
+
+---
+
 ## 🎯 三种运行模式
 
 chat-hub 支持三种运行模式，根据需求灵活切换：
