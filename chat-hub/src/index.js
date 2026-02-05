@@ -6,34 +6,49 @@ const config = require('./config');
  * 主入口
  */
 async function main() {
-  const botName = config.bot?.name || '小琳';
-  
+  const botName = config.bot?.name || 'Bot';
+  const mode = config.mode || 'storage';
+  const triggerEnabled = config.trigger?.enabled ?? false;
+
   console.log('========================================');
-  console.log(`  AI 聊天室 - ${botName}`);
-  console.log('  - Redis 消息总线 ✓');
-  console.log('  - 消息去重 ✓');
-  console.log('  - OpenClaw 触发器 ✓');
-  console.log('  - 钉钉 Webhook ✓');
+  console.log(`  chat-hub 消息中转系统`);
+  console.log('----------------------------------------');
+  console.log(`  机器人: ${botName}`);
+  console.log(`  模式: ${mode === 'hub' ? 'B - 完整中转' : 'A - 存储分析'}`);
+  console.log('----------------------------------------');
+  console.log('  功能状态:');
+  console.log(`  - 消息存储: ${config.features?.storage !== false ? '✓' : '✗'}`);
+  console.log(`  - 数据分析: ${config.features?.analytics !== false ? '✓' : '✗'}`);
+  console.log(`  - Redis 同步: ${config.features?.redis !== false && config.redis?.enabled !== false ? '✓' : '✗'}`);
+  console.log(`  - OpenClaw 触发: ${triggerEnabled ? '✓' : '✗'}`);
+  console.log(`  - 钉钉 Webhook: ${config.dingtalk?.enabled !== false && config.dingtalk?.webhookBase ? '✓' : '✗'}`);
   console.log('========================================\n');
 
   try {
     // 1. 启动消息中转服务
     await startServer();
 
-    // 2. 启动 OpenClaw 触发器（只处理自己）
-    const trigger = new OpenClawTrigger(botName, {
-      gatewayUrl: config.bot?.gatewayUrl || null,
-      gatewayToken: config.bot?.gatewayToken || null,
-      cooldownMs: config.bots?.cooldownMs || 3000
-    });
-    await trigger.start();
+    // 2. 根据配置决定是否启动 OpenClaw 触发器
+    if (triggerEnabled) {
+      const trigger = new OpenClawTrigger(botName, {
+        gatewayUrl: config.bot?.gatewayUrl || null,
+        gatewayToken: config.bot?.gatewayToken || null,
+        cooldownMs: config.trigger?.cooldownMs || 3000,
+        command: config.trigger?.command || 'openclaw system event --text',
+        messagePrefix: config.trigger?.messagePrefix || '[钉钉群消息]'
+      });
+      await trigger.start();
+      console.log('[Trigger] OpenClaw 触发器已启动');
+    } else {
+      console.log('[Trigger] OpenClaw 触发器未启用（模式 A：存储分析）');
+    }
 
     console.log('\n========================================');
     console.log('  服务已启动！');
-    console.log(`  - 机器人: ${botName}`);
-    console.log(`  - 中转服务: http://localhost:${config.server?.port || 3000}`);
-    console.log(`  - Redis: ${config.redis?.host}:${config.redis?.port}`);
-    console.log(`  - 去重: ${config.dedup?.enabled ? '已启用' : '未启用'}`);
+    console.log(`  API: http://localhost:${config.server?.port || 3000}`);
+    if (config.redis?.host) {
+      console.log(`  Redis: ${config.redis.host}:${config.redis.port || 6379}`);
+    }
     console.log('========================================\n');
 
     // 优雅退出
