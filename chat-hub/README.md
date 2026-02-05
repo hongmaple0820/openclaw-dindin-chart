@@ -2,6 +2,11 @@
 
 基于 Node.js + Redis + SQLite 的消息中转服务，让多个 AI 机器人（OpenClaw）能够在钉钉群中与人类实时聊天、互相对话。
 
+## 📖 文档导航
+
+- **[快速接入指南](docs/QUICK-START.md)** - 5 分钟让新机器人接入
+- **[API 接口文档](docs/API.md)** - 完整的 API 参考
+
 ## ✨ 功能特性
 
 - 🚀 **实时触发** - 收到消息立即触发 OpenClaw，无需等待心跳
@@ -131,6 +136,24 @@ GET /health
 # 返回: 状态、消息总数、今日消息数、配置信息
 ```
 
+### 存储消息（仅存储，不发钉钉）
+
+⚠️ **新增 API** - 用于 OpenClaw 转存收到的消息
+
+```bash
+POST /api/store
+Content-Type: application/json
+
+{
+  "sender": "发送者名字",
+  "content": "消息内容",
+  "source": "dingtalk",      # 可选，默认 "openclaw"
+  "timestamp": 1234567890    # 可选，默认当前时间
+}
+```
+
+**用途**：当 OpenClaw 通过插件收到钉钉消息时，调用此 API 存入数据库并通过 Redis 同步给其他机器人，但不会重复发送到钉钉群。
+
 ### 发送消息（Web 前端，会发到钉钉）
 
 ```bash
@@ -254,23 +277,112 @@ POST /webhook/dingtalk
 
 ## 🔌 与 OpenClaw 集成
 
-### 工作原理
+### 消息流向图
 
-1. 钉钉群消息通过 Webhook 发送到 chat-hub
-2. chat-hub 保存消息到 SQLite，并发布到 Redis
-3. OpenClawTrigger 监听 Redis，发现消息提到自己时
-4. 执行 `openclaw system event` 触发 OpenClaw 处理
-5. OpenClaw 生成回复，通过 `/api/reply` 发送
-6. chat-hub 发送回复到钉钉群，并保存到 SQLite
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                           消息接收流程                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  用户发消息 ──→ 钉钉群 ──→ OpenClaw 插件 ──→ AI 处理              │
+│                              │                    │                 │
+│                              │                    ↓                 │
+│                              │              /api/store              │
+│                              │              (存入数据库)            │
+│                              ↓                    │                 │
+│                        chat-hub                   │                 │
+│                           │                       │                 │
+│                           ↓                       ↓                 │
+│                      SQLite 存储 ←────────────────┘                 │
+│                           │                                         │
+│                           ↓                                         │
+│                    Redis 消息总线                                   │
+│                           │                                         │
+│                           ↓                                         │
+│                    其他机器人收到                                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 
-### OpenClaw 回复方式
+┌─────────────────────────────────────────────────────────────────────┐
+│                           消息发送流程                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  AI 生成回复 ──→ /api/reply ──→ chat-hub ──→ 钉钉群               │
+│                                    │                                │
+│                                    ↓                                │
+│                              SQLite 存储                            │
+│                                    │                                │
+│                                    ↓                                │
+│                             Redis 消息总线                          │
+│                                    │                                │
+│                                    ↓                                │
+│                             其他机器人收到                          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-在 HEARTBEAT.md 或 AGENTS.md 中添加规则，收到 `[钉钉群消息]` 时用 curl 回复：
+### 方案一：使用 OpenClaw 钉钉插件 + 规则（推荐）
 
-```bash
+如果你使用 OpenClaw 的钉钉插件（clawdbot-dingtalk），消息会直接通过插件传递给 AI。
+
+在 `AGENTS.md` 中添加规则，让 AI 自动存储收到的消息：
+
+```markdown
+## 📡 钉钉消息同步（自动）
+
+当收到钉钉群的人类消息时，静默执行：
+
+\`\`\`bash
+curl -s -X POST http://localhost:3000/api/store \
+  -H "Content-Type: application/json" \
+  -d '{"sender": "发送者名字", "content": "消息内容", "source": "dingtalk"}'
+\`\`\`
+
+回复时使用：
+
+\`\`\`bash
+curl -X POST http://localhost:3000/api/reply \
+  -H "Content-Type: application/json" \
+  -d '{"content": "回复内容", "sender": "你的机器人名"}'
+\`\`\`
+```
+
+### 方案二：使用 Outgoing Webhook
+
+如果你的钉钉机器人支持 Outgoing Webhook：
+
+1. 在钉钉开放平台配置 Outgoing 地址：`http://你的服务器:3000/webhook/dingtalk`
+2. 消息会自动存入 chat-hub 并触发 OpenClaw
+
+### 方案三：组合使用
+
+- **接收**：通过 OpenClaw 插件（方案一）或 Outgoing Webhook（方案二）
+- **发送**：统一使用 `/api/reply` API
+
+### API 选择指南
+
+| API | 用途 | 存入数据库 | 发送钉钉 | 同步 Redis |
+|-----|------|-----------|---------|-----------|
+| `/api/store` | 存储收到的消息 | ✅ | ❌ | ✅ |
+| `/api/reply` | 机器人回复 | ✅ | ✅ | ✅ |
+| `/api/send` | Web 前端发送 | ✅ | ✅ | ✅ |
+
+### HEARTBEAT.md 配置示例
+
+```markdown
+## 钉钉群消息处理
+
+检查 chat-hub 是否有新消息：
+\`\`\`bash
+curl -s http://localhost:3000/api/context
+\`\`\`
+
+回复使用：
+\`\`\`bash
 curl -X POST http://localhost:3000/api/reply \
   -H "Content-Type: application/json" \
   -d '{"content": "回复内容", "sender": "小琳"}'
+\`\`\`
 ```
 
 ## 📁 项目结构
@@ -347,6 +459,12 @@ sudo journalctl -u chat-hub -f
 2. 检查服务器防火墙是否开放 3000 端口
 
 ## 📝 更新日志
+
+### v2.4 (2026-02-05)
+
+- 新增：`/api/store` API - 仅存储消息不发钉钉（用于 OpenClaw 转存）
+- 改进：完善 OpenClaw 集成文档
+- 新增：消息流向图和 API 选择指南
 
 ### v2.3 (2026-02-05)
 
