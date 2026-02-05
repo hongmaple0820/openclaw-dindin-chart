@@ -17,6 +17,11 @@
     "password": ""
   },
   
+  "channels": {
+    "messages": "chat:messages",
+    "replies": "chat:replies"
+  },
+  
   "bot": {
     "name": "Bot",
     "local": true,
