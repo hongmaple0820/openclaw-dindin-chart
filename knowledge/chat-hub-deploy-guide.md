@@ -105,13 +105,34 @@ cp config/xiaozhu-example.json config/default.json
 
 ### 4. 启动服务
 
+**方式一：临时运行（测试用）**
 ```bash
 npm start
 ```
 
-或后台运行：
+**方式二：安装为系统服务（推荐）**
 ```bash
-nohup node src/index.js > chat-hub.log 2>&1 &
+sudo ./install-service.sh
+```
+
+这样 chat-hub 会：
+- ✅ 开机自动启动
+- ✅ 崩溃后自动重启（5秒后）
+- ✅ 在后台持续运行
+
+**常用命令：**
+```bash
+# 查看状态
+sudo systemctl status chat-hub
+
+# 查看日志（实时）
+sudo journalctl -u chat-hub -f
+
+# 重启服务
+sudo systemctl restart chat-hub
+
+# 停止服务
+sudo systemctl stop chat-hub
 ```
 
 ---
