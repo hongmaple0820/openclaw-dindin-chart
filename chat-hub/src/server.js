@@ -104,6 +104,38 @@ app.post('/api/send', async (req, res) => {
 });
 
 /**
+ * 机器人发送回复（会自动转发到钉钉）
+ * POST /api/reply
+ */
+app.post('/api/reply', async (req, res) => {
+  try {
+    const { content, sender = 'Bot', atTargets = null } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+
+    const message = {
+      id: uuidv4(),
+      type: 'bot',
+      sender,
+      content,
+      timestamp: Date.now(),
+      atTargets,  // 可选：@ 用户
+      replyTo: null
+    };
+
+    // 发布到回复频道（会被转发到钉钉）
+    await redisClient.publish(config.channels.replies, message);
+    
+    console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50));
+    res.json({ success: true, message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * 获取聊天上下文
  * GET /api/context
  */
@@ -135,9 +167,17 @@ app.get('/health', (req, res) => {
  * 启动服务器并订阅回复频道
  */
 async function start() {
-  // 订阅机器人回复频道，转发到钉钉
+  const myBotName = config.bot?.name || '小琳';
+  
+  // 订阅机器人回复频道，只转发自己的回复到钉钉
   await redisClient.subscribe(config.channels.replies, async (message) => {
-    console.log('[Server] 收到机器人回复:', message.sender, '->', message.content?.substring(0, 50));
+    // 只处理自己的回复
+    if (message.sender !== myBotName) {
+      console.log(`[Server] 忽略其他机器人回复: ${message.sender}`);
+      return;
+    }
+    
+    console.log('[Server] 收到自己的回复:', message.sender, '->', message.content?.substring(0, 50));
 
     // 去重：避免重复发送
     const replyId = `reply-${message.id}`;
@@ -146,8 +186,8 @@ async function start() {
       return;
     }
 
-    // 发送到钉钉
-    await dingtalk.sendText(message.content, message.sender);
+    // 发送到钉钉（支持 @ 用户）
+    await dingtalk.sendText(message.content, message.sender, message.atTargets);
 
     // 保存到上下文
     await redisClient.addToContext(message);

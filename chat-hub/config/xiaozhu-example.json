@@ -8,12 +8,12 @@
     "password": "***REMOVED***"
   },
   "bot": {
-    "name": "小琳",
+    "name": "小猪",
     "local": true
   },
   "dingtalk": {
     "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=***TOKEN_REMOVED***",
-    "secret": "***SECRET_REMOVED***"
+    "secret": "你的加签密钥"
   },
   "bots": {
     "cooldownMs": 3000,

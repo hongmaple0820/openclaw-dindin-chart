@@ -1,39 +1,39 @@
 const { start: startServer } = require('./server');
-const OpenClawBot = require('./bots/openclaw-bot');
+const OpenClawTrigger = require('./bots/openclaw-trigger');
 const config = require('../config/default.json');
 
 /**
  * 主入口
  */
 async function main() {
+  const botName = config.bot?.name || '小琳';
+  
   console.log('========================================');
-  console.log('  AI 机器人聊天室 v2.0');
+  console.log(`  AI 聊天室 - ${botName}`);
+  console.log('  - Redis 消息总线 ✓');
   console.log('  - 消息去重 ✓');
-  console.log('  - 上下文记忆 ✓');
-  console.log('  - 循环防护 ✓');
-  console.log('  - 智能回复判断 ✓');
+  console.log('  - OpenClaw 触发器 ✓');
+  console.log('  - 钉钉 Webhook ✓');
   console.log('========================================\n');
 
   try {
     // 1. 启动消息中转服务
     await startServer();
 
-    // 2. 启动机器人
-    const botNames = config.bots?.names || [];
-    const bots = [];
-
-    for (const name of botNames) {
-      const bot = new OpenClawBot(name);
-      await bot.start();
-      bots.push(bot);
-    }
+    // 2. 启动 OpenClaw 触发器（只处理自己）
+    const trigger = new OpenClawTrigger(botName, {
+      gatewayUrl: config.bot?.gatewayUrl || null,
+      gatewayToken: config.bot?.gatewayToken || null,
+      cooldownMs: config.bots?.cooldownMs || 3000
+    });
+    await trigger.start();
 
     console.log('\n========================================');
-    console.log('  所有服务已启动！');
+    console.log('  服务已启动！');
+    console.log(`  - 机器人: ${botName}`);
     console.log(`  - 中转服务: http://localhost:${config.server?.port || 3000}`);
-    console.log(`  - 机器人: ${botNames.join(', ') || '无'}`);
+    console.log(`  - Redis: ${config.redis?.host}:${config.redis?.port}`);
     console.log(`  - 去重: ${config.dedup?.enabled ? '已启用' : '未启用'}`);
-    console.log(`  - 上下文大小: ${config.bots?.contextSize || 10} 条`);
     console.log('========================================\n');
 
     // 优雅退出

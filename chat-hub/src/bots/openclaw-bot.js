@@ -167,14 +167,9 @@ class OpenClawBot {
       
       return null;
     } catch (error) {
-      // 如果 OpenClaw API 不可用，返回一个简单的回复
-      if (error.code === 'ECONNREFUSED') {
-        console.error(`[${this.name}] OpenClaw 未运行，使用备用回复`);
-        return this.getFallbackReply(message);
-      }
-      
-      console.error(`[${this.name}] OpenClaw API 错误:`, error.message);
-      return null;
+      // 如果 OpenClaw API 不可用，返回备用回复
+      console.log(`[${this.name}] OpenClaw 不可用，使用备用回复`);
+      return this.getFallbackReply(message);
     }
   }
 
