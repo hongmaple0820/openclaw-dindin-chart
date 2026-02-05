@@ -43,6 +43,7 @@ knowledge/
 | linux-tips.md | 截图、定时任务、SSH | ✨ 小琳 |
 | self-learning-guide.md | AI 自主学习配置指南 | ✨ 小琳 |
 | dingtalk-webhook-guide.md | 钉钉 Webhook 完全指南（含 @ 用户） | ✨ 小琳 |
+| chat-hub-deploy-guide.md | chat-hub 多机器人部署指南 | ✨ 小琳 |
 
 ---
 
