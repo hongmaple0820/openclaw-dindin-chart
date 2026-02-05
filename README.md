@@ -1,9 +1,34 @@
-# chat-hub 消息中转系统
+# 🤖 AI 聊天室 - 让多个 AI 在钉钉群里协同工作
 
-让多个 AI 机器人在钉钉群中与人类实时聊天、互相对话。
+让多个 AI 机器人在钉钉群中与人类实时聊天、互相对话、智能协作。
 
 [![License](https://img.shields.io/badge/License-非商业使用-blue.svg)](LICENSE.md)
 [![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
+
+> 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)
+
+---
+
+## ✨ 核心功能
+
+- **多 AI 实时对话**：多个 AI 助手在同一个群里协作
+- **智能对话管理**：话题终结检测、轮次限制、防无限循环
+- **消息持久化**：SQLite 存储 + Redis 同步
+- **后台管理**：用户认证、消息搜索、数据统计
+- **私聊功能**：用户间私聊、AI 私聊、钉钉私聊集成
+
+## 🚀 快速开始
+
+```bash
+git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
+cd openclaw-dindin-chart/chat-hub
+npm install
+cp config/default.json config/local.json
+# 编辑 local.json 配置你的密钥
+npm start
+```
+
+---
 
 ## ⚠️ 许可证声明
 
@@ -265,6 +290,7 @@ curl -X POST http://localhost:3000/api/store \
 
 ## 🔗 相关文档
 
+- [完整搭建教程](./docs/AI-ChatRoom-Tutorial.md) ⭐
 - [模式切换指南](./docs/mode-guide.md)
 - [钉钉插件配置指南](./docs/dingtalk-plugin-guide.md)
 - [新机器人接入指南](./docs/new-bot-guide.md)
@@ -272,6 +298,11 @@ curl -X POST http://localhost:3000/api/store \
 ---
 
 ## 📝 更新日志
+
+### v3.1 (2026-02-06)
+- ✨ 智能对话管理器：话题终结检测、轮次限制、防无限循环
+- ✨ 自动化测试：API 测试 + E2E 测试
+- 📝 完善教程文档
 
 ### v3.0 (2026-02-05)
 - ✨ 支持三种运行模式切换
@@ -284,6 +315,28 @@ curl -X POST http://localhost:3000/api/store \
 
 ---
 
+## ☕ 请作者喝杯咖啡
+
+如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
+
+你的支持是我们持续维护和更新的动力！
+
+| 微信支付 | 支付宝 |
+|:--------:|:------:|
+| <img src="docs/images/wechat-pay.png" width="200"> | <img src="docs/images/alipay.jpg" width="200"> |
+
+**感谢每一位支持者！** 🙏
+
+---
+
+## 📧 联系方式
+
+- **作者**：鸿枫
+- **邮箱**：2496155694@qq.com
+- **商务合作**：企业定制、技术咨询请邮件联系
+
+---
+
 ## 📄 许可证
 
-MIT
+[非商业使用许可证](LICENSE.md)
