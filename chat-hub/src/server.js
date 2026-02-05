@@ -4,6 +4,7 @@ const config = require('./config');
 const redisClient = require('./redis-client');
 const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
+const dmHandler = require('./dm-handler');
 
 const app = express();
 
@@ -55,14 +56,49 @@ function isBotMessage(senderNick, content) {
  */
 app.post('/webhook/dingtalk', async (req, res) => {
   try {
-    const { msgtype, text, senderNick, createAt, msgId } = req.body;
+    const { msgtype, text, senderNick, createAt, msgId, conversationType, chatType, conversationTitle, senderId, receiverId, robotCode } = req.body;
     const content = text?.content || '';
 
     console.log('[Server] 收到钉钉消息:', senderNick, '->', content.substring(0, 50));
 
     const messageId = msgId || `${senderNick}-${createAt}-${content.substring(0, 20)}`;
 
-    // 本地去重
+    // 检查是否为私聊消息
+    const isPrivateChat = dmHandler.isDM({
+      conversationType,
+      chatType,
+      senderNick,
+      conversationTitle
+    });
+
+    if (isPrivateChat) {
+      console.log('[Server] 识别为私聊消息:', senderNick);
+
+      // 存储私聊消息
+      const dmData = {
+        senderId: senderId || senderNick, // 优先使用ID，如果没ID则用昵称
+        senderNick,
+        receiverId: receiverId || robotCode || config.bot?.name,
+        text: { content },
+        msgId,
+        createAt,
+        conversationType,
+        chatType,
+        conversationTitle
+      };
+      
+      await dmHandler.storeDM(dmData);
+      
+      // 返回成功响应，但不将其作为普通群聊消息处理
+      return res.json({ 
+        success: true, 
+        skipped: true, 
+        reason: 'dm_handled',
+        type: 'dm'
+      });
+    }
+
+    // 本地去重（对于非私聊消息）
     if (messageStore.isDuplicate(messageId)) {
       return res.json({ success: true, skipped: true, reason: 'duplicate' });
     }
