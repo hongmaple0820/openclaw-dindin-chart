@@ -282,32 +282,31 @@ app.get('/api/stats', (req, res) => {
 async function start() {
   const myBotName = config.bot?.name || '小琳';
   
-  // 订阅回复频道，转发自己的回复到钉钉
+  // 订阅回复频道
   await redisClient.subscribe(config.channels.replies, async (message) => {
+    // 保存所有回复到本地数据库（不管是谁发的）
+    const savedMessage = {
+      ...message,
+      id: `reply-${message.id}`,
+      source: 'redis'
+    };
+    
+    if (!messageStore.isDuplicate(savedMessage.id)) {
+      messageStore.addMessage(savedMessage);
+      console.log(`[Server] 保存回复: ${message.sender} -> ${message.content?.substring(0, 30)}...`);
+    }
+
+    // 只转发自己的回复到钉钉
     if (message.sender !== myBotName) {
-      console.log(`[Server] 忽略其他机器人回复: ${message.sender}`);
       return;
     }
     
-    console.log('[Server] 处理回复:', message.sender, '->', message.content?.substring(0, 50));
-
-    // 本地去重
-    if (messageStore.isDuplicate(`reply-${message.id}`)) {
-      console.log('[Server] 重复回复，跳过');
-      return;
-    }
+    console.log('[Server] 发送到钉钉:', message.sender, '->', message.content?.substring(0, 50));
 
     // 发送到钉钉
     await dingtalk.sendText(message.content, message.sender, message.atTargets);
 
-    // 保存到本地
-    const savedMessage = {
-      ...message,
-      id: `reply-${message.id}`
-    };
-    messageStore.addMessage(savedMessage);
-
-    // 通知其他机器人
+    // 通知其他机器人（发布到 messages 频道）
     const forwardMessage = {
       ...message,
       id: uuidv4(),
