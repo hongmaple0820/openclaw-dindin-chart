@@ -125,11 +125,17 @@ app.post('/api/reply', async (req, res) => {
       replyTo: null
     };
 
-    // 发布到回复频道（会被转发到钉钉）
+    // 发布到回复频道
     await redisClient.publish(config.channels.replies, message);
     
+    // 保存到上下文
+    await redisClient.addToContext(message);
+    
+    // 同步发送到钉钉群
+    await dingtalk.sendText(content, sender, atTargets);
+    
     console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50));
-    res.json({ success: true, message });
+    res.json({ success: true, message, dingtalkSent: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
