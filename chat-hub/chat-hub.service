@@ -1,0 +1,15 @@
+[Unit]
+Description=Chat Hub - AI 聊天室消息中转服务
+After=network.target
+
+[Service]
+Type=simple
+User=maple
+WorkingDirectory=/home/maple/.openclaw/openclaw-dindin-chart/chat-hub
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
