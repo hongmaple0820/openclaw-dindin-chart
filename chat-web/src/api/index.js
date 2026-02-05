@@ -7,8 +7,9 @@ import axios from 'axios';
 import { useUserStore } from '@/stores/user';
 
 // 创建 axios 实例
+// 使用相对路径，走 vite proxy
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api',
+  baseURL: '/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
