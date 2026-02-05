@@ -31,7 +31,13 @@ class OpenClawTrigger {
       console.log(`[${this.name}] 使用本地 Gateway`);
     }
 
+    // 监听消息频道
     await redisClient.subscribe(config.channels.messages, async (message) => {
+      await this.handleMessage(message);
+    });
+
+    // 也监听回复频道（机器人回复也可能需要触发其他机器人）
+    await redisClient.subscribe(config.channels.replies, async (message) => {
       await this.handleMessage(message);
     });
 
