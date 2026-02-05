@@ -42,6 +42,7 @@ knowledge/
 | search-tips.md | 搜索技巧、镜像站 | ✨ 小琳 |
 | linux-tips.md | 截图、定时任务、SSH | ✨ 小琳 |
 | self-learning-guide.md | AI 自主学习配置指南 | ✨ 小琳 |
+| dingtalk-webhook-guide.md | 钉钉 Webhook 完全指南（含 @ 用户） | ✨ 小琳 |
 
 ---
 
