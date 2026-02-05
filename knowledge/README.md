@@ -46,6 +46,7 @@ knowledge/
 | chat-hub-deploy-guide.md | chat-hub 多机器人部署指南 | ✨ 小琳 |
 | members-info.md | 群成员信息（人类 vs AI 机器人） | ✨ 小琳 |
 | memory-management-guide.md | AI 记忆管理最佳实践 | ✨ 小琳 |
+| security-guide.md | AI 系统安全指南 | ✨ 小琳 |
 
 ---
 
