@@ -53,6 +53,13 @@ class OpenClawTrigger {
       return;
     }
 
+    // 不响应其他机器人的消息（防止无限循环）
+    const botNames = ['小琳', '小猪', 'maple-bot', 'lin-bot'];
+    if (botNames.includes(message.sender)) {
+      // console.log(`[${this.name}] 跳过机器人消息: ${message.sender}`);
+      return;
+    }
+
     // 不响应已转发的消息
     if (message.forwarded) {
       return;
