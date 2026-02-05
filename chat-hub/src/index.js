@@ -1,5 +1,6 @@
 const { start: startServer } = require('./server');
 const OpenClawTrigger = require('./bots/openclaw-trigger');
+const SmartConversationManager = require('./bots/smart-conversation');
 const Analytics = require('./analytics');
 const config = require('./config');
 
@@ -10,6 +11,7 @@ async function main() {
   const botName = config.bot?.name || 'Bot';
   const mode = config.mode || 'storage';
   const triggerEnabled = config.trigger?.enabled ?? false;
+  const smartMode = config.trigger?.smart ?? false;  // 智能模式
 
   // 初始化使用统计
   const analytics = new Analytics(config.analytics || {});
@@ -25,7 +27,7 @@ async function main() {
   console.log(`  - 消息存储: ${config.features?.storage !== false ? '✓' : '✗'}`);
   console.log(`  - 数据分析: ${config.features?.analytics !== false ? '✓' : '✗'}`);
   console.log(`  - Redis 同步: ${config.features?.redis !== false && config.redis?.enabled !== false ? '✓' : '✗'}`);
-  console.log(`  - OpenClaw 触发: ${triggerEnabled ? '✓' : '✗'}`);
+  console.log(`  - OpenClaw 触发: ${triggerEnabled ? (smartMode ? '✓ 智能模式' : '✓ 基础模式') : '✗'}`);
   console.log(`  - 钉钉 Webhook: ${config.dingtalk?.enabled !== false && config.dingtalk?.webhookBase ? '✓' : '✗'}`);
   console.log(`  - 使用统计: ${analytics.enabled ? '✓' : '✗'}`);
   console.log('========================================\n');
@@ -38,16 +40,32 @@ async function main() {
     // 1. 启动消息中转服务
     await startServer();
 
-    // 2. 根据配置决定是否启动 OpenClaw 触发器
+    // 2. 根据配置决定启动哪种触发器
     if (triggerEnabled) {
-      const trigger = new OpenClawTrigger(botName, {
-        gatewayUrl: config.bot?.gatewayUrl || null,
-        gatewayToken: config.bot?.gatewayToken || null,
-        cooldownMs: config.trigger?.cooldownMs || 3000,
-        command: config.trigger?.command || 'openclaw system event --text',
-        messagePrefix: config.trigger?.messagePrefix || '[钉钉群消息]'
-      });
-      await trigger.start();
+      if (smartMode) {
+        // 智能对话管理器
+        const manager = new SmartConversationManager(botName, {
+          gatewayUrl: config.bot?.gatewayUrl || null,
+          gatewayToken: config.bot?.gatewayToken || null,
+          checkIntervalMs: config.trigger?.checkIntervalMs || 10000,
+          botCooldownMs: config.trigger?.botCooldownMs || 30000,
+          humanCooldownMs: config.trigger?.humanCooldownMs || 3000,
+          maxConversationTurns: config.trigger?.maxTurns || 5
+        });
+        await manager.start();
+        console.log('[Trigger] 智能对话管理器已启动');
+      } else {
+        // 基础触发器
+        const trigger = new OpenClawTrigger(botName, {
+          gatewayUrl: config.bot?.gatewayUrl || null,
+          gatewayToken: config.bot?.gatewayToken || null,
+          cooldownMs: config.trigger?.cooldownMs || 3000,
+          command: config.trigger?.command || 'openclaw system event --text',
+          messagePrefix: config.trigger?.messagePrefix || '[钉钉群消息]'
+        });
+        await trigger.start();
+        console.log('[Trigger] OpenClaw 触发器已启动');
+      }
       console.log('[Trigger] OpenClaw 触发器已启动');
     } else {
       console.log('[Trigger] OpenClaw 触发器未启用（模式 A：存储分析）');
