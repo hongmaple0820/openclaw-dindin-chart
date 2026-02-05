@@ -1,0 +1,26 @@
+{
+  "server": {
+    "port": 3000
+  },
+  "redis": {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "password": "你的Redis密码"
+  },
+  "dingtalk": {
+    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=***TOKEN_REMOVED***",
+    "secret": "***SECRET_REMOVED***"
+  },
+  "bots": {
+    "cooldownMs": 5000,
+    "enabled": ["bot-a", "bot-b"]
+  },
+  "openclawBots": {
+    "小明": "@小明机器人",
+    "小红": "@小红机器人"
+  },
+  "channels": {
+    "messages": "chat:messages",
+    "replies": "chat:replies"
+  }
+}
