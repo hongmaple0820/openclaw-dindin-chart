@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const PrivateMessageModel = require('../models/private-message');
 const { authenticate } = require('../middleware/auth');
+const { notifyNewDM } = require('../services/redis');
 
 // 初始化模型
 const pmModel = new PrivateMessageModel();
@@ -37,6 +38,9 @@ router.post('/send', authenticate, async (req, res) => {
       messageType: messageType || 'text',
       source: 'web'
     });
+
+    // 发送 Redis 通知
+    await notifyNewDM(message);
 
     res.json({
       success: true,
