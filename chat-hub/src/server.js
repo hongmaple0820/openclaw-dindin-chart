@@ -21,6 +21,17 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 /**
+ * 解析消息中的 @ 提及
+ * 支持格式：@小琳 @小猪 @鸿枫 等
+ */
+function parseAtMentions(content) {
+  if (!content) return [];
+  // 匹配 @xxx 格式（中文、英文、数字、下划线、连字符）
+  const matches = content.match(/@[\w\u4e00-\u9fa5-]+/g) || [];
+  return matches.map(m => m.substring(1)); // 去掉 @ 符号
+}
+
+/**
  * 识别消息是否来自机器人
  */
 function isBotMessage(senderNick, content) {
@@ -57,6 +68,9 @@ app.post('/webhook/dingtalk', async (req, res) => {
     }
 
     const isBot = isBotMessage(senderNick, content);
+    
+    // 解析 @ 提及
+    const atTargets = parseAtMentions(content);
 
     const message = {
       id: messageId,
@@ -65,6 +79,7 @@ app.post('/webhook/dingtalk', async (req, res) => {
       content: content,
       timestamp: createAt || Date.now(),
       source: 'dingtalk',
+      atTargets: atTargets.length > 0 ? atTargets : null,
       replyTo: null
     };
 
@@ -73,8 +88,12 @@ app.post('/webhook/dingtalk', async (req, res) => {
 
     // 发布到 Redis（仅用于中转通知）
     await redisClient.publish(config.channels.messages, message);
+    
+    if (atTargets.length > 0) {
+      console.log('[Server] @ 提及:', atTargets.join(', '));
+    }
 
-    res.json({ success: true, messageId: message.id, type: message.type });
+    res.json({ success: true, messageId: message.id, type: message.type, atTargets });
   } catch (error) {
     console.error('[Server] 处理消息失败:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -87,11 +106,14 @@ app.post('/webhook/dingtalk', async (req, res) => {
  */
 app.post('/api/send', async (req, res) => {
   try {
-    const { content, sender = 'WebUser' } = req.body;
+    const { content, sender = 'WebUser', atTargets } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, error: 'content is required' });
     }
+
+    // 自动解析 @ 提及（如果没有传入 atTargets）
+    const parsedAtTargets = atTargets || parseAtMentions(content);
 
     const message = {
       id: uuidv4(),
@@ -100,6 +122,7 @@ app.post('/api/send', async (req, res) => {
       content,
       timestamp: Date.now(),
       source: 'web',
+      atTargets: parsedAtTargets.length > 0 ? parsedAtTargets : null,
       replyTo: null
     };
 
@@ -160,7 +183,7 @@ app.post('/api/reply', async (req, res) => {
  */
 app.post('/api/store', async (req, res) => {
   try {
-    const { content, sender, source = 'openclaw', timestamp } = req.body;
+    const { content, sender, source = 'openclaw', timestamp, atTargets } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, error: 'content is required' });
@@ -170,6 +193,9 @@ app.post('/api/store', async (req, res) => {
       return res.status(400).json({ success: false, error: 'sender is required' });
     }
 
+    // 自动解析 @ 提及（如果没有传入 atTargets）
+    const parsedAtTargets = atTargets || parseAtMentions(content);
+
     const message = {
       id: uuidv4(),
       type: 'human',
@@ -177,6 +203,7 @@ app.post('/api/store', async (req, res) => {
       content,
       timestamp: timestamp || Date.now(),
       source,
+      atTargets: parsedAtTargets.length > 0 ? parsedAtTargets : null,
       replyTo: null
     };
 
@@ -186,7 +213,7 @@ app.post('/api/store', async (req, res) => {
     // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
     
-    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50));
+    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '');
     res.json({ success: true, message });
   } catch (error) {
     console.error('[Server] 存储消息失败:', error);
