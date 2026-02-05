@@ -155,6 +155,46 @@ app.post('/api/reply', async (req, res) => {
 });
 
 /**
+ * 仅存储消息（不发钉钉，用于 OpenClaw 转存收到的消息）
+ * POST /api/store
+ */
+app.post('/api/store', async (req, res) => {
+  try {
+    const { content, sender, source = 'openclaw', timestamp } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+
+    if (!sender) {
+      return res.status(400).json({ success: false, error: 'sender is required' });
+    }
+
+    const message = {
+      id: uuidv4(),
+      type: 'human',
+      sender,
+      content,
+      timestamp: timestamp || Date.now(),
+      source,
+      replyTo: null
+    };
+
+    // 仅保存到本地，不发钉钉
+    messageStore.addMessage(message);
+    
+    // 发布到 Redis（通知其他机器人）
+    await redisClient.publish(config.channels.messages, message);
+    
+    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50));
+    res.json({ success: true, message });
+  } catch (error) {
+    console.error('[Server] 存储消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * 获取聊天消息
  * GET /api/context
  */
