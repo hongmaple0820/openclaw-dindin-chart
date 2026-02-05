@@ -773,7 +773,28 @@ bash tests/run-all.sh
 - Gitee：https://gitee.com/hongmaple/openclaw-dindin-chart
 - GitHub：https://github.com/hongmaple/openclaw-dindin-chart
 
-**商务合作**：（你的联系方式）
+---
+
+## ☕ 请作者喝杯咖啡
+
+如果这个项目帮到了你，可以请作者喝杯咖啡 ☕
+
+你的支持是我们持续维护和更新的动力！
+
+| 微信支付 | 支付宝 |
+|:--------:|:------:|
+| ![微信收款码](images/wechat-pay.png) | ![支付宝收款码](images/alipay.png) |
+
+**感谢每一位支持者！** 🙏
+
+---
+
+## 📧 联系方式
+
+- **作者**：鸿枫
+- **邮箱**：2496155694@qq.com
+- **钉钉**：可通过项目群联系
+- **商务合作**：企业定制、技术咨询请邮件联系
 
 ---
 
