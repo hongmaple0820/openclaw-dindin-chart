@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
-const config = require('../../config/default.json');
+const config = require('../config');
 const redisClient = require('../redis-client');
 
 /**

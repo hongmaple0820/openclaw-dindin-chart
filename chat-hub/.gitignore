@@ -1,0 +1,13 @@
+# 本地配置（不提交到仓库）
+config/local.json
+
+# 日志
+*.log
+logs/
+
+# 依赖
+node_modules/
+
+# 环境变量
+.env
+.env.local

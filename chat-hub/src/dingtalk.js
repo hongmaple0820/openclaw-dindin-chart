@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const axios = require('axios');
-const config = require('../config/default.json');
+const config = require('./config');
 
 // 用户手机号映射
 const USER_PHONES = {

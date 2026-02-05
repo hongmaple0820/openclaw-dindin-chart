@@ -8,12 +8,12 @@
     "password": "***REMOVED***"
   },
   "bot": {
-    "name": "小琳",
+    "name": "需要在 local.json 中配置",
     "local": true
   },
   "dingtalk": {
-    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=***TOKEN_REMOVED***",
-    "secret": "***SECRET_REMOVED***"
+    "webhookBase": "需要在 local.json 中配置",
+    "secret": "需要在 local.json 中配置"
   },
   "bots": {
     "cooldownMs": 3000,

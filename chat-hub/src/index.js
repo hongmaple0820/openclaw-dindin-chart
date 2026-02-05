@@ -1,6 +1,6 @@
 const { start: startServer } = require('./server');
 const OpenClawTrigger = require('./bots/openclaw-trigger');
-const config = require('../config/default.json');
+const config = require('./config');
 
 /**
  * 主入口

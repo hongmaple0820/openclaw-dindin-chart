@@ -1,7 +1,7 @@
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
-const config = require('../../config/default.json');
+const config = require('../config');
 const redisClient = require('../redis-client');
 
 /**
