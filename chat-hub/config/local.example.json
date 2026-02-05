@@ -1,9 +1,12 @@
 {
+  "redis": {
+    "host": "你的Redis地址",
+    "port": 6379,
+    "password": "你的Redis密码"
+  },
   "bot": {
-    "name": "你的机器人名（小琳/小猪）",
-    "local": true,
-    "gatewayUrl": "远程 OpenClaw 时填写，如 ws://IP:18789",
-    "gatewayToken": "远程 OpenClaw 时填写"
+    "name": "小琳",
+    "local": true
   },
   "dingtalk": {
     "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=你的token",

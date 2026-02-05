@@ -3,9 +3,9 @@
     "port": 3000
   },
   "redis": {
-    "host": "47.96.248.176",
+    "host": "localhost",
     "port": 6379,
-    "password": "***REMOVED***"
+    "password": ""
   },
   "bot": {
     "name": "需要在 local.json 中配置",
