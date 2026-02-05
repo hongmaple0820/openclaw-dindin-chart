@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
 const redisClient = require('./redis-client');
+const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 
 const app = express();
@@ -9,7 +10,7 @@ const app = express();
 // CORS 支持
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -25,12 +26,10 @@ app.use(express.json());
 function isBotMessage(senderNick, content) {
   const botNames = config.bots?.names || [];
   
-  // 检查发送者名称
   if (botNames.some(name => senderNick?.includes(name))) {
     return true;
   }
   
-  // 检查消息末尾的签名格式 [机器人名]
   const signatureMatch = content?.match(/\[([^\]]+)\]\s*$/);
   if (signatureMatch && botNames.includes(signatureMatch[1])) {
     return true;
@@ -50,31 +49,29 @@ app.post('/webhook/dingtalk', async (req, res) => {
 
     console.log('[Server] 收到钉钉消息:', senderNick, '->', content.substring(0, 50));
 
-    // 生成消息 ID（用于去重）
     const messageId = msgId || `${senderNick}-${createAt}-${content.substring(0, 20)}`;
 
-    // 去重检查
-    if (await redisClient.isDuplicate(messageId)) {
+    // 本地去重
+    if (messageStore.isDuplicate(messageId)) {
       return res.json({ success: true, skipped: true, reason: 'duplicate' });
     }
 
-    // 识别消息类型
     const isBot = isBotMessage(senderNick, content);
 
-    // 构造标准消息格式
     const message = {
       id: messageId,
       type: isBot ? 'bot' : 'human',
       sender: senderNick || '未知用户',
       content: content,
       timestamp: createAt || Date.now(),
+      source: 'dingtalk',
       replyTo: null
     };
 
-    // 保存到上下文
-    await redisClient.addToContext(message);
+    // 保存到本地
+    messageStore.addMessage(message);
 
-    // 发布到消息频道
+    // 发布到 Redis（仅用于中转通知）
     await redisClient.publish(config.channels.messages, message);
 
     res.json({ success: true, messageId: message.id, type: message.type });
@@ -85,38 +82,47 @@ app.post('/webhook/dingtalk', async (req, res) => {
 });
 
 /**
- * 手动发送消息（用于测试）
+ * Web 前端发送消息（同步到钉钉）
  * POST /api/send
  */
 app.post('/api/send', async (req, res) => {
   try {
-    const { content, sender = 'TestUser', type = 'human' } = req.body;
+    const { content, sender = 'WebUser' } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
 
     const message = {
       id: uuidv4(),
-      type,
+      type: 'human',
       sender,
       content,
       timestamp: Date.now(),
+      source: 'web',
       replyTo: null
     };
 
-    // 去重检查
-    if (await redisClient.isDuplicate(message.id)) {
-      return res.json({ success: true, skipped: true });
-    }
-
-    await redisClient.addToContext(message);
+    // 保存到本地
+    messageStore.addMessage(message);
+    
+    // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
     
+    // 发送到钉钉群
+    const dingtalkContent = `${sender}：${content}`;
+    await dingtalk.sendText(dingtalkContent);
+    
+    console.log('[Server] Web 消息已发送:', sender, '->', content.substring(0, 50));
     res.json({ success: true, message });
   } catch (error) {
+    console.error('[Server] 发送消息失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * 机器人发送回复（会自动转发到钉钉）
+ * 机器人发送回复（同步到钉钉）
  * POST /api/reply
  */
 app.post('/api/reply', async (req, res) => {
@@ -133,11 +139,12 @@ app.post('/api/reply', async (req, res) => {
       sender,
       content,
       timestamp: Date.now(),
-      atTargets,  // 可选：@ 用户
+      source: 'bot',
+      atTargets,
       replyTo: null
     };
 
-    // 发布到回复频道（订阅者会自动发送到钉钉）
+    // 发布到回复频道（订阅者会发送到钉钉）
     await redisClient.publish(config.channels.replies, message);
     
     console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50));
@@ -148,14 +155,74 @@ app.post('/api/reply', async (req, res) => {
 });
 
 /**
- * 获取聊天上下文
+ * 获取聊天消息
  * GET /api/context
  */
 app.get('/api/context', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    const context = await redisClient.getContext(limit);
+    const limit = parseInt(req.query.limit) || 50;
+    const context = messageStore.getMessages(limit);
     res.json({ success: true, context });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取未同步消息（离线参与者重连时调用）
+ * GET /api/sync/:participantId
+ */
+app.get('/api/sync/:participantId', async (req, res) => {
+  try {
+    const { participantId } = req.params;
+    const messages = messageStore.getUnsyncedMessages(participantId);
+    res.json({ success: true, count: messages.length, messages });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 标记同步完成
+ * POST /api/sync/:participantId
+ */
+app.post('/api/sync/:participantId', async (req, res) => {
+  try {
+    const { participantId } = req.params;
+    const { timestamp } = req.body;
+    messageStore.markSynced(participantId, timestamp || Date.now());
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取同步状态
+ * GET /api/sync-status
+ */
+app.get('/api/sync-status', async (req, res) => {
+  try {
+    const status = messageStore.getSyncStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 删除消息
+ * DELETE /api/message/:messageId
+ */
+app.delete('/api/message/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const deleted = messageStore.deleteMessage(messageId);
+    if (deleted) {
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ success: false, error: 'Message not found' });
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -168,43 +235,46 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: Date.now(),
+    messageCount: messageStore.messages.length,
     config: {
-      bots: config.bots?.names || [],
-      dedup: config.dedup?.enabled || false
+      bot: config.bot?.name,
+      storeDir: messageStore.storeDir
     }
   });
 });
 
 /**
- * 启动服务器并订阅回复频道
+ * 启动服务器
  */
 async function start() {
   const myBotName = config.bot?.name || '小琳';
   
-  // 订阅机器人回复频道，只转发自己的回复到钉钉
+  // 订阅回复频道，转发自己的回复到钉钉
   await redisClient.subscribe(config.channels.replies, async (message) => {
-    // 只处理自己的回复
     if (message.sender !== myBotName) {
       console.log(`[Server] 忽略其他机器人回复: ${message.sender}`);
       return;
     }
     
-    console.log('[Server] 收到自己的回复:', message.sender, '->', message.content?.substring(0, 50));
+    console.log('[Server] 处理回复:', message.sender, '->', message.content?.substring(0, 50));
 
-    // 去重：避免重复发送
-    const replyId = `reply-${message.id}`;
-    if (await redisClient.isDuplicate(replyId)) {
-      console.log('[Server] 重复回复，跳过发送');
+    // 本地去重
+    if (messageStore.isDuplicate(`reply-${message.id}`)) {
+      console.log('[Server] 重复回复，跳过');
       return;
     }
 
-    // 发送到钉钉（支持 @ 用户）
+    // 发送到钉钉
     await dingtalk.sendText(message.content, message.sender, message.atTargets);
 
-    // 保存到上下文
-    await redisClient.addToContext(message);
+    // 保存到本地
+    const savedMessage = {
+      ...message,
+      id: `reply-${message.id}`
+    };
+    messageStore.addMessage(savedMessage);
 
-    // 发布到消息频道，让其他机器人可以看到（但标记为 bot 类型）
+    // 通知其他机器人
     const forwardMessage = {
       ...message,
       id: uuidv4(),
@@ -217,10 +287,14 @@ async function start() {
   const port = config.server?.port || 3000;
   app.listen(port, () => {
     console.log(`[Server] 消息中转服务已启动: http://localhost:${port}`);
-    console.log('[Server] 钉钉回调地址: POST /webhook/dingtalk');
-    console.log('[Server] 测试接口: POST /api/send');
-    console.log('[Server] 上下文接口: GET /api/context');
-    console.log('[Server] 机器人列表:', config.bots?.names?.join(', ') || '未配置');
+    console.log('[Server] 存储目录:', messageStore.storeDir);
+    console.log('[Server] 已加载消息:', messageStore.messages.length, '条');
+    console.log('[Server] 钉钉回调: POST /webhook/dingtalk');
+    console.log('[Server] 发送消息: POST /api/send');
+    console.log('[Server] 机器人回复: POST /api/reply');
+    console.log('[Server] 获取消息: GET /api/context');
+    console.log('[Server] 同步消息: GET /api/sync/:participantId');
+    console.log('[Server] 删除消息: DELETE /api/message/:messageId');
   });
 }
 

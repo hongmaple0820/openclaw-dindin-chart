@@ -141,7 +141,7 @@ import { ElMessage } from 'element-plus'
 import axios from 'axios'
 
 // 环境配置
-const appTitle = import.meta.env.VITE_APP_TITLE || 'AI 聊天室'
+const appTitle = import.meta.env.VITE_APP_TITLE || 'MapleChatRoom'
 const defaultApiBase = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
 
 // 状态
