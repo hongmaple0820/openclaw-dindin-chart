@@ -380,6 +380,107 @@ app.get('/api/stats', (req, res) => {
 });
 
 /**
+ * 获取私聊会话列表
+ * GET /api/dm/conversations
+ */
+app.get('/api/dm/conversations', async (req, res) => {
+  try {
+    const userId = req.query.userId || req.query.sender;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'userId is required' });
+    }
+    
+    const limit = parseInt(req.query.limit) || 20;
+    const conversations = await dmHandler.getUserConversations(userId, { limit });
+    
+    res.json({ 
+      success: true, 
+      count: conversations.length,
+      conversations 
+    });
+  } catch (error) {
+    console.error('[Server] 获取私聊会话失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取私聊消息
+ * GET /api/dm/messages/:conversationId
+ */
+app.get('/api/dm/messages/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    
+    // 验证用户是否有权访问此会话
+    const userId = req.query.userId || req.query.sender;
+    if (userId) {
+      const conversationUsers = conversationId.split('_');
+      if (!conversationUsers.includes(userId)) {
+        return res.status(403).json({ success: false, error: 'Unauthorized to access this conversation' });
+      }
+    }
+    
+    const messages = await dmHandler.getConversationMessages(conversationId, { limit });
+    
+    res.json({ 
+      success: true, 
+      count: messages.length,
+      messages 
+    });
+  } catch (error) {
+    console.error('[Server] 获取私聊消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 存储私聊消息
+ * POST /api/dm/store
+ */
+app.post('/api/dm/store', async (req, res) => {
+  try {
+    const { content, sender, senderId, receiver, receiverId, source = 'web' } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+
+    if (!sender || !senderId) {
+      return res.status(400).json({ success: false, error: 'sender and senderId are required' });
+    }
+
+    const dmData = {
+      sender_id: senderId,
+      sender_name: sender,
+      receiver_id: receiverId || config.bot?.name || 'bot',
+      receiver_name: receiver || config.bot?.name || 'Bot',
+      content,
+      source
+    };
+
+    // 构造消息对象用于存储
+    const messageData = {
+      ...dmData,
+      text: { content },
+      createAt: Date.now()
+    };
+
+    const message = await dmHandler.storeDM(messageData);
+    
+    if (message) {
+      res.json({ success: true, message });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to store DM' });
+    }
+  } catch (error) {
+    console.error('[Server] 存储私聊消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * 启动服务器
  */
 async function start() {
