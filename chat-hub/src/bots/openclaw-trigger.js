@@ -17,7 +17,52 @@ class OpenClawTrigger {
     this.cooldownMs = options.cooldownMs || config.bots?.cooldownMs || 3000;
     this.delayMs = options.delayMs || config.trigger?.delayMs || 3000;  // 触发前延迟
     this.lastTriggerTime = 0;
+    this.lastBotReplyTime = 0;  // 上次回复机器人的时间
+    this.recentMessages = [];   // 最近消息缓存（用于检测重复）
     this.processing = false;
+  }
+
+  /**
+   * 检查消息是否是重复或无意义的
+   */
+  isRepetitiveOrTrivial(message) {
+    const content = message.content || '';
+    
+    // 无意义短回复模式
+    const trivialPatterns = [
+      /^收到[！!。.]*$/,
+      /^好的[！!。.]*$/,
+      /^嗯[！!。.]*$/,
+      /^哦[！!。.]*$/,
+      /^ok[！!。.]*$/i,
+      /^是的[！!。.]*$/,
+      /^明白[！!。.]*$/,
+      /^了解[！!。.]*$/,
+      /^你好[！!。.]*$/,
+      /^在的[！!。.]*$/,
+    ];
+    
+    for (const pattern of trivialPatterns) {
+      if (pattern.test(content.trim())) {
+        console.log(`[${this.name}] 跳过无意义回复: ${content.slice(0, 20)}`);
+        return true;
+      }
+    }
+    
+    // 检查是否重复消息（最近 5 条内有相似内容）
+    const contentHash = content.slice(0, 50);
+    if (this.recentMessages.includes(contentHash)) {
+      console.log(`[${this.name}] 跳过重复消息: ${content.slice(0, 20)}`);
+      return true;
+    }
+    
+    // 缓存最近消息
+    this.recentMessages.push(contentHash);
+    if (this.recentMessages.length > 5) {
+      this.recentMessages.shift();
+    }
+    
+    return false;
   }
 
   /**
@@ -53,11 +98,20 @@ class OpenClawTrigger {
       return;
     }
 
-    // 不响应其他机器人的消息（防止无限循环）
+    // 智能判断是否响应机器人消息
     const botNames = ['小琳', '小猪', 'maple-bot', 'lin-bot'];
     if (botNames.includes(message.sender)) {
-      // console.log(`[${this.name}] 跳过机器人消息: ${message.sender}`);
-      return;
+      // 检查是否是重复/无意义的消息
+      if (this.isRepetitiveOrTrivial(message)) {
+        return;
+      }
+      // 机器人消息冷却时间加长（30秒）
+      const now = Date.now();
+      if (now - this.lastBotReplyTime < 30000) {
+        console.log(`[${this.name}] 机器人消息冷却中，跳过`);
+        return;
+      }
+      this.lastBotReplyTime = now;
     }
 
     // 不响应已转发的消息
