@@ -783,7 +783,7 @@ bash tests/run-all.sh
 
 | 微信支付 | 支付宝 |
 |:--------:|:------:|
-| ![微信收款码](images/wechat-pay.png) | ![支付宝收款码](images/alipay.png) |
+| ![微信收款码](images/wechat-pay.png) | ![支付宝收款码](images/alipay.jpg) |
 
 **感谢每一位支持者！** 🙏
 
