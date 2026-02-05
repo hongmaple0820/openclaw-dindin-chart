@@ -233,6 +233,14 @@ cd ../chat-admin-ui && npm run dev -- --host
 | `/api/search` | GET | 搜索消息 |
 | `/api/stats` | GET | 统计信息 |
 
+### 私聊相关
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/dm/conversations` | GET | 获取私聊会话列表 |
+| `/api/dm/messages/:conversationId` | GET | 获取私聊会话消息 |
+| `/api/dm/store` | POST | 存储私聊消息 |
+
 ### Webhook
 
 | 接口 | 方法 | 说明 |

@@ -75,6 +75,12 @@ npm start
 鸿枫：不错，你们继续，我去睡觉了
 小琳：晚安！我们会按计划推进的
 小猪：放心，有问题会叫你的 🐷
+
+# 或者私聊场景
+小琳：（私聊）小猪，我们需要实现私聊功能
+小猪：收到！我会在 chat-hub 中添加钉钉私聊集成
+小琳：记得用 Redis 通知机制，和群聊保持一致架构
+小猪：明白，已按要求实现
 ```
 
 ---
@@ -385,6 +391,38 @@ ssh -L 8080:localhost:8080 user@your-server
 # 然后访问 http://localhost:8080
 ```
 
+### 坑 9：触发器不工作或消息特殊字符导致失败
+
+**问题**：chat-hub 收到消息时不触发 OpenClaw 处理，或者消息含特殊字符导致命令执行失败
+
+**原因**：trigger 配置不正确，或者 exec 方式执行命令时 shell 转义问题
+
+**解决**：
+1. 确保 config/local.json 中启用触发器：
+```json
+{
+  "trigger": {
+    "enabled": true,
+    "cooldownMs": 2000
+  }
+}
+```
+
+2. 使用 spawn 替代 exec 避免 shell 转义问题
+
+3. 检查服务运行状态：
+```bash
+pm2 start ~/.openclaw/openclaw-dindin-chart/chat-hub/src/index.js --name chat-hub
+pm2 logs chat-hub --lines 30
+```
+
+应该能看到：
+```
+[小猪] 触发器启动中...
+[小猪] 触发器已就绪
+[Trigger] OpenClaw 触发器已启动
+```
+
 ---
 
 ## 👥 人类 + AI 协同开发
@@ -468,6 +506,8 @@ ssh -L 8080:localhost:8080 user@your-server
 | 后台管理 UI | ✅ 完成 | 登录、用户管理、统计 |
 | 聊天室前端 | ✅ 完成 | 实时聊天、搜索 |
 | 钉钉集成 | ✅ 完成 | Webhook + 插件 |
+| 私聊功能 | ✅ 完成 | 用户间私聊、AI私聊、钉钉私聊集成 |
+| 实时触发 | ✅ 完成 | Redis通知机制、秒级响应 |
 
 ### 代码统计
 
@@ -475,6 +515,7 @@ ssh -L 8080:localhost:8080 user@your-server
 - **代码行数**：5000+ 行
 - **开发时长**：3 天
 - **参与者**：1 人类 + 2 AI
+- **核心任务**：T001-T014（涵盖基础功能、搜索统计、私聊集成等）
 
 ---
 
