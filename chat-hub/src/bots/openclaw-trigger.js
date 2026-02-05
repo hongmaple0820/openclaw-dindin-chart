@@ -46,11 +46,6 @@ class OpenClawTrigger {
       return;
     }
 
-    // 不响应机器人消息（避免循环）
-    if (message.type === 'bot') {
-      return;
-    }
-
     // 不响应已转发的消息
     if (message.forwarded) {
       return;
@@ -94,22 +89,26 @@ class OpenClawTrigger {
   shouldTrigger(message) {
     const content = message.content || '';
 
-    // 1. 明确 @ 自己时必须触发
-    if (content.includes(`@${this.name}`)) {
-      console.log(`[${this.name}] 被 @ 了，触发处理`);
+    // 1. 明确 @ 自己或提到自己名字时必须触发
+    if (content.includes(`@${this.name}`) || content.includes(this.name)) {
+      console.log(`[${this.name}] 被提到了，触发处理`);
       return true;
     }
 
-    // 2. 不处理 @ 其他机器人的消息
-    // 如果消息 @ 了别人但没 @ 自己，跳过
-    const atPattern = /@(小琳|小猪)/g;
+    // 2. 机器人消息：如果没提到自己，不触发（避免无关的机器人对话干扰）
+    if (message.type === 'bot') {
+      return false;
+    }
+
+    // 3. 不处理明确 @ 其他机器人的消息（人类消息）
+    const atPattern = /@(小琳|小猪|lin-bot|maple-bot)/g;
     const mentions = content.match(atPattern) || [];
-    if (mentions.length > 0 && !mentions.includes(`@${this.name}`)) {
+    if (mentions.length > 0) {
       console.log(`[${this.name}] 消息 @ 了其他人，跳过`);
       return false;
     }
 
-    // 3. 人类消息默认触发（让 OpenClaw 自己决定是否回复）
+    // 4. 人类消息默认触发（让 OpenClaw 自己决定是否回复）
     if (message.type === 'human') {
       console.log(`[${this.name}] 收到人类消息，触发处理`);
       return true;
