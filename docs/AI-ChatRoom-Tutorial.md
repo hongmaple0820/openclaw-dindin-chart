@@ -1,7 +1,7 @@
 # 🤖 AI 聊天室搭建教程：让多个 AI 在钉钉群里协同工作
 
 > 作者：鸿枫 & 小琳（AI 助手）  
-> 更新：2026-02-06  
+> 更新：2026-02-06 07:00  
 > 开源地址：https://gitee.com/hongmaple/openclaw-dindin-chart  
 > GitHub 镜像：https://github.com/hongmaple/openclaw-dindin-chart  
 > 许可证：**非商业使用许可证**（商业使用需授权）
@@ -52,6 +52,7 @@ npm start
 2. **搭建教程**：从零开始部署整套系统
 3. **避坑指南**：踩过的坑和解决方案
 4. **协同开发**：人类 + AI 团队的工作模式
+5. **智能对话**：如何让 AI 之间智能协作而不无限循环
 
 ---
 
@@ -62,6 +63,7 @@ npm start
 - 群里有两个 AI 助手：小琳和小猪
 - 你可以 @小琳 让她做事，@小猪 让他帮忙
 - 两个 AI 之间也可以互相对话、协作
+- **AI 能智能判断何时回复、何时沉默**
 - 所有聊天记录都被保存，可以搜索、统计
 
 这就是我们搭建的 **AI 聊天室**。
@@ -74,10 +76,14 @@ npm start
 小猪：收到！示例代码已添加
 鸿枫：不错，你们继续，我去睡觉了
 小琳：晚安！我们会按计划推进的
-小猪：放心，有问题会叫你的 🐷
+# 话题自然结束，AI 不会无限循环
 
-# 或者私聊场景
-小琳：（私聊）小猪，我们需要实现私聊功能
+# 或者讨论场景
+小琳：@小猪 你觉得这个架构怎么样？
+小猪：我觉得可以优化一下数据库设计
+小琳：好建议！具体怎么改？
+小猪：可以加个索引...
+# 有价值的讨论会继续，最多5轮自动收敛
 小猪：收到！我会在 chat-hub 中添加钉钉私聊集成
 小琳：记得用 Redis 通知机制，和群聊保持一致架构
 小猪：明白，已按要求实现
@@ -412,7 +418,7 @@ ssh -L 8080:localhost:8080 user@your-server
 
 3. 检查服务运行状态：
 ```bash
-pm2 start ~/.openclaw/openclaw-dindin-chart/chat-hub/src/index.js --name chat-hub
+pm2 start ~/.openclaw/openclaw-dindin-chart/chat-hub/start.sh --name chat-hub
 pm2 logs chat-hub --lines 30
 ```
 
@@ -421,6 +427,140 @@ pm2 logs chat-hub --lines 30
 [小猪] 触发器启动中...
 [小猪] 触发器已就绪
 [Trigger] OpenClaw 触发器已启动
+```
+
+### 坑 10：多机器人无限循环回复
+
+**问题**：两个 AI 互相回复"收到"，停不下来
+
+**原因**：没有智能判断何时该回复、何时该沉默
+
+**解决**：启用智能对话管理器
+
+```json
+{
+  "trigger": {
+    "enabled": true,
+    "smart": true,
+    "maxTurns": 5,
+    "botCooldownMs": 30000
+  }
+}
+```
+
+智能对话管理器会：
+- 自动识别"收到""好的"等话题终结词
+- 限制单话题最多 5 轮对话
+- 机器人消息冷却 30 秒
+
+### 坑 11：pm2 启动时找不到 openclaw 命令
+
+**问题**：chat-hub 通过 pm2 启动后，触发 OpenClaw 失败
+
+**原因**：pm2 不继承用户的 shell 环境变量，PATH 中没有 `~/.npm-global/bin`
+
+**解决**：创建启动脚本设置 PATH
+
+```bash
+# chat-hub/start.sh
+#!/bin/bash
+export PATH=$PATH:$HOME/.npm-global/bin
+cd $(dirname $0)
+node src/index.js
+```
+
+```bash
+pm2 start ~/.openclaw/openclaw-dindin-chart/chat-hub/start.sh --name chat-hub
+```
+
+### 坑 12：触发器只监听一个 Redis 频道
+
+**问题**：机器人通过 `/api/reply` 发送的消息不会触发其他机器人
+
+**原因**：触发器只监听 `chat:messages` 频道，而 `/api/reply` 发布到 `chat:replies` 频道
+
+**解决**：触发器需要同时监听两个频道
+
+```javascript
+// 监听消息频道
+await redisClient.subscribe('chat:messages', handleMessage);
+// 也监听回复频道
+await redisClient.subscribe('chat:replies', handleMessage);
+```
+
+---
+
+## 🧠 智能对话管理器
+
+这是解决"AI 无限循环"问题的核心组件。
+
+### 核心功能
+
+| 功能 | 说明 |
+|------|------|
+| 话题终结检测 | "收到""好的""晚安" 等自动关闭话题 |
+| 回复信号检测 | 问号、疑问词、请求词触发回复 |
+| 轮次限制 | 单话题最多 5 轮，避免无限对话 |
+| 重复检测 | 最近 10 条内相似消息跳过 |
+| 分别冷却 | 人类 3 秒，机器人 30 秒 |
+| 自主检查 | 每 10 秒检查遗漏消息 |
+| 对话追踪 | 每个发送者独立状态追踪 |
+
+### 配置方式
+
+```json
+{
+  "trigger": {
+    "enabled": true,
+    "smart": true,
+    "cooldownMs": 2000,
+    "botCooldownMs": 30000,
+    "humanCooldownMs": 3000,
+    "checkIntervalMs": 10000,
+    "maxTurns": 5
+  }
+}
+```
+
+### 工作流程
+
+```
+1. 收到消息
+2. 检查：是自己发的？跳过
+3. 检查：是话题终结词？关闭话题
+4. 检查：是重复消息？跳过
+5. 检查：超过最大轮次？等待明确 @
+6. 检查：机器人消息？需要有回复信号才触发
+7. 触发 OpenClaw 处理
+8. 更新对话状态
+```
+
+### 话题终结词列表
+
+```javascript
+const topicEnders = [
+  /^收到[！!。.]*$/,
+  /^好的[！!。.]*$/,
+  /^嗯[！!。.]*$/,
+  /^ok[！!。.]*$/i,
+  /^明白[！!。.]*$/,
+  /^了解[！!。.]*$/,
+  /^谢谢[！!。.]*$/,
+  /^晚安[！!。.]*$/,
+  /^再见[！!。.]*$/,
+];
+```
+
+### 回复信号列表
+
+```javascript
+const replySignals = [
+  /@小琳/, /@小猪/,     // @ 提及
+  /\?$/, /？$/,          // 问号结尾
+  /怎么/, /如何/, /为什么/, /什么/,  // 疑问词
+  /帮我/, /请/, /麻烦/,  // 请求词
+  /你觉得/, /你认为/,    // 征求意见
+];
 ```
 
 ---
@@ -508,14 +648,28 @@ pm2 logs chat-hub --lines 30
 | 钉钉集成 | ✅ 完成 | Webhook + 插件 |
 | 私聊功能 | ✅ 完成 | 用户间私聊、AI私聊、钉钉私聊集成 |
 | 实时触发 | ✅ 完成 | Redis通知机制、秒级响应 |
+| 智能对话管理 | ✅ 完成 | 话题终结、轮次限制、重复检测 |
+| 自动化测试 | ✅ 完成 | API 测试 9 例 + E2E 测试 8 例 |
 
 ### 代码统计
 
-- **总提交**：50+ commits
-- **代码行数**：5000+ 行
+- **总提交**：60+ commits
+- **代码行数**：6000+ 行
 - **开发时长**：3 天
 - **参与者**：1 人类 + 2 AI
-- **核心任务**：T001-T014（涵盖基础功能、搜索统计、私聊集成等）
+- **核心任务**：T001-T020（涵盖基础功能、私聊、智能对话等）
+
+### 自动化测试
+
+运行测试：
+```bash
+cd ~/.openclaw/openclaw-dindin-chart
+bash tests/run-all.sh
+```
+
+测试覆盖：
+- **API 测试**：健康检查、用户认证、私信功能、搜索
+- **E2E 测试**：页面加载、登录流程、私信页面（Playwright）
 
 ---
 
