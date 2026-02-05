@@ -57,6 +57,19 @@ class MessageStore {
     // 统计消息数量
     const count = this.db.prepare('SELECT COUNT(*) as count FROM messages').get();
     console.log('[Store] 已加载消息:', count.count, '条');
+
+    // 创建已读表（群聊）
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS message_reads (
+        message_id TEXT NOT NULL,
+        reader_id TEXT NOT NULL,
+        read_at INTEGER NOT NULL,
+        PRIMARY KEY (message_id, reader_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_reads_message ON message_reads(message_id);
+      CREATE INDEX IF NOT EXISTS idx_reads_reader ON message_reads(reader_id);
+    `);
   }
 
   /**
@@ -283,6 +296,171 @@ class MessageStore {
     } catch (error) {
       console.error('[Store] 清空消息失败:', error.message);
       return false;
+    }
+  }
+
+  // ==================== 已读功能 ====================
+
+  /**
+   * 标记消息已读（单条）
+   * @param {string} messageId 消息ID
+   * @param {string} readerId 读者ID（如 "小琳"、"小猪"、"maple"）
+   */
+  markAsRead(messageId, readerId) {
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO message_reads (message_id, reader_id, read_at)
+        VALUES (?, ?, ?)
+      `);
+      stmt.run(messageId, readerId, Date.now());
+      return true;
+    } catch (error) {
+      console.error('[Store] 标记已读失败:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 批量标记已读（到某个时间点之前的所有消息）
+   * @param {string} readerId 读者ID
+   * @param {number} beforeTimestamp 时间戳，标记此时间之前的所有消息
+   */
+  markAllAsRead(readerId, beforeTimestamp = Date.now()) {
+    try {
+      // 获取所有未读消息ID
+      const msgStmt = this.db.prepare(`
+        SELECT m.id FROM messages m
+        LEFT JOIN message_reads r ON m.id = r.message_id AND r.reader_id = ?
+        WHERE m.timestamp <= ? AND r.message_id IS NULL
+      `);
+      const unreadMessages = msgStmt.all(readerId, beforeTimestamp);
+
+      if (unreadMessages.length === 0) {
+        return { marked: 0 };
+      }
+
+      // 批量插入
+      const insertStmt = this.db.prepare(`
+        INSERT OR REPLACE INTO message_reads (message_id, reader_id, read_at)
+        VALUES (?, ?, ?)
+      `);
+
+      const now = Date.now();
+      const insertMany = this.db.transaction((messages) => {
+        for (const msg of messages) {
+          insertStmt.run(msg.id, readerId, now);
+        }
+      });
+
+      insertMany(unreadMessages);
+      return { marked: unreadMessages.length };
+    } catch (error) {
+      console.error('[Store] 批量标记已读失败:', error.message);
+      return { marked: 0, error: error.message };
+    }
+  }
+
+  /**
+   * 获取未读消息
+   * @param {string} readerId 读者ID
+   * @param {number} limit 限制数量
+   */
+  getUnreadMessages(readerId, limit = 100) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT m.* FROM messages m
+        LEFT JOIN message_reads r ON m.id = r.message_id AND r.reader_id = ?
+        WHERE r.message_id IS NULL
+        ORDER BY m.timestamp ASC
+        LIMIT ?
+      `);
+      const rows = stmt.all(readerId, limit);
+
+      return rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        sender: row.sender,
+        content: row.content,
+        timestamp: row.timestamp,
+        source: row.source,
+        atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+        replyTo: row.reply_to
+      }));
+    } catch (error) {
+      console.error('[Store] 获取未读消息失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 获取未读消息数量
+   * @param {string} readerId 读者ID
+   */
+  getUnreadCount(readerId) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT COUNT(*) as count FROM messages m
+        LEFT JOIN message_reads r ON m.id = r.message_id AND r.reader_id = ?
+        WHERE r.message_id IS NULL
+      `);
+      return stmt.get(readerId).count;
+    } catch (error) {
+      console.error('[Store] 获取未读数量失败:', error.message);
+      return 0;
+    }
+  }
+
+  /**
+   * 获取消息的已读状态（谁读了）
+   * @param {string} messageId 消息ID
+   */
+  getMessageReadStatus(messageId) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT reader_id, read_at FROM message_reads WHERE message_id = ?
+      `);
+      const rows = stmt.all(messageId);
+      return rows.map(row => ({
+        readerId: row.reader_id,
+        readAt: row.read_at
+      }));
+    } catch (error) {
+      console.error('[Store] 获取已读状态失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 获取所有参与者的已读状态摘要
+   */
+  getReadStatusSummary() {
+    try {
+      // 获取所有已知的读者
+      const readersStmt = this.db.prepare(`
+        SELECT DISTINCT reader_id FROM message_reads
+        UNION
+        SELECT DISTINCT sender FROM messages
+      `);
+      const readers = readersStmt.all().map(r => r.reader_id || r.sender);
+
+      const summary = {};
+      for (const reader of readers) {
+        const unreadCount = this.getUnreadCount(reader);
+        const lastReadStmt = this.db.prepare(`
+          SELECT MAX(read_at) as last_read FROM message_reads WHERE reader_id = ?
+        `);
+        const lastRead = lastReadStmt.get(reader)?.last_read || null;
+
+        summary[reader] = {
+          unreadCount,
+          lastRead,
+          lastReadTime: lastRead ? new Date(lastRead).toISOString() : null
+        };
+      }
+      return summary;
+    } catch (error) {
+      console.error('[Store] 获取已读摘要失败:', error.message);
+      return {};
     }
   }
 

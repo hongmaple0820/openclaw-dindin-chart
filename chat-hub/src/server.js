@@ -331,6 +331,112 @@ app.delete('/api/message/:messageId', async (req, res) => {
   }
 });
 
+// ==================== 已读功能 API ====================
+
+/**
+ * 标记单条消息已读
+ * POST /api/read/:messageId
+ * Body: { readerId: "小琳" }
+ */
+app.post('/api/read/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { readerId } = req.body;
+
+    if (!readerId) {
+      return res.status(400).json({ success: false, error: 'readerId is required' });
+    }
+
+    const result = messageStore.markAsRead(messageId, readerId);
+    res.json({ success: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 批量标记已读（标记到某个时间点之前的所有消息）
+ * POST /api/read-all
+ * Body: { readerId: "小琳", beforeTimestamp?: 1234567890 }
+ */
+app.post('/api/read-all', async (req, res) => {
+  try {
+    const { readerId, beforeTimestamp } = req.body;
+
+    if (!readerId) {
+      return res.status(400).json({ success: false, error: 'readerId is required' });
+    }
+
+    const result = messageStore.markAllAsRead(readerId, beforeTimestamp || Date.now());
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取未读消息
+ * GET /api/unread/:readerId
+ */
+app.get('/api/unread/:readerId', async (req, res) => {
+  try {
+    const { readerId } = req.params;
+    const limit = parseInt(req.query.limit) || 100;
+
+    const messages = messageStore.getUnreadMessages(readerId, limit);
+    const count = messageStore.getUnreadCount(readerId);
+
+    res.json({ 
+      success: true, 
+      count,
+      messages 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取未读消息数量
+ * GET /api/unread-count/:readerId
+ */
+app.get('/api/unread-count/:readerId', async (req, res) => {
+  try {
+    const { readerId } = req.params;
+    const count = messageStore.getUnreadCount(readerId);
+    res.json({ success: true, count });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取消息的已读状态（谁读了这条消息）
+ * GET /api/read-status/:messageId
+ */
+app.get('/api/read-status/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const readers = messageStore.getMessageReadStatus(messageId);
+    res.json({ success: true, readers });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取所有参与者的已读状态摘要
+ * GET /api/read-summary
+ */
+app.get('/api/read-summary', async (req, res) => {
+  try {
+    const summary = messageStore.getReadStatusSummary();
+    res.json({ success: true, summary });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 /**
  * 健康检查
  */
