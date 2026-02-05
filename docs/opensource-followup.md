@@ -17,7 +17,7 @@
   - 更新文章中的 GitHub 链接
 
 - [ ] **更新联系邮箱**
-  - 将 `hongmaple@example.com` 替换为真实邮箱
+  - 将 `2496155694@qq.com` 替换为真实邮箱
   - 更新 LICENSE.md
   - 更新 README.md
   - 更新文章

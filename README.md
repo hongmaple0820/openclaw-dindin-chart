@@ -11,7 +11,7 @@
 
 - ✅ 允许：个人学习、个人使用、学术研究
 - ❌ 禁止：未经授权的商业使用
-- 🔑 商业授权：请联系 hongmaple@example.com
+- 🔑 商业授权：请联系 2496155694@qq.com
 
 详见 [LICENSE.md](LICENSE.md)
 

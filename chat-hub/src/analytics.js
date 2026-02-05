@@ -19,19 +19,22 @@
  * 
  * 禁用方法：
  * 在 config/local.json 中设置 "analytics": { "enabled": false }
+ * 
+ * 统计服务使用 CountAPI (免费开源)
  */
 
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const https = require('https');
 
 class Analytics {
   constructor(config = {}) {
     this.enabled = config.enabled !== false;  // 默认启用
-    this.endpoint = config.endpoint || 'https://analytics.example.com/v1/collect';
     this.projectId = 'openclaw-dindin-chart';
-    this.version = require('../package.json').version || '0.0.0';
+    this.namespace = 'hongmaple';
+    this.version = '1.0.0';
     
     // 安装 ID 存储路径
     this.idPath = path.join(os.homedir(), '.openclaw', '.analytics-id');
@@ -59,26 +62,32 @@ class Analytics {
   }
 
   /**
-   * 记录启动事件
+   * 使用 CountAPI 记录启动次数 (免费开源服务)
+   * https://countapi.xyz/
    */
   async trackStartup() {
     if (!this.enabled) return;
 
-    const data = {
-      event: 'startup',
-      installId: this.installId,
-      projectId: this.projectId,
-      version: this.version,
-      os: {
-        platform: os.platform(),
-        release: os.release(),
-        arch: os.arch()
-      },
-      node: process.version,
-      timestamp: new Date().toISOString()
-    };
-
-    await this.send(data);
+    try {
+      // CountAPI - 免费的计数服务
+      const url = `https://api.countapi.xyz/hit/${this.namespace}/${this.projectId}-startup`;
+      
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.value) {
+              console.log(`[Analytics] 全球第 ${result.value} 次启动`);
+            }
+          } catch (e) {}
+        });
+      }).on('error', () => {});
+      
+    } catch (err) {
+      // 统计失败不影响主程序
+    }
   }
 
   /**
@@ -100,62 +109,12 @@ class Analytics {
       // 记录今天
       fs.writeFileSync(statePath, today);
       
-      const data = {
-        event: 'daily_active',
-        installId: this.installId,
-        projectId: this.projectId,
-        version: this.version,
-        date: today
-      };
-
-      await this.send(data);
+      // CountAPI 记录每日活跃
+      const url = `https://api.countapi.xyz/hit/${this.namespace}/${this.projectId}-daily`;
+      https.get(url, () => {}).on('error', () => {});
+      
     } catch (err) {
       // 静默失败
-    }
-  }
-
-  /**
-   * 发送统计数据
-   */
-  async send(data) {
-    if (!this.enabled) return;
-
-    try {
-      // 使用 fetch 或 axios 发送
-      // 这里用简单的 http 请求
-      const https = require('https');
-      const url = new URL(this.endpoint);
-      
-      const postData = JSON.stringify(data);
-      
-      const options = {
-        hostname: url.hostname,
-        port: url.port || 443,
-        path: url.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData)
-        },
-        timeout: 5000  // 5 秒超时
-      };
-
-      const req = https.request(options, (res) => {
-        // 静默处理响应
-      });
-
-      req.on('error', (err) => {
-        // 静默失败，不影响主程序
-      });
-
-      req.setTimeout(5000, () => {
-        req.destroy();
-      });
-
-      req.write(postData);
-      req.end();
-    } catch (err) {
-      // 统计失败不应影响主程序
     }
   }
 
@@ -169,6 +128,30 @@ class Analytics {
       platform: os.platform(),
       enabled: this.enabled
     };
+  }
+
+  /**
+   * 获取全局统计（从 CountAPI）
+   */
+  async getGlobalStats() {
+    return new Promise((resolve) => {
+      const url = `https://api.countapi.xyz/get/${this.namespace}/${this.projectId}-startup`;
+      
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            resolve({ totalStartups: result.value || 0 });
+          } catch (e) {
+            resolve({ totalStartups: 0 });
+          }
+        });
+      }).on('error', () => {
+        resolve({ totalStartups: 0 });
+      });
+    });
   }
 }
 

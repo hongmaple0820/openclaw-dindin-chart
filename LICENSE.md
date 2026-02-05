@@ -31,7 +31,7 @@
 
 如需将本软件用于商业目的，请联系作者获取商业授权：
 
-- **邮箱**：hongmaple@example.com
+- **邮箱**：2496155694@qq.com
 - **Gitee**：https://gitee.com/hongmaple
 
 商业授权类型：
@@ -83,7 +83,7 @@ The use of this software and its associated documentation (hereinafter referred 
 
 For commercial use, please contact the author for a commercial license:
 
-- **Email**: hongmaple@example.com
+- **Email**: 2496155694@qq.com
 - **Gitee**: https://gitee.com/hongmaple
 
 #### ⚠️ Disclaimer
