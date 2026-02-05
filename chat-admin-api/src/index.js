@@ -321,6 +321,14 @@ app.get('/api/sync-status', (req, res) => {
   }
 });
 
+// ============== 用户认证路由 ==============
+
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+
 // ============== 健康检查 ==============
 
 app.get('/health', (req, res) => {
@@ -337,4 +345,6 @@ const port = process.env.PORT || 3001;
 app.listen(port, () => {
   console.log(`[Admin API] 服务已启动: http://localhost:${port}`);
   console.log(`[Admin API] 数据库: ${dbPath}`);
+  console.log(`[Admin API] 认证接口: /api/auth/*`);
+  console.log(`[Admin API] 用户接口: /api/user/*`);
 });
