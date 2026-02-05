@@ -2,7 +2,29 @@
 
 > 作者：鸿枫 & 小琳（AI 助手）  
 > 更新：2026-02-06  
-> 仓库：https://gitee.com/hongmaple/openclaw-dindin-chart
+> 开源地址：https://gitee.com/hongmaple/openclaw-dindin-chart  
+> GitHub 镜像：https://github.com/hongmaple/openclaw-dindin-chart  
+> 许可证：MIT
+
+---
+
+## ⭐ 开源说明
+
+本项目完全开源，欢迎 Star、Fork、PR！
+
+**快速体验**：
+```bash
+git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
+cd openclaw-dindin-chart/chat-hub
+npm install
+cp config/default.json config/local.json
+# 编辑 local.json 配置你的密钥
+npm start
+```
+
+**技术支持**：
+- 提 Issue：https://gitee.com/hongmaple/openclaw-dindin-chart/issues
+- 加入交流群：（钉钉群二维码）
 
 ---
 
@@ -441,9 +463,78 @@ ssh -L 8080:localhost:8080 user@your-server
 
 ---
 
+## 💰 商业化思路
+
+如果你想基于这个项目盈利，这里有一些思路：
+
+### 1. SaaS 服务
+
+**模式**：提供托管的 AI 聊天室服务
+
+| 套餐 | 价格 | 功能 |
+|------|------|------|
+| 免费版 | ¥0/月 | 1 个 AI、100 条/天 |
+| 专业版 | ¥99/月 | 3 个 AI、无限消息、数据分析 |
+| 企业版 | ¥499/月 | 无限 AI、私有部署、定制开发 |
+
+**优势**：用户无需自己部署，开箱即用
+
+### 2. 企业定制开发
+
+**客户**：需要 AI 助手的企业
+
+**服务内容**：
+- 定制 AI 人设和能力
+- 对接企业内部系统（ERP、CRM）
+- 知识库训练
+- 私有化部署
+
+**定价**：按项目报价，¥5,000 - ¥50,000+
+
+### 3. 技术咨询
+
+**客户**：想自己搭建但缺乏经验的团队
+
+**服务**：
+- 架构设计咨询：¥500/小时
+- 远程部署指导：¥2,000/次
+- 长期技术支持：¥1,000/月
+
+### 4. 培训课程
+
+**产品**：
+- 视频教程：《从零搭建 AI 聊天室》¥199
+- 实战训练营：¥999（含 1v1 答疑）
+- 企业内训：¥5,000/天
+
+### 5. 开源 + 增值服务
+
+保持核心开源，通过增值服务盈利：
+- **Pro 插件**：高级分析、告警、备份
+- **云服务**：托管 Redis、自动备份
+- **技术支持**：付费 Issue 优先处理
+
+### 6. AI 代理出租
+
+**模式**：把训练好的 AI 助手出租给企业
+
+- 客服 AI：¥2,000/月
+- 销售 AI：¥3,000/月
+- 技术支持 AI：¥5,000/月
+
+### 建议的起步策略
+
+1. **先做口碑**：开源项目积累 Star 和用户
+2. **收集需求**：通过 Issue 了解用户痛点
+3. **小规模试水**：接几个定制项目验证市场
+4. **逐步产品化**：把常见需求做成标准产品
+
+---
+
 ## 🔗 相关资源
 
-- **项目仓库**：https://gitee.com/hongmaple/openclaw-dindin-chart
+- **开源仓库**：https://gitee.com/hongmaple/openclaw-dindin-chart
+- **GitHub 镜像**：https://github.com/hongmaple/openclaw-dindin-chart
 - **OpenClaw 官网**：https://openclaw.ai
 - **OpenClaw 文档**：https://docs.openclaw.ai
 
@@ -462,6 +553,17 @@ ssh -L 8080:localhost:8080 user@your-server
 如果你也想尝试，欢迎 clone 这个项目，按照教程搭建你自己的 AI 聊天室！
 
 有问题可以在 Gitee 提 Issue，或者直接 @小琳 问她 😄
+
+---
+
+## ⭐ 支持项目
+
+如果这个项目对你有帮助，请给个 Star ⭐
+
+- Gitee：https://gitee.com/hongmaple/openclaw-dindin-chart
+- GitHub：https://github.com/hongmaple/openclaw-dindin-chart
+
+**商务合作**：（你的联系方式）
 
 ---
 

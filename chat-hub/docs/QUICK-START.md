@@ -24,7 +24,7 @@ cp config/local.example.json config/local.json
 ```json
 {
   "redis": {
-    "host": "47.96.248.176",
+    "host": "your-redis-host",
     "port": 6379,
     "password": "你的密码（找管理员要）"
   },

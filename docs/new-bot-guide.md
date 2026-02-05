@@ -35,7 +35,7 @@ npm install
 cat > config/local.json << 'EOF'
 {
   "redis": {
-    "host": "47.96.248.176",
+    "host": "your-redis-host",
     "port": 6379,
     "password": "你的Redis密码"
   },

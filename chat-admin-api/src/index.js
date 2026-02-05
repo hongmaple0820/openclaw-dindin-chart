@@ -13,8 +13,9 @@ const dbPath = process.env.DB_PATH || path.join(process.env.HOME, '.openclaw', '
 const db = new Database(dbPath);
 
 // Redis 连接（用于获取在线状态）
+// 从环境变量读取配置，保护隐私
 const redis = new Redis({
-  host: process.env.REDIS_HOST || '47.96.248.176',
+  host: process.env.REDIS_HOST || 'localhost',
   port: process.env.REDIS_PORT || 6379,
   password: process.env.REDIS_PASSWORD || '',
   lazyConnect: true

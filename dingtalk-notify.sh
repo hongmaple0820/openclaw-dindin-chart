@@ -5,28 +5,32 @@
 # 用法:
 #   ./dingtalk-notify.sh "消息内容"              # 普通发送
 #   ./dingtalk-notify.sh "消息内容" all          # @所有人
-#   ./dingtalk-notify.sh "消息内容" lin          # @lin
-#   ./dingtalk-notify.sh "消息内容" maple        # @鸿枫
-#   ./dingtalk-notify.sh "消息内容" lin maple    # @多人
+#   ./dingtalk-notify.sh "消息内容" user1        # @user1
+#   ./dingtalk-notify.sh "消息内容" user1 user2  # @多人
+#
+# 配置:
+#   1. 复制此脚本为 dingtalk-notify-local.sh
+#   2. 填写下方的 WEBHOOK_BASE、SECRET 和 USERS
+#   3. 将 dingtalk-notify-local.sh 加入 .gitignore
 # ============================================
 
 MESSAGE="$1"
 shift  # 移除第一个参数，剩下的是 @ 目标
 
 if [ -z "$MESSAGE" ]; then
-  echo "用法: $0 \"消息内容\" [all|lin|maple|...]"
+  echo "用法: $0 \"消息内容\" [all|user1|user2|...]"
   exit 1
 fi
 
-# 配置
-WEBHOOK_BASE="https://oapi.dingtalk.com/robot/send?access_token=***TOKEN_REMOVED***"
-SECRET="***SECRET_REMOVED***"
+# ========== 配置（请修改为你的配置）==========
+WEBHOOK_BASE="https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN"
+SECRET="YOUR_SECRET"
 
-# 用户手机号映射
+# 用户手机号映射（请修改为你的用户）
 declare -A USERS
-USERS["lin"]="16670151072"
-USERS["maple"]="19976618156"
-USERS["鸿枫"]="19976618156"
+USERS["user1"]="13800000001"
+USERS["user2"]="13800000002"
+# ============================================
 
 # 生成时间戳和签名
 timestamp=$(date +%s%3N)
