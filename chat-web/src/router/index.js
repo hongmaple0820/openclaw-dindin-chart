@@ -25,6 +25,12 @@ const routes = [
         meta: { title: '聊天室', requiresAuth: true }
       },
       {
+        path: 'dm',
+        name: 'DM',
+        component: () => import('@/views/DM.vue'),
+        meta: { title: '私信', requiresAuth: true }
+      },
+      {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),

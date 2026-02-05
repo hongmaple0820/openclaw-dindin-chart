@@ -326,9 +326,11 @@ app.get('/api/sync-status', (req, res) => {
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
+const dmRoutes = require('./routes/dm');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/dm', dmRoutes);
 
 // ============== 健康检查 ==============
 
@@ -348,4 +350,5 @@ app.listen(port, () => {
   console.log(`[Admin API] 数据库: ${dbPath}`);
   console.log(`[Admin API] 认证接口: /api/auth/*`);
   console.log(`[Admin API] 用户接口: /api/user/*`);
+  console.log(`[Admin API] 私信接口: /api/dm/*`);
 });

@@ -23,6 +23,7 @@
         >
           <el-menu-item index="/">首页</el-menu-item>
           <el-menu-item index="/chat" v-if="userStore.isLoggedIn">聊天室</el-menu-item>
+          <el-menu-item index="/dm" v-if="userStore.isLoggedIn">私信</el-menu-item>
         </el-menu>
       </div>
 
