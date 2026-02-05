@@ -124,13 +124,17 @@ const apiBase = ref(localStorage.getItem('chat-apiBase') || defaultApiBase)
 const settingsName = ref('')
 const settingsApiBase = ref('')
 
-// @ 成员列表
-const atMembers = [
+// @ 成员列表（排除自己）
+const allMembers = [
   { name: '小琳', avatar: '✨' },
   { name: '小猪', avatar: '🐷' },
   { name: '鸿枫', avatar: '🍁' },
   { name: '琳琳', avatar: '👩' }
 ]
+
+const atMembers = computed(() => {
+  return allMembers.filter(m => m.name !== userName.value)
+})
 
 // 轮询定时器
 let pollTimer = null
