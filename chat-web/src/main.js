@@ -1,16 +1,27 @@
-import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import App from './App.vue'
+/**
+ * 应用入口
+ * @author 小琳
+ * @date 2026-02-06
+ */
+import { createApp } from 'vue';
+import ElementPlus from 'element-plus';
+import * as ElementPlusIconsVue from '@element-plus/icons-vue';
+import 'element-plus/dist/index.css';
 
-const app = createApp(App)
+import App from './App.vue';
+import router from './router';
+import pinia from './stores';
+import './styles/global.css';
 
-// 注册所有图标
+const app = createApp(App);
+
+// 注册 Element Plus 图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
+  app.component(key, component);
 }
 
-app.use(ElementPlus, { locale: zhCn })
-app.mount('#app')
+app.use(pinia);
+app.use(router);
+app.use(ElementPlus);
+
+app.mount('#app');
