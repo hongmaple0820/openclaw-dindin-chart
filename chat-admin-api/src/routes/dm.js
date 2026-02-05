@@ -18,7 +18,7 @@ const pmModel = new PrivateMessageModel();
 router.post('/send', authenticate, async (req, res) => {
   try {
     const { receiverId, receiverName, content, messageType } = req.body;
-    const senderId = req.user.userId;
+    const senderId = req.user.id;  // 注意：是 id 不是 userId
     const senderName = req.user.nickname || req.user.username;
 
     if (!receiverId || !content) {
@@ -57,7 +57,7 @@ router.post('/send', authenticate, async (req, res) => {
  */
 router.get('/conversations', authenticate, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { limit = 20, offset = 0 } = req.query;
 
     const conversations = pmModel.getConversations(userId, {
@@ -85,7 +85,7 @@ router.get('/conversations', authenticate, async (req, res) => {
 router.get('/messages/:conversationId', authenticate, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { limit = 50, before } = req.query;
 
     // 验证用户是会话参与者
@@ -124,7 +124,7 @@ router.get('/messages/:conversationId', authenticate, async (req, res) => {
 router.post('/read/:conversationId', authenticate, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const count = pmModel.markAsRead(conversationId, userId);
 
@@ -148,7 +148,7 @@ router.post('/read/:conversationId', authenticate, async (req, res) => {
 router.delete('/message/:messageId', authenticate, async (req, res) => {
   try {
     const { messageId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const deleted = pmModel.delete(messageId, userId);
 
@@ -178,7 +178,7 @@ router.delete('/message/:messageId', authenticate, async (req, res) => {
  */
 router.get('/unread', authenticate, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const count = pmModel.getUnreadCount(userId);
 
     res.json({
@@ -200,7 +200,7 @@ router.get('/unread', authenticate, async (req, res) => {
  */
 router.get('/search', authenticate, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { q, limit = 20 } = req.query;
 
     if (!q) {
