@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Redis 消息队列
+  redis:
+    image: redis:7-alpine
+    container_name: chat-hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  # chat-hub 服务（小琳）
+  chat-hub-lin:
+    build: ./chat-hub
+    container_name: chat-hub-lin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./chat-hub/uploads:/app/uploads
+      - ./chat-hub/config:/app/config
+      - chat_hub_data:/app/data
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # chat-hub 服务（小猪）
+  chat-hub-zhu:
+    build: ./chat-hub
+    container_name: chat-hub-zhu
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./chat-hub/uploads:/app/uploads
+      - ./chat-hub/config:/app/config
+      - chat_hub_data:/app/data
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: chat-hub-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - chat-hub-lin
+      - chat-hub-zhu
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  chat_hub_data:

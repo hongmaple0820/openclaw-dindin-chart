@@ -35,6 +35,12 @@ const routes = [
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),
         meta: { title: '个人中心', requiresAuth: true }
+      },
+      {
+        path: 'files',
+        name: 'Files',
+        component: () => import('@/views/FileManagement.vue'),
+        meta: { title: '个人网盘', requiresAuth: true }
       }
     ]
   },

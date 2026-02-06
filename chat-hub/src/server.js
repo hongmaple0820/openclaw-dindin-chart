@@ -5,6 +5,7 @@ const redisClient = require('./redis-client');
 const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
+const fileRoutes = require('./routes/files');
 
 const app = express();
 
@@ -592,6 +593,9 @@ app.post('/api/dm/store', async (req, res) => {
 async function start() {
   const myBotName = config.bot?.name || '小琳';
   
+  // 注册文件路由
+  app.use('/api/files', fileRoutes);
+
   // 订阅回复频道
   await redisClient.subscribe(config.channels.replies, async (message) => {
     // 保存所有回复到本地数据库（不管是谁发的）
@@ -641,6 +645,9 @@ async function start() {
     console.log('[Server] 统计信息: GET /api/stats');
     console.log('[Server] 同步消息: GET /api/sync/:participantId');
     console.log('[Server] 删除消息: DELETE /api/message/:messageId');
+    console.log('[Server] 文件上传: POST /api/files/upload/init');
+    console.log('[Server] 文件下载: GET /api/files/:id/download');
+    console.log('[Server] 文件列表: GET /api/files');
   });
 }
 
