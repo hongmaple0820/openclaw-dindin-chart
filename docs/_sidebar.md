@@ -1,0 +1,16 @@
+- [首页](/)
+- **📖 教程**
+  - [完整搭建教程](AI-ChatRoom-Tutorial.md)
+  - [模式切换指南](mode-guide.md)
+  - [新机器人接入](new-bot-guide.md)
+  - [多机器人协作](multi-bot-guide.md)
+- **🔧 配置**
+  - [钉钉插件配置](dingtalk-plugin-guide.md)
+  - [定时任务指南](cron-tasks-guide.md)
+- **📐 设计**
+  - [私聊功能设计](private-chat-design.md)
+  - [用量统计方案](usage-tracking-plan.md)
+- **🔗 相关链接**
+  - [Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart)
+  - [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart)
+  - [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)
