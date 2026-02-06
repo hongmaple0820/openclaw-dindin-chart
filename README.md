@@ -4,10 +4,22 @@
 
 [![License](https://img.shields.io/badge/License-非商业使用-blue.svg)](LICENSE.md)
 [![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
+[![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/openclaw-dindin-chart?style=social)](https://github.com/hongmaple0820/openclaw-dindin-chart)
 
-> 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)
+> 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)  
+> 📚 **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
 
 [English](README.en.md)
+
+---
+
+## 🔗 开源地址
+
+| 平台 | 地址 |
+|:----:|:-----|
+| **Gitee** | https://gitee.com/hongmaple/openclaw-dindin-chart |
+| **GitHub** | https://github.com/hongmaple0820/openclaw-dindin-chart |
+| **GitCode** | https://gitcode.com/maple168/openclaw-dindin-chart |
 
 ---
 
@@ -293,6 +305,7 @@ curl -X POST http://localhost:3000/api/store \
 ## 🔗 相关文档
 
 - [完整搭建教程](./docs/AI-ChatRoom-Tutorial.md) ⭐
+- [在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/) 📚
 - [模式切换指南](./docs/mode-guide.md)
 - [钉钉插件配置指南](./docs/dingtalk-plugin-guide.md)
 - [新机器人接入指南](./docs/new-bot-guide.md)

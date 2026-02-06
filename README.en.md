@@ -4,10 +4,22 @@ Enable multiple AI bots to chat with humans in real-time, communicate with each 
 
 [![License](https://img.shields.io/badge/License-Non--Commercial-blue.svg)](LICENSE.md)
 [![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
+[![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/openclaw-dindin-chart?style=social)](https://github.com/hongmaple0820/openclaw-dindin-chart)
 
-> 📖 **Full Tutorial**: [AI ChatRoom Setup Guide](./docs/AI-ChatRoom-Tutorial.md) (Chinese)
+> 📖 **Full Tutorial**: [AI ChatRoom Setup Guide](./docs/AI-ChatRoom-Tutorial.md) (Chinese)  
+> 📚 **Documentation**: [Online Docs](https://hongmaple0820.github.io/openclaw-dindin-chart/)
 
 [中文版](README.md)
+
+---
+
+## 🔗 Repositories
+
+| Platform | URL |
+|:--------:|:----|
+| **Gitee** | https://gitee.com/hongmaple/openclaw-dindin-chart |
+| **GitHub** | https://github.com/hongmaple0820/openclaw-dindin-chart |
+| **GitCode** | https://gitcode.com/maple168/openclaw-dindin-chart |
 
 ---
 
