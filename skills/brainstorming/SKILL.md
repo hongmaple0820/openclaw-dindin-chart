@@ -1,54 +1,218 @@
----
-name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
----
+# Brainstorming
 
-# Brainstorming Ideas Into Designs
+结构化头脑风暴，将模糊的想法转化为清晰的设计方案。
 
-## Overview
+## 激活场景
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+- 用户有一个想法但不知道如何实现
+- 需要探索多种可能的方案
+- 做技术选型或架构设计
+- 用户说"帮我想想"、"有什么方案"、"怎么设计"
 
-Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design in small sections (200-300 words), checking after each section whether it looks right so far.
+## 核心流程
 
-## The Process
+```
+想法 → 澄清问题 → 发散思考 → 收敛评估 → 形成方案
+```
 
-**Understanding the idea:**
-- Check out the current project state first (files, docs, recent commits)
-- Ask questions one at a time to refine the idea
-- Prefer multiple choice questions when possible, but open-ended is fine too
-- Only one question per message - if a topic needs more exploration, break it into multiple questions
-- Focus on understanding: purpose, constraints, success criteria
+## 第一阶段：澄清问题
 
-**Exploring approaches:**
-- Propose 2-3 different approaches with trade-offs
-- Present options conversationally with your recommendation and reasoning
-- Lead with your recommended option and explain why
+在开始头脑风暴之前，先确保理解问题：
 
-**Presenting the design:**
-- Once you believe you understand what you're building, present the design
-- Break it into sections of 200-300 words
-- Ask after each section whether it looks right so far
-- Cover: architecture, components, data flow, error handling, testing
-- Be ready to go back and clarify if something doesn't make sense
+### 关键问题
 
-## After the Design
+1. **目标是什么？** - 你想实现什么？
+2. **为谁而做？** - 目标用户是谁？
+3. **为什么重要？** - 解决什么痛点？
+4. **有什么限制？** - 时间、预算、技术栈
+5. **成功标准？** - 怎么衡量成功？
 
-**Documentation:**
-- Write the validated design to `docs/plans/YYYY-MM-DD-<topic>-design.md`
-- Use elements-of-style:writing-clearly-and-concisely skill if available
-- Commit the design document to git
+### 模板
 
-**Implementation (if continuing):**
-- Ask: "Ready to set up for implementation?"
-- Use superpowers:using-git-worktrees to create isolated workspace
-- Use superpowers:writing-plans to create detailed implementation plan
+```markdown
+## 问题定义
 
-## Key Principles
+**目标**：[一句话描述要实现什么]
+**用户**：[谁会使用这个]
+**痛点**：[现在有什么问题]
+**约束**：[技术、时间、资源限制]
+**成功标准**：[如何衡量成功]
+```
 
-- **One question at a time** - Don't overwhelm with multiple questions
-- **Multiple choice preferred** - Easier to answer than open-ended when possible
-- **YAGNI ruthlessly** - Remove unnecessary features from all designs
-- **Explore alternatives** - Always propose 2-3 approaches before settling
-- **Incremental validation** - Present design in sections, validate each
-- **Be flexible** - Go back and clarify when something doesn't make sense
+## 第二阶段：发散思考
+
+生成尽可能多的想法，不要评判。
+
+### 技巧
+
+1. **类比法** - 其他领域如何解决类似问题？
+2. **极端法** - 如果没有限制会怎么做？最简单的方案是什么？
+3. **逆向法** - 怎么做会失败？然后反过来
+4. **组合法** - 现有方案能否组合？
+5. **替代法** - 能用什么替代现有方案？
+
+### 输出
+
+```markdown
+## 方案清单
+
+### 方案 A：[名称]
+简述：一两句话描述
+
+### 方案 B：[名称]
+简述：一两句话描述
+
+### 方案 C：[名称]
+简述：一两句话描述
+
+（至少 3-5 个方案）
+```
+
+## 第三阶段：收敛评估
+
+对每个方案进行评估。
+
+### 评估维度
+
+| 维度 | 问题 |
+|------|------|
+| 可行性 | 技术上能实现吗？ |
+| 成本 | 需要多少时间/资源？ |
+| 风险 | 有什么可能出错？ |
+| 收益 | 能带来多大价值？ |
+| 可维护性 | 长期维护成本如何？ |
+| 可扩展性 | 未来能否扩展？ |
+
+### 评分矩阵
+
+```markdown
+| 方案 | 可行性 | 成本 | 风险 | 收益 | 总分 |
+|------|--------|------|------|------|------|
+| A    | ⭐⭐⭐  | ⭐⭐  | ⭐⭐⭐ | ⭐⭐⭐ | 11   |
+| B    | ⭐⭐   | ⭐⭐⭐ | ⭐⭐  | ⭐⭐⭐ | 10   |
+| C    | ⭐⭐⭐  | ⭐   | ⭐⭐⭐ | ⭐⭐  | 9    |
+```
+
+### 优缺点分析
+
+```markdown
+### 方案 A：[名称]
+
+**优点**：
+- 优点 1
+- 优点 2
+
+**缺点**：
+- 缺点 1
+- 缺点 2
+
+**适用场景**：适合...的情况
+**不适用场景**：不适合...的情况
+```
+
+## 第四阶段：形成方案
+
+选择最佳方案并细化。
+
+### 决策记录
+
+```markdown
+## 决策
+
+**选择**：方案 A
+
+**理由**：
+1. 技术上最成熟
+2. 团队有经验
+3. 能满足当前需求
+
+**取舍**：
+- 放弃了方案 B，因为成本太高
+- 放弃了方案 C，因为风险太大
+
+**后续步骤**：
+1. 第一步
+2. 第二步
+3. 第三步
+```
+
+### 实施计划
+
+```markdown
+## 实施计划
+
+### 阶段 1：基础搭建 (Week 1)
+- [ ] 任务 1
+- [ ] 任务 2
+
+### 阶段 2：核心功能 (Week 2-3)
+- [ ] 任务 3
+- [ ] 任务 4
+
+### 阶段 3：优化完善 (Week 4)
+- [ ] 任务 5
+- [ ] 任务 6
+```
+
+## 常见场景
+
+### 技术选型
+
+```markdown
+**问题**：选择前端框架
+
+**方案**：
+- A: React - 生态丰富，学习曲线平缓
+- B: Vue - 简单易用，文档友好
+- C: Svelte - 性能最好，包体积小
+
+**评估重点**：团队经验、项目规模、性能要求
+```
+
+### 架构设计
+
+```markdown
+**问题**：设计消息系统架构
+
+**方案**：
+- A: 直接数据库轮询 - 简单但性能差
+- B: WebSocket 长连接 - 实时但复杂
+- C: Redis 消息队列 - 可扩展但需要维护
+- D: 第三方服务（Firebase）- 省事但依赖外部
+
+**评估重点**：实时性要求、规模、成本、可控性
+```
+
+### 产品功能
+
+```markdown
+**问题**：如何增加用户参与度
+
+**方案**：
+- A: 积分系统 - 激励持续使用
+- B: 社交功能 - 用户间互动
+- C: 个性化推荐 - 内容匹配
+- D: 游戏化元素 - 成就徽章
+
+**评估重点**：用户类型、开发成本、长期效果
+```
+
+## 引导问题
+
+在头脑风暴过程中，可以用这些问题引导：
+
+- "如果不考虑成本/时间，你会怎么做？"
+- "竞品是怎么解决这个问题的？"
+- "有没有更简单的方法？"
+- "这个方案的最大风险是什么？"
+- "用户真正需要的是什么？"
+- "一年后回看，你会后悔这个决定吗？"
+- "如果只能做一件事，你会选什么？"
+
+## 注意事项
+
+1. **不要过早评判** - 发散阶段先记录所有想法
+2. **鼓励极端想法** - 有时候最疯狂的想法能启发好方案
+3. **记录思考过程** - 决策依据比结论更重要
+4. **接受不确定性** - 有时候没有"正确答案"
+5. **小步验证** - 选择方案后先做小规模验证
