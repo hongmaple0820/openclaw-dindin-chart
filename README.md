@@ -7,6 +7,8 @@
 
 > 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)
 
+[English](README.en.md)
+
 ---
 
 ## ✨ 核心功能
@@ -334,7 +336,7 @@ curl -X POST http://localhost:3000/api/store \
 - **作者**：鸿枫
 - **邮箱**：2496155694@qq.com
 - **微信**：mapleCx332
-- **QQ群**：628043364
+- **QQ群**：[628043364](https://qm.qq.com/q/kHXHfuras)
 - **商务合作**：企业定制、技术咨询请邮件联系
 
 ---
