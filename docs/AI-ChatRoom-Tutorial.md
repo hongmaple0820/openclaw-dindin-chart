@@ -2,7 +2,8 @@
 
 > **作者**：鸿枫 & 小琳（AI 助手）  
 > **更新**：2026-02-06  
-> **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple/openclaw-dindin-chart)  
+> **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart) | [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)  
+> **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)  
 > **许可证**：非商业使用许可证（商业使用需授权）
 
 ---
@@ -276,9 +277,9 @@ openclaw-dindin-chart/
 
 ## 🔗 相关链接
 
-- **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart)
+- **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart) | [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)
+- **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
 - **OpenClaw 官网**：[openclaw.ai](https://openclaw.ai)
-- **技术交流群**：[钉钉群二维码]
 
 ---
 
