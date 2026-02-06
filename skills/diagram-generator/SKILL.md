@@ -1,322 +1,266 @@
-# Diagram Generator
+---
+name: diagram-generator
+description: Mermaid 绘图技能。用于生成流程图、时序图、架构图、类图、ER图、状态图、甘特图、饼图等。当需要可视化流程、系统架构、数据关系时使用。
+---
 
-使用 Mermaid 生成专业的架构图、流程图、时序图等。
+# Mermaid 绘图技能
 
-## 激活场景
+使用 Mermaid 生成各类图表，适用于技术文档、架构设计、流程说明等场景。
 
-- 用户说"画图"、"架构图"、"流程图"、"时序图"
-- 需要可视化系统设计
-- 文档需要配图
+## 支持的图表类型
 
-## 工具
-
-### Mermaid CLI
-
-```bash
-# 安装
-npm install -g @mermaid-js/mermaid-cli
-
-# 使用
-mmdc -i input.mmd -o output.png
-mmdc -i input.mmd -o output.svg
-mmdc -i input.mmd -o output.pdf
-```
-
-### 在线编辑器
-
-https://mermaid.live/ - 实时预览和导出
+| 类型 | 语法 | 适用场景 |
+|:-----|:-----|:---------|
+| 流程图 | `flowchart` | 业务流程、算法逻辑 |
+| 时序图 | `sequenceDiagram` | API 交互、消息流程 |
+| 类图 | `classDiagram` | 数据模型、OOP 设计 |
+| ER 图 | `erDiagram` | 数据库设计 |
+| 状态图 | `stateDiagram-v2` | 状态机、生命周期 |
+| 甘特图 | `gantt` | 项目进度、时间线 |
+| 饼图 | `pie` | 数据分布、占比 |
+| 架构图 | `C4Context` | 系统架构 |
 
 ---
 
-## 图表类型
+## 流程图（Flowchart）
 
-### 1. 流程图 (Flowchart)
+### 基本语法
 
 ```mermaid
 flowchart TD
     A[开始] --> B{条件判断}
-    B -->|是| C[处理A]
-    B -->|否| D[处理B]
+    B -->|是| C[执行操作]
+    B -->|否| D[其他操作]
     C --> E[结束]
     D --> E
 ```
 
-**语法**：
-- `A[文字]` 矩形
-- `A(文字)` 圆角矩形
-- `A{文字}` 菱形（判断）
-- `A((文字))` 圆形
-- `-->` 箭头
-- `---` 线条
-- `-->|文字|` 带标签的箭头
+### 方向
 
-**方向**：
-- `TD` 上到下
-- `LR` 左到右
-- `BT` 下到上
-- `RL` 右到左
+| 方向 | 说明 |
+|:-----|:-----|
+| `TD` / `TB` | 从上到下 |
+| `BT` | 从下到上 |
+| `LR` | 从左到右 |
+| `RL` | 从右到左 |
+
+### 节点形状
+
+```mermaid
+flowchart LR
+    A[矩形] --> B(圆角矩形)
+    B --> C([体育场形])
+    C --> D[[子程序]]
+    D --> E[(数据库)]
+    E --> F((圆形))
+    F --> G>旗帜形]
+    G --> H{菱形}
+    H --> I{{六边形}}
+```
+
+### 样式
+
+```mermaid
+flowchart LR
+    A[节点A] --> B[节点B]
+    
+    style A fill:#10B981,color:white,stroke:#059669
+    style B fill:#2563EB,color:white,stroke:#1d4ed8
+```
 
 ---
 
-### 2. 时序图 (Sequence Diagram)
+## 时序图（Sequence Diagram）
+
+### 基本语法
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant F as 前端
-    participant B as 后端
+    participant S as 服务器
     participant D as 数据库
     
-    U->>F: 点击登录
-    F->>B: POST /api/login
-    B->>D: 查询用户
-    D-->>B: 返回用户信息
-    B-->>F: 返回 token
-    F-->>U: 跳转首页
+    U->>S: 发送请求
+    activate S
+    S->>D: 查询数据
+    D-->>S: 返回结果
+    S-->>U: 响应数据
+    deactivate S
 ```
 
-**语法**：
-- `participant A as 别名` 定义参与者
-- `A->>B: 消息` 实线箭头
-- `A-->>B: 消息` 虚线箭头
-- `A-xB: 消息` 异步消息
-- `Note over A,B: 备注` 添加备注
+### 箭头类型
 
----
+| 箭头 | 说明 |
+|:-----|:-----|
+| `->` | 实线无箭头 |
+| `-->` | 虚线无箭头 |
+| `->>` | 实线带箭头 |
+| `-->>` | 虚线带箭头 |
+| `-x` | 实线带叉 |
+| `--x` | 虚线带叉 |
 
-### 3. 架构图 (Architecture)
+### 循环和条件
 
 ```mermaid
-flowchart TB
-    subgraph 前端
-        A[Web App]
-        B[Mobile App]
+sequenceDiagram
+    participant A as 客户端
+    participant B as 服务器
+    
+    loop 每秒
+        A->>B: 心跳检测
+        B-->>A: 响应
     end
     
-    subgraph 后端
-        C[API Gateway]
-        D[Auth Service]
-        E[Chat Service]
+    alt 成功
+        B-->>A: 200 OK
+    else 失败
+        B-->>A: 500 Error
     end
-    
-    subgraph 存储
-        F[(MySQL)]
-        G[(Redis)]
-        H[MinIO]
-    end
-    
-    A --> C
-    B --> C
-    C --> D
-    C --> E
-    D --> F
-    E --> F
-    E --> G
-    E --> H
 ```
 
 ---
 
-### 4. 类图 (Class Diagram)
+## 类图（Class Diagram）
 
 ```mermaid
 classDiagram
-    class User {
-        +String id
+    class Animal {
         +String name
-        +String avatar
-        +login()
-        +logout()
+        +int age
+        +makeSound()
+    }
+    class Dog {
+        +String breed
+        +bark()
+    }
+    class Cat {
+        +meow()
     }
     
-    class Message {
-        +String id
-        +String content
-        +Date createdAt
-        +send()
-    }
-    
-    User "1" --> "*" Message : sends
+    Animal <|-- Dog
+    Animal <|-- Cat
 ```
 
 ---
 
-### 5. 状态图 (State Diagram)
-
-```mermaid
-stateDiagram-v2
-    [*] --> 待处理
-    待处理 --> 处理中: 开始处理
-    处理中 --> 已完成: 处理成功
-    处理中 --> 失败: 处理失败
-    失败 --> 待处理: 重试
-    已完成 --> [*]
-```
-
----
-
-### 6. ER 图 (Entity Relationship)
+## ER 图（Entity Relationship）
 
 ```mermaid
 erDiagram
-    USER ||--o{ MESSAGE : sends
+    USER ||--o{ ORDER : places
+    ORDER ||--|{ ORDER_ITEM : contains
+    PRODUCT ||--o{ ORDER_ITEM : includes
+    
     USER {
-        string id PK
+        int id PK
         string name
-        string avatar
+        string email
     }
-    MESSAGE {
-        string id PK
-        string content
-        string sender_id FK
+    ORDER {
+        int id PK
+        int user_id FK
         datetime created_at
     }
 ```
 
 ---
 
-### 7. 甘特图 (Gantt)
+## 状态图（State Diagram）
+
+```mermaid
+stateDiagram-v2
+    [*] --> 待处理
+    待处理 --> 进行中: 开始
+    进行中 --> 已完成: 完成
+    进行中 --> 已取消: 取消
+    已完成 --> [*]
+    已取消 --> [*]
+```
+
+---
+
+## 甘特图（Gantt）
 
 ```mermaid
 gantt
     title 项目进度
-    dateFormat YYYY-MM-DD
+    dateFormat  YYYY-MM-DD
     
-    section 设计
-    需求分析     :done,    des1, 2024-01-01, 3d
-    架构设计     :done,    des2, after des1, 5d
+    section 第一阶段
+    需求分析    :a1, 2024-01-01, 7d
+    系统设计    :a2, after a1, 5d
     
-    section 开发
-    后端开发     :active,  dev1, 2024-01-09, 10d
-    前端开发     :         dev2, 2024-01-09, 10d
-    
-    section 测试
-    集成测试     :         test1, after dev1, 5d
+    section 第二阶段
+    开发实现    :b1, after a2, 14d
+    测试验收    :b2, after b1, 7d
 ```
 
 ---
 
-### 8. 饼图 (Pie)
+## 饼图（Pie）
 
 ```mermaid
 pie title 技术栈分布
-    "JavaScript" : 45
-    "Python" : 25
-    "Go" : 15
-    "其他" : 15
+    "JavaScript" : 40
+    "Python" : 30
+    "Go" : 20
+    "其他" : 10
 ```
 
 ---
 
-## 样式美化
+## 生成图片
 
-### 主题
+### 安装工具
 
 ```bash
-# 使用主题
-mmdc -i input.mmd -o output.png -t dark
-mmdc -i input.mmd -o output.png -t forest
-mmdc -i input.mmd -o output.png -t neutral
+npm install -g @mermaid-js/mermaid-cli
 ```
 
-### 自定义样式
+### 生成命令
 
-```mermaid
-flowchart LR
-    A[开始]:::green --> B[处理]:::blue --> C[结束]:::green
-    
-    classDef green fill:#10B981,color:white
-    classDef blue fill:#2563EB,color:white
+```bash
+# 生成 PNG
+mmdc -i diagram.mmd -o diagram.png
+
+# 生成 SVG（推荐）
+mmdc -i diagram.mmd -o diagram.svg
+
+# WSL 环境
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser mmdc -i diagram.mmd -o diagram.png
 ```
 
-### 配置文件
+### Puppeteer 配置
 
 ```json
-// mermaid-config.json
+// puppeteer-config.json
 {
-  "theme": "base",
-  "themeVariables": {
-    "primaryColor": "#2563EB",
-    "primaryTextColor": "#fff",
-    "primaryBorderColor": "#1d4ed8",
-    "lineColor": "#64748b",
-    "secondaryColor": "#f1f5f9",
-    "tertiaryColor": "#fff"
-  }
+  "args": ["--no-sandbox", "--disable-setuid-sandbox"]
 }
 ```
 
 ```bash
-mmdc -i input.mmd -o output.png -c mermaid-config.json
+mmdc -i diagram.mmd -o diagram.png -p puppeteer-config.json
 ```
 
 ---
 
-## 操作流程
+## 常见问题
 
-1. **理解需求**：用户想表达什么关系/流程
-2. **选择图表类型**：流程图、时序图、架构图等
-3. **编写 Mermaid 代码**：写到 `.mmd` 文件
-4. **生成图片**：`mmdc -i xx.mmd -o xx.png`
-5. **调整样式**：根据需要调整颜色、布局
+### Q: 中文乱码
+**A**: 安装中文字体
+```bash
+sudo apt-get install fonts-wqy-microhei
+fc-cache -fv
+```
 
----
-
-## 示例：AI 聊天室架构图
-
-```mermaid
-flowchart TB
-    subgraph 用户层
-        U1[👤 鸿枫]
-        U2[🌸 小琳]
-        U3[🐷 小猪]
-    end
-    
-    subgraph 接入层
-        DD[钉钉群]
-        WEB[Web 聊天室]
-    end
-    
-    subgraph 服务层
-        HUB[Chat-Hub<br/>消息中转]
-        OC1[OpenClaw<br/>小琳实例]
-        OC2[OpenClaw<br/>小猪实例]
-    end
-    
-    subgraph 存储层
-        DB[(SQLite)]
-        RD[(Redis)]
-        FS[文件存储]
-    end
-    
-    U1 --> DD
-    U2 --> OC1
-    U3 --> OC2
-    
-    DD <--> HUB
-    WEB <--> HUB
-    OC1 <--> HUB
-    OC2 <--> HUB
-    
-    HUB --> DB
-    HUB --> RD
-    HUB --> FS
-    
-    style HUB fill:#2563EB,color:white
-    style OC1 fill:#10B981,color:white
-    style OC2 fill:#F472B6,color:white
+### Q: 找不到 Chromium
+**A**: 安装并设置环境变量
+```bash
+sudo apt-get install chromium-browser
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ```
 
 ---
 
-## 注意事项
-
-1. **保持简洁**：一张图不要超过 15-20 个节点
-2. **分层清晰**：用 subgraph 组织相关元素
-3. **颜色适度**：2-3 个主色即可
-4. **中文支持**：需要系统有中文字体
-5. **导出格式**：SVG 最清晰，PNG 兼容性好
-
----
-
-*让文档更生动，让架构更清晰*
+*技能作者：小琳 ✨*

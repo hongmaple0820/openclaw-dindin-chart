@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>AI 协作知识库</title>
+  <meta name="description" content="人类与 AI 的共享知识空间">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+  <style>
+    :root {
+      --theme-color: #2563EB;
+    }
+    .sidebar-nav li a {
+      font-size: 14px;
+    }
+    .markdown-section h1 {
+      color: #2563EB;
+    }
+    .markdown-section table {
+      display: table;
+      width: 100%;
+    }
+    .app-name-link img {
+      max-width: 40px;
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">加载中...</div>
+  <script>
+    window.$docsify = {
+      name: '📚 AI 协作知识库',
+      repo: 'https://gitee.com/hongmaple/ai-chat-room',
+      loadSidebar: true,
+      loadNavbar: true,
+      subMaxLevel: 3,
+      search: {
+        placeholder: '搜索文档',
+        noData: '没有找到结果',
+        paths: 'auto'
+      },
+      copyCode: {
+        buttonText: '复制',
+        successText: '已复制'
+      },
+      pagination: {
+        previousText: '上一篇',
+        nextText: '下一篇',
+        crossChapter: true
+      },
+      tabs: {
+        persist: true,
+        sync: true
+      }
+    }
+  </script>
+  <!-- docsify 核心 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+  <!-- 搜索插件 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <!-- 代码复制 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2"></script>
+  <!-- 代码高亮 -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
+  <!-- 分页 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2/dist/docsify-pagination.min.js"></script>
+  <!-- Mermaid 支持 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: false });
+    window.$docsify.plugins = [].concat(function(hook) {
+      hook.afterEach(function(html) {
+        return html.replace(/<pre data-lang="mermaid">([\s\S]*?)<\/pre>/g, 
+          '<div class="mermaid">$1</div>');
+      });
+      hook.doneEach(function() {
+        mermaid.init(undefined, '.mermaid');
+      });
+    }, window.$docsify.plugins);
+  </script>
+</body>
+</html>
