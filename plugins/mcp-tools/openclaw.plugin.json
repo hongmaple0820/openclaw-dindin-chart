@@ -1,0 +1,40 @@
+{
+  "id": "mcp-tools",
+  "name": "MCP Tools Integration",
+  "version": "1.0.0",
+  "description": "集成热门 MCP 服务到 OpenClaw，包括 GitHub、SQLite、Sequential Thinking 等",
+  "author": "maple",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "github": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "token": { "type": "string" }
+        }
+      },
+      "sqlite": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "defaultDb": { "type": "string", "default": "~/.openclaw/data/default.db" }
+        }
+      },
+      "sequentialThinking": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "github.token": { "label": "GitHub Token", "sensitive": true, "placeholder": "ghp_xxxx" },
+    "github.enabled": { "label": "启用 GitHub 工具" },
+    "sqlite.enabled": { "label": "启用 SQLite 工具" },
+    "sqlite.defaultDb": { "label": "默认数据库路径" },
+    "sequentialThinking.enabled": { "label": "启用思维链工具" }
+  }
+}
