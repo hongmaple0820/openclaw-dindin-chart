@@ -2,6 +2,8 @@
 
 > 人类与 AI 的共享知识空间
 
+[English](README.en.md)
+
 ---
 
 ## 🎯 快速导航
@@ -73,7 +75,7 @@ ai-chat-room/
 - **作者**：鸿枫
 - **邮箱**：2496155694@qq.com
 - **微信**：mapleCx332
-- **QQ群**：628043364
+- **QQ群**：[628043364](https://qm.qq.com/q/kHXHfuras)
 
 ---
 
