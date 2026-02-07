@@ -687,6 +687,237 @@ app.get('/api/reactions/:messageId/details', (req, res) => {
   }
 });
 
+// ==================== 消息导出 API ====================
+
+const exportService = require('./export-service');
+
+/**
+ * 导出消息
+ * POST /api/export
+ * Body: { format, sender, startTime, endTime, includeImages, includeReactions, includeChain }
+ */
+app.post('/api/export', async (req, res) => {
+  try {
+    const {
+      format = 'json',
+      sender = null,
+      startTime = null,
+      endTime = null,
+      source = null,
+      includeImages = false,
+      includeReactions = false,
+      includeChain = false,
+      limit = 1000
+    } = req.body;
+
+    // 验证格式
+    const validFormats = ['json', 'csv', 'markdown', 'html'];
+    if (!validFormats.includes(format)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid format. Must be one of: ${validFormats.join(', ')}`
+      });
+    }
+
+    // 构建查询条件
+    let sql = 'SELECT * FROM messages WHERE 1=1';
+    const params = [];
+
+    if (sender) {
+      sql += ' AND sender = ?';
+      params.push(sender);
+    }
+
+    if (startTime) {
+      sql += ' AND timestamp >= ?';
+      params.push(startTime);
+    }
+
+    if (endTime) {
+      sql += ' AND timestamp <= ?';
+      params.push(endTime);
+    }
+
+    if (source) {
+      sql += ' AND source = ?';
+      params.push(source);
+    }
+
+    sql += ' ORDER BY timestamp ASC LIMIT ?';
+    params.push(limit);
+
+    // 查询消息
+    const stmt = messageStore.db.prepare(sql);
+    let messages = stmt.all(...params);
+
+    // 转换格式
+    messages = messages.map(row => ({
+      id: row.id,
+      type: row.type,
+      sender: row.sender,
+      content: row.content,
+      timestamp: row.timestamp,
+      source: row.source,
+      atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+      replyTo: row.reply_to
+    }));
+
+    // 附加引用链
+    if (includeChain) {
+      messages = messageStore.attachReplyToMessages(messages, true);
+    }
+
+    // 附加图片
+    if (includeImages) {
+      messages = messageStore.attachImages(messages);
+    }
+
+    // 附加表情
+    if (includeReactions) {
+      messages = messageStore.attachReactions(messages);
+    }
+
+    // 生成导出内容
+    let content, contentType, filename;
+
+    switch (format) {
+      case 'json':
+        content = exportService.exportJSON(messages, { includeImages, includeReactions });
+        contentType = 'application/json';
+        filename = `messages-${Date.now()}.json`;
+        break;
+
+      case 'csv':
+        content = exportService.exportCSV(messages);
+        contentType = 'text/csv';
+        filename = `messages-${Date.now()}.csv`;
+        break;
+
+      case 'markdown':
+        content = exportService.exportMarkdown(messages, { includeReactions });
+        contentType = 'text/markdown';
+        filename = `messages-${Date.now()}.md`;
+        break;
+
+      case 'html':
+        content = exportService.exportHTML(messages, { includeReactions });
+        contentType = 'text/html';
+        filename = `messages-${Date.now()}.html`;
+        break;
+    }
+
+    // 设置响应头
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(content);
+
+    console.log('[Server] 导出完成:', format, messages.length, '条消息');
+  } catch (error) {
+    console.error('[Server] 导出失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 导出为 ZIP 压缩包（包含所有格式）
+ * POST /api/export/zip
+ */
+app.post('/api/export/zip', async (req, res) => {
+  try {
+    const options = req.body;
+
+    // 获取消息（同上）
+    let sql = 'SELECT * FROM messages WHERE 1=1';
+    const params = [];
+
+    if (options.sender) {
+      sql += ' AND sender = ?';
+      params.push(options.sender);
+    }
+
+    if (options.startTime) {
+      sql += ' AND timestamp >= ?';
+      params.push(options.startTime);
+    }
+
+    if (options.endTime) {
+      sql += ' AND timestamp <= ?';
+      params.push(options.endTime);
+    }
+
+    sql += ' ORDER BY timestamp ASC LIMIT ?';
+    params.push(options.limit || 1000);
+
+    const stmt = messageStore.db.prepare(sql);
+    let messages = stmt.all(...params);
+
+    messages = messages.map(row => ({
+      id: row.id,
+      type: row.type,
+      sender: row.sender,
+      content: row.content,
+      timestamp: row.timestamp,
+      source: row.source,
+      atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+      replyTo: row.reply_to
+    }));
+
+    if (options.includeChain) {
+      messages = messageStore.attachReplyToMessages(messages, true);
+    }
+
+    if (options.includeImages) {
+      messages = messageStore.attachImages(messages);
+    }
+
+    if (options.includeReactions) {
+      messages = messageStore.attachReactions(messages);
+    }
+
+    // 生成所有格式
+    const files = [
+      {
+        name: 'messages.json',
+        content: exportService.exportJSON(messages, options)
+      },
+      {
+        name: 'messages.csv',
+        content: exportService.exportCSV(messages)
+      },
+      {
+        name: 'messages.md',
+        content: exportService.exportMarkdown(messages, options)
+      },
+      {
+        name: 'messages.html',
+        content: exportService.exportHTML(messages, options)
+      }
+    ];
+
+    // 创建 ZIP
+    const zipPath = path.join(exportService.exportDir, `export-${Date.now()}.zip`);
+    await exportService.createZip(files, zipPath);
+
+    // 发送文件
+    res.download(zipPath, `messages-${Date.now()}.zip`, (err) => {
+      if (err) {
+        console.error('[Server] ZIP 下载失败:', err);
+      }
+      // 下载完成后删除文件
+      setTimeout(() => {
+        if (fs.existsSync(zipPath)) {
+          fs.unlinkSync(zipPath);
+        }
+      }, 5000);
+    });
+
+    console.log('[Server] ZIP 导出完成:', messages.length, '条消息');
+  } catch (error) {
+    console.error('[Server] ZIP 导出失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ==================== 已读功能 API ====================
 
 /**

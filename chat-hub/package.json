@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
