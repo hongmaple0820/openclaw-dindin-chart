@@ -950,3 +950,114 @@ async function start() {
 }
 
 module.exports = { app, start };
+
+// ==================== 用户管理 API ====================
+const userManager = require('./user-manager');
+
+/**
+ * 注册新用户
+ * POST /api/users/register
+ */
+app.post('/api/users/register', async (req, res) => {
+  try {
+    const { username, displayName, phone, email, avatar } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'username is required' });
+    }
+
+    // 检查用户名是否已存在
+    const existing = userManager.getUser(username);
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'Username already exists' });
+    }
+
+    const result = userManager.registerUser({
+      username,
+      displayName,
+      phone,
+      email,
+      avatar
+    });
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('[Server] 注册用户失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 更新用户信息
+ * PUT /api/users/:userId
+ */
+app.put('/api/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const updates = req.body;
+
+    const result = userManager.updateUser(userId, updates);
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('[Server] 更新用户失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取用户信息
+ * GET /api/users/:identifier
+ */
+app.get('/api/users/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const user = userManager.getUser(identifier);
+
+    if (user) {
+      res.json({ success: true, user });
+    } else {
+      res.status(404).json({ success: false, error: 'User not found' });
+    }
+  } catch (error) {
+    console.error('[Server] 获取用户失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取所有用户
+ * GET /api/users
+ */
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = userManager.getAllUsers();
+    res.json({ success: true, count: users.length, users });
+  } catch (error) {
+    console.error('[Server] 获取用户列表失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取钉钉手机号映射
+ * GET /api/users/dingtalk/phone-map
+ */
+app.get('/api/users/dingtalk/phone-map', async (req, res) => {
+  try {
+    const phoneMap = userManager.getDingtalkPhoneMap();
+    res.json({ success: true, phoneMap });
+  } catch (error) {
+    console.error('[Server] 获取手机号映射失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+

@@ -2,10 +2,18 @@ const crypto = require('crypto');
 const axios = require('axios');
 const config = require('./config');
 
-// 用户手机号映射（从配置文件读取，保护隐私）
-// 在 config/local.json 中配置：
-// "userPhones": { "用户名": "手机号" }
-const USER_PHONES = config.userPhones || {};
+// 动态获取用户手机号映射
+function getUserPhoneMap() {
+  try {
+    const userManager = require('./user-manager');
+    const dynamicMap = userManager.getDingtalkPhoneMap();
+    // 合并配置文件中的映射和数据库中的映射
+    return { ...config.userPhones || {}, ...dynamicMap };
+  } catch (error) {
+    console.warn('[钉钉] 无法获取动态用户映射，使用配置文件映射:', error.message);
+    return config.userPhones || {};
+  }
+}
 
 // 发送队列和锁，防止并发发送
 let sendQueue = Promise.resolve();
@@ -127,6 +135,8 @@ function sleep(ms) {
  * @returns {{ atMobiles: string[], isAtAll: boolean, atText: string }}
  */
 function parseAtTargets(atTargets) {
+  const USER_PHONES = getUserPhoneMap(); // 动态获取映射
+  
   const result = {
     atMobiles: [],
     isAtAll: false,
@@ -250,5 +260,5 @@ module.exports = {
   sendMarkdown, 
   generateSign,
   parseAtTargets,
-  USER_PHONES
+  getUserPhoneMap
 };
