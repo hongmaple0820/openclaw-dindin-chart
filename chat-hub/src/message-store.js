@@ -66,6 +66,27 @@ class MessageStore {
     const count = this.db.prepare('SELECT COUNT(*) as count FROM messages').get();
     console.log('[Store] 已加载消息:', count.count, '条');
 
+    // 创建 FTS5 全文搜索表
+    this.db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+        id UNINDEXED,
+        content,
+        sender,
+        tokenize = 'unicode61'
+      );
+    `);
+
+    // 同步现有消息到 FTS 表
+    const ftsCount = this.db.prepare('SELECT COUNT(*) as count FROM messages_fts').get();
+    if (ftsCount.count === 0 && count.count > 0) {
+      console.log('[Store] 同步消息到 FTS 索引...');
+      this.db.exec(`
+        INSERT INTO messages_fts (id, content, sender)
+        SELECT id, content, sender FROM messages;
+      `);
+      console.log('[Store] FTS 索引已同步:', count.count, '条');
+    }
+
     // 创建已读表（群聊）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS message_reads (
@@ -163,6 +184,15 @@ class MessageStore {
           message.replyTo || null
         );
         
+        // 同时更新 FTS 索引
+        if (result.changes > 0) {
+          const ftsStmt = this.db.prepare(`
+            INSERT INTO messages_fts (id, content, sender)
+            VALUES (?, ?, ?)
+          `);
+          ftsStmt.run(message.id, message.content, message.sender);
+        }
+        
         return result.changes > 0;
       } catch (error) {
         console.error('[Store] 添加消息失败:', error.message);
@@ -178,6 +208,13 @@ class MessageStore {
     try {
       const stmt = this.db.prepare('DELETE FROM messages WHERE id = ?');
       const result = stmt.run(messageId);
+      
+      // 同时删除 FTS 索引
+      if (result.changes > 0) {
+        const ftsStmt = this.db.prepare('DELETE FROM messages_fts WHERE id = ?');
+        ftsStmt.run(messageId);
+      }
+      
       return result.changes > 0;
     } catch (error) {
       console.error('[Store] 删除消息失败:', error.message);
@@ -304,15 +341,116 @@ class MessageStore {
   /**
    * 搜索消息
    */
-  searchMessages(query, limit = 50) {
+  /**
+   * 搜索消息（使用 FTS5 全文索引）
+   * @param {string} query 搜索关键词
+   * @param {Object} options 搜索选项
+   */
+  searchMessages(query, options = {}) {
     try {
-      const stmt = this.db.prepare(`
-        SELECT * FROM messages 
-        WHERE content LIKE ? 
-        ORDER BY timestamp DESC 
-        LIMIT ?
-      `);
-      const rows = stmt.all(`%${query}%`, limit);
+      const {
+        limit = 50,
+        offset = 0,
+        sender = null,
+        startTime = null,
+        endTime = null,
+        source = null,
+        highlight = false
+      } = options;
+
+      // 使用 FTS5 全文搜索
+      let sql = `
+        SELECT 
+          m.id, m.type, m.sender, m.content, m.timestamp, m.source, m.at_targets, m.reply_to,
+          ${highlight ? "highlight(messages_fts, 1, '<mark>', '</mark>') as highlighted" : 'NULL as highlighted'}
+        FROM messages_fts fts
+        JOIN messages m ON fts.id = m.id
+        WHERE fts.content MATCH ?
+      `;
+      
+      const params = [query];
+
+      // 添加过滤条件
+      if (sender) {
+        sql += ` AND m.sender = ?`;
+        params.push(sender);
+      }
+      
+      if (startTime) {
+        sql += ` AND m.timestamp >= ?`;
+        params.push(startTime);
+      }
+      
+      if (endTime) {
+        sql += ` AND m.timestamp <= ?`;
+        params.push(endTime);
+      }
+      
+      if (source) {
+        sql += ` AND m.source = ?`;
+        params.push(source);
+      }
+
+      sql += ` ORDER BY m.timestamp DESC LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+
+      const stmt = this.db.prepare(sql);
+      const rows = stmt.all(...params);
+      
+      return rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        sender: row.sender,
+        content: row.content,
+        timestamp: row.timestamp,
+        source: row.source,
+        atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+        replyTo: row.reply_to,
+        highlighted: row.highlighted || null
+      }));
+    } catch (error) {
+      console.error('[Store] 搜索消息失败:', error.message);
+      
+      // 回退到 LIKE 搜索
+      return this.searchMessagesLegacy(query, options);
+    }
+  }
+
+  /**
+   * 传统搜索（回退方案）
+   */
+  searchMessagesLegacy(query, options = {}) {
+    try {
+      const { limit = 50, offset = 0, sender = null, startTime = null, endTime = null, source = null } = options;
+      
+      let sql = `SELECT * FROM messages WHERE content LIKE ?`;
+      const params = [`%${query}%`];
+
+      if (sender) {
+        sql += ` AND sender = ?`;
+        params.push(sender);
+      }
+      
+      if (startTime) {
+        sql += ` AND timestamp >= ?`;
+        params.push(startTime);
+      }
+      
+      if (endTime) {
+        sql += ` AND timestamp <= ?`;
+        params.push(endTime);
+      }
+      
+      if (source) {
+        sql += ` AND source = ?`;
+        params.push(source);
+      }
+
+      sql += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+
+      const stmt = this.db.prepare(sql);
+      const rows = stmt.all(...params);
       
       return rows.map(row => ({
         id: row.id,
@@ -325,7 +463,7 @@ class MessageStore {
         replyTo: row.reply_to
       }));
     } catch (error) {
-      console.error('[Store] 搜索消息失败:', error.message);
+      console.error('[Store] 传统搜索失败:', error.message);
       return [];
     }
   }

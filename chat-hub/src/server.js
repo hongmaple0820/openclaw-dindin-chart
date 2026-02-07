@@ -820,19 +820,53 @@ app.get('/health', (req, res) => {
  * 搜索消息
  * GET /api/search?q=关键词&limit=50
  */
+/**
+ * 搜索消息（增强版）
+ * GET /api/search?q=关键词&sender=发送者&startTime=开始时间&endTime=结束时间&source=来源&limit=50&offset=0&highlight=true&includeChain=false
+ */
 app.get('/api/search', (req, res) => {
   try {
-    const { q, limit, includeChain } = req.query;
+    const { 
+      q, 
+      sender, 
+      startTime, 
+      endTime, 
+      source, 
+      limit, 
+      offset, 
+      highlight, 
+      includeChain 
+    } = req.query;
+    
     if (!q) {
       return res.status(400).json({ success: false, error: 'q is required' });
     }
-    const messages = messageStore.searchMessages(q, parseInt(limit) || 50);
+
+    // 构建搜索选项
+    const options = {
+      limit: parseInt(limit) || 50,
+      offset: parseInt(offset) || 0,
+      sender: sender || null,
+      startTime: startTime ? parseInt(startTime) : null,
+      endTime: endTime ? parseInt(endTime) : null,
+      source: source || null,
+      highlight: highlight === 'true'
+    };
+
+    const messages = messageStore.searchMessages(q, options);
     
     // 附加引用消息内容
     const messagesWithReply = messageStore.attachReplyToMessages(messages, includeChain === 'true');
     
-    res.json({ success: true, count: messagesWithReply.length, messages: messagesWithReply });
+    res.json({ 
+      success: true, 
+      count: messagesWithReply.length, 
+      messages: messagesWithReply,
+      query: q,
+      options 
+    });
   } catch (error) {
+    console.error('[Server] 搜索失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
