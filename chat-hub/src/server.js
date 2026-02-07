@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
 const redisClient = require('./redis-client');
@@ -410,6 +411,168 @@ app.delete('/api/message/:messageId', async (req, res) => {
       res.json({ success: true });
     } else {
       res.status(404).json({ success: false, error: 'Message not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==================== 图片上传 API ====================
+
+const imageUpload = require('./image-upload');
+const upload = imageUpload.createUploadMiddleware();
+
+/**
+ * 上传图片
+ * POST /api/upload/image
+ * Form-data: image (file), sender (string), messageId (string, optional)
+ */
+app.post('/api/upload/image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '没有上传文件' });
+    }
+
+    const { sender, messageId } = req.body;
+    
+    if (!sender) {
+      // 删除已上传的文件
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({ success: false, error: 'sender is required' });
+    }
+
+    // 如果没有提供 messageId，创建一个图片消息
+    let finalMessageId = messageId;
+    if (!finalMessageId) {
+      const message = {
+        id: uuidv4(),
+        type: 'image',
+        sender,
+        content: `[图片] ${req.file.originalname}`,
+        timestamp: Date.now(),
+        source: 'upload',
+        atTargets: null,
+        replyTo: null
+      };
+      
+      await messageStore.addMessage(message);
+      finalMessageId = message.id;
+      
+      // 推送消息
+      try {
+        const websocket = require('./websocket');
+        websocket.pushMessage(message);
+      } catch (e) {}
+      
+      // 发布到 Redis
+      await redisClient.publish(config.channels.messages, message);
+    }
+
+    // 处理上传的文件
+    const imageData = await imageUpload.processUploadedFile(req.file, sender, finalMessageId);
+    
+    // 存储图片记录
+    await messageStore.addImage(imageData);
+
+    console.log('[Server] 图片上传成功:', imageData.originalName, '->', imageData.filename);
+    
+    res.json({
+      success: true,
+      image: {
+        id: imageData.id,
+        messageId: finalMessageId,
+        filename: imageData.filename,
+        originalName: imageData.originalName,
+        url: `/api/images/${imageData.filename}`,
+        thumbnailUrl: imageData.thumbnailPath ? `/api/images/thumb_${imageData.filename}` : null,
+        mimeType: imageData.mimeType,
+        fileSize: imageData.fileSize,
+        width: imageData.width,
+        height: imageData.height
+      }
+    });
+  } catch (error) {
+    console.error('[Server] 图片上传失败:', error);
+    
+    // 清理已上传的文件
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取图片文件
+ * GET /api/images/:filename
+ */
+app.get('/api/images/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // 判断是原图还是缩略图
+    const isThumbnail = filename.startsWith('thumb_');
+    const imageDir = isThumbnail ? imageUpload.thumbnailDir : imageUpload.imageDir;
+    const filePath = path.join(imageDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: '图片不存在' });
+    }
+
+    res.sendFile(filePath);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取消息的图片列表
+ * GET /api/images/message/:messageId
+ */
+app.get('/api/images/message/:messageId', (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const images = messageStore.getMessageImages(messageId);
+    
+    const imagesWithUrls = images.map(img => ({
+      ...img,
+      url: `/api/images/${img.filename}`,
+      thumbnailUrl: img.thumbnailPath ? `/api/images/thumb_${img.filename}` : null
+    }));
+    
+    res.json({ success: true, count: images.length, images: imagesWithUrls });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 删除图片
+ * DELETE /api/images/:imageId
+ */
+app.delete('/api/images/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params;
+    
+    // 获取图片信息
+    const image = messageStore.getImageById(imageId);
+    if (!image) {
+      return res.status(404).json({ success: false, error: '图片不存在' });
+    }
+
+    // 删除文件
+    imageUpload.deleteImageFiles(image.filePath, image.thumbnailPath);
+    
+    // 删除数据库记录
+    const deleted = messageStore.deleteImage(imageId);
+    
+    if (deleted) {
+      res.json({ success: true, message: '图片已删除' });
+    } else {
+      res.status(500).json({ success: false, error: '删除失败' });
     }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

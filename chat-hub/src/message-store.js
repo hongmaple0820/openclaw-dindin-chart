@@ -78,6 +78,30 @@ class MessageStore {
       CREATE INDEX IF NOT EXISTS idx_reads_message ON message_reads(message_id);
       CREATE INDEX IF NOT EXISTS idx_reads_reader ON message_reads(reader_id);
     `);
+
+    // 创建图片上传表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS images (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        thumbnail_path TEXT,
+        mime_type TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        width INTEGER,
+        height INTEGER,
+        uploaded_by TEXT NOT NULL,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        FOREIGN KEY (message_id) REFERENCES messages(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_images_message ON images(message_id);
+      CREATE INDEX IF NOT EXISTS idx_images_uploader ON images(uploaded_by);
+    `);
+    
+    console.log('[Store] 图片上传功能已初始化');
   }
 
   /**
@@ -579,6 +603,171 @@ class MessageStore {
       });
     } catch (error) {
       console.error('[Store] 附加引用消息失败:', error.message);
+      return messages;
+    }
+  }
+
+  // ==================== 图片上传功能 ====================
+
+  /**
+   * 添加图片记录
+   * @param {Object} imageData 图片数据
+   */
+  async addImage(imageData) {
+    return this.withRetry(() => {
+      try {
+        const stmt = this.db.prepare(`
+          INSERT INTO images (
+            id, message_id, filename, original_name, file_path, thumbnail_path,
+            mime_type, file_size, width, height, uploaded_by
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        const result = stmt.run(
+          imageData.id,
+          imageData.messageId,
+          imageData.filename,
+          imageData.originalName,
+          imageData.filePath,
+          imageData.thumbnailPath || null,
+          imageData.mimeType,
+          imageData.fileSize,
+          imageData.width || null,
+          imageData.height || null,
+          imageData.uploadedBy
+        );
+        
+        return result.changes > 0;
+      } catch (error) {
+        console.error('[Store] 添加图片失败:', error.message);
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * 获取消息的所有图片
+   * @param {string} messageId 消息ID
+   */
+  getMessageImages(messageId) {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM images WHERE message_id = ?');
+      const rows = stmt.all(messageId);
+      return rows.map(row => ({
+        id: row.id,
+        messageId: row.message_id,
+        filename: row.filename,
+        originalName: row.original_name,
+        filePath: row.file_path,
+        thumbnailPath: row.thumbnail_path,
+        mimeType: row.mime_type,
+        fileSize: row.file_size,
+        width: row.width,
+        height: row.height,
+        uploadedBy: row.uploaded_by,
+        createdAt: row.created_at
+      }));
+    } catch (error) {
+      console.error('[Store] 获取图片失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 获取单张图片信息
+   * @param {string} imageId 图片ID
+   */
+  getImageById(imageId) {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM images WHERE id = ?');
+      const row = stmt.get(imageId);
+      if (!row) return null;
+      
+      return {
+        id: row.id,
+        messageId: row.message_id,
+        filename: row.filename,
+        originalName: row.original_name,
+        filePath: row.file_path,
+        thumbnailPath: row.thumbnail_path,
+        mimeType: row.mime_type,
+        fileSize: row.file_size,
+        width: row.width,
+        height: row.height,
+        uploadedBy: row.uploaded_by,
+        createdAt: row.created_at
+      };
+    } catch (error) {
+      console.error('[Store] 获取图片失败:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * 删除图片记录
+   * @param {string} imageId 图片ID
+   */
+  deleteImage(imageId) {
+    try {
+      const stmt = this.db.prepare('DELETE FROM images WHERE id = ?');
+      const result = stmt.run(imageId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('[Store] 删除图片失败:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 获取用户上传的所有图片
+   * @param {string} userId 用户ID
+   * @param {number} limit 限制数量
+   */
+  getUserImages(userId, limit = 50) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM images 
+        WHERE uploaded_by = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+      `);
+      const rows = stmt.all(userId, limit);
+      return rows.map(row => ({
+        id: row.id,
+        messageId: row.message_id,
+        filename: row.filename,
+        originalName: row.original_name,
+        filePath: row.file_path,
+        thumbnailPath: row.thumbnail_path,
+        mimeType: row.mime_type,
+        fileSize: row.file_size,
+        width: row.width,
+        height: row.height,
+        uploadedBy: row.uploaded_by,
+        createdAt: row.created_at
+      }));
+    } catch (error) {
+      console.error('[Store] 获取用户图片失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 为消息列表附加图片信息
+   * @param {Array} messages 消息列表
+   */
+  attachImages(messages) {
+    try {
+      return messages.map(msg => {
+        const images = this.getMessageImages(msg.id);
+        if (images.length > 0) {
+          return { ...msg, images };
+        }
+        return msg;
+      });
+    } catch (error) {
+      console.error('[Store] 附加图片失败:', error.message);
       return messages;
     }
   }
