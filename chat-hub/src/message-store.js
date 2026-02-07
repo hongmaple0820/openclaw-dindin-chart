@@ -371,10 +371,11 @@ class MessageStore {
         SELECT m.* FROM messages m
         LEFT JOIN message_reads r ON m.id = r.message_id AND r.reader_id = ?
         WHERE r.message_id IS NULL
+          AND m.sender != ?
         ORDER BY m.timestamp ASC
         LIMIT ?
       `);
-      const rows = stmt.all(readerId, limit);
+      const rows = stmt.all(readerId, readerId, limit);
 
       return rows.map(row => ({
         id: row.id,
@@ -402,8 +403,9 @@ class MessageStore {
         SELECT COUNT(*) as count FROM messages m
         LEFT JOIN message_reads r ON m.id = r.message_id AND r.reader_id = ?
         WHERE r.message_id IS NULL
+          AND m.sender != ?
       `);
-      return stmt.get(readerId).count;
+      return stmt.get(readerId, readerId).count;
     } catch (error) {
       console.error('[Store] 获取未读数量失败:', error.message);
       return 0;
