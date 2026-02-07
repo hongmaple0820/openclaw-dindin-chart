@@ -14,7 +14,7 @@ class EmailNotifier {
     this.minAlertInterval = 30 * 60 * 1000; // 最小提醒间隔 30 分钟
     
     if (this.enabled) {
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         service: config.email.service || 'QQ',
         auth: {
           user: config.email.auth.user,
