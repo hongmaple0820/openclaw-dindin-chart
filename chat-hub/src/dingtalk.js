@@ -168,11 +168,16 @@ async function sendText(content, sender = 'System', atTargets = null) {
     // 解析 @ 目标
     const { atMobiles, isAtAll, atText } = parseAtTargets(atTargets);
 
+    // 添加发送者标识
+    const fullContent = sender 
+      ? `${atText}${content} [${sender}]`
+      : `${atText}${content}`;
+
     // 构造消息体
     const data = {
       msgtype: 'text',
       text: {
-        content: atText + content
+        content: fullContent
       },
       at: {
         atMobiles,
@@ -184,47 +189,16 @@ async function sendText(content, sender = 'System', atTargets = null) {
 
     try {
       const response = await requestWithRetry(url, data);
-      console.log('[钉钉] 发送成功');
+      console.log('[钉钉] 发送成功:', sender, '->', content.substring(0, 50));
+      if (atMobiles.length > 0) {
+        console.log('[钉钉] @用户:', atMobiles.join(', '));
+      }
+      if (isAtAll) {
+        console.log('[钉钉] @所有人');
+      }
       return response.data;
     } catch (error) {
       console.error('[钉钉] 发送失败:', error.message);
-      throw error;
-    }
-  });
-}
-
-    // 添加发送者标识和 @ 文本
-    const fullContent = sender 
-      ? `${atText}${content} [${sender}]`
-      : `${atText}${content}`;
-
-    const body = {
-      msgtype: 'text',
-      text: {
-        content: fullContent
-      },
-      at: {
-        atMobiles: atMobiles,
-        isAtAll: isAtAll
-      }
-    };
-
-    try {
-      const res = await axios.post(url, body, { timeout: 10000 });
-      if (res.data.errcode !== 0) {
-        console.error('[钉钉] 发送失败:', res.data);
-      } else {
-        console.log('[钉钉] 发送成功:', sender, '->', content.substring(0, 50));
-        if (atMobiles.length > 0) {
-          console.log('[钉钉] @用户:', atMobiles.join(', '));
-        }
-        if (isAtAll) {
-          console.log('[钉钉] @所有人');
-        }
-      }
-      return res.data;
-    } catch (error) {
-      console.error('[钉钉] 请求失败:', error.message);
       throw error;
     }
   });
