@@ -370,14 +370,15 @@ custom_domains = chat.your-domain.com
 3. ✅ **Cloudflare Quick Tunnel** - 成功运行
 4. ✅ **localtunnel** - 当前使用
 
-#### 当前配置
-- **方案**：localtunnel
-- **地址**：https://chat-maple.loca.lt
-- **启动命令**：
-  ```bash
-  nohup lt --port 3000 --subdomain chat-maple > /tmp/localtunnel.log 2>&1 &
-  ```
+#### 当前配置（最终方案）
+- **方案**：Tailscale ⭐⭐⭐
+- **地址（域名）**：http://lidx.tailcd4f49.ts.net:3000
+- **地址（IP）**：http://100.85.28.39:3000
 - **状态**：运行中 ✅
+
+#### 已尝试方案
+1. ❌ **localtunnel** - 有密码验证页面（不适合）
+2. ✅ **Tailscale** - 完美运行（最终选择）
 
 #### 经验总结
 1. **优先尝试无需授权的方案**（localtunnel、Quick Tunnel）
