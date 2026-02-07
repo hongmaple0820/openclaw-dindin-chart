@@ -7,6 +7,7 @@ const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
+const sseManager = require('./sse-manager');
 
 const app = express();
 
@@ -274,6 +275,9 @@ app.post('/api/reply', async (req, res) => {
       const websocket = require('./websocket');
       websocket.pushMessage(message);
     } catch (e) {}
+
+    // SSE 推送新消息
+    sseManager.broadcast('message', message);
 
     // 发布到回复频道（订阅者会发送到钉钉）
     await redisClient.publish(config.channels.replies, message);
@@ -818,6 +822,51 @@ async function start() {
       forwarded: true
     };
     await redisClient.publish(config.channels.messages, forwardMessage);
+  });
+
+  // ============ SSE 实时推送 ============
+
+  /**
+   * SSE 连接端点
+   * GET /api/sse/connect
+   * Query: userId (必填)
+   */
+  app.get('/api/sse/connect', (req, res) => {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'userId is required' });
+    }
+
+    console.log(`[SSE] 收到连接请求: ${userId}`);
+    sseManager.connect(userId, res);
+  });
+
+  /**
+   * 获取在线用户列表
+   * GET /api/sse/online
+   */
+  app.get('/api/sse/online', (req, res) => {
+    const users = sseManager.getOnlineUsers();
+    res.json({
+      success: true,
+      count: users.length,
+      users,
+    });
+  });
+
+  /**
+   * 检查用户是否在线
+   * GET /api/sse/status/:userId
+   */
+  app.get('/api/sse/status/:userId', (req, res) => {
+    const { userId } = req.params;
+    const isOnline = sseManager.isOnline(userId);
+    res.json({
+      success: true,
+      userId,
+      isOnline,
+    });
   });
 
   // SPA fallback - 所有未匹配的路由返回 index.html
