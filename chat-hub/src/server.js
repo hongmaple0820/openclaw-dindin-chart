@@ -253,7 +253,7 @@ app.post('/api/send', async (req, res) => {
  */
 app.post('/api/reply', async (req, res) => {
   try {
-    const { content, sender = 'Bot', atTargets = null } = req.body;
+    const { content, sender = 'Bot', atTargets = null, replyTo = null } = req.body;
 
     if (!content) {
       return res.status(400).json({ success: false, error: 'content is required' });
@@ -267,7 +267,7 @@ app.post('/api/reply', async (req, res) => {
       timestamp: Date.now(),
       source: 'bot',
       atTargets,
-      replyTo: null
+      replyTo  // 支持引用回复
     };
 
     // WebSocket 推送新消息
@@ -282,7 +282,7 @@ app.post('/api/reply', async (req, res) => {
     // 发布到回复频道（订阅者会发送到钉钉）
     await redisClient.publish(config.channels.replies, message);
     
-    console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50));
+    console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50), replyTo ? `(回复: ${replyTo})` : '');
     res.json({ success: true, message });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -295,7 +295,7 @@ app.post('/api/reply', async (req, res) => {
  */
 app.post('/api/store', async (req, res) => {
   try {
-    const { content, sender, source = 'openclaw', timestamp, atTargets } = req.body;
+    const { content, sender, source = 'openclaw', timestamp, atTargets, replyTo } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, error: 'content is required' });
@@ -316,7 +316,7 @@ app.post('/api/store', async (req, res) => {
       timestamp: timestamp || Date.now(),
       source,
       atTargets: parsedAtTargets.length > 0 ? parsedAtTargets : null,
-      replyTo: null
+      replyTo: replyTo || null  // 支持引用回复
     };
 
     // 仅保存到本地，不发钉钉
@@ -334,7 +334,7 @@ app.post('/api/store', async (req, res) => {
     // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
     
-    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '');
+    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '', replyTo ? `(回复: ${replyTo})` : '');
     res.json({ success: true, message });
   } catch (error) {
     console.error('[Server] 存储消息失败:', error);
@@ -467,14 +467,19 @@ app.get('/api/unread/:readerId', async (req, res) => {
   try {
     const { readerId } = req.params;
     const limit = parseInt(req.query.limit) || 100;
+    const includeChain = req.query.includeChain === 'true'; // 是否包含完整引用链
 
     const messages = messageStore.getUnreadMessages(readerId, limit);
+    
+    // 附加引用消息内容
+    const messagesWithReply = messageStore.attachReplyToMessages(messages, includeChain);
+    
     const count = messageStore.getUnreadCount(readerId);
 
     res.json({ 
       success: true, 
       count,
-      messages 
+      messages: messagesWithReply
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -546,12 +551,16 @@ app.get('/health', (req, res) => {
  */
 app.get('/api/search', (req, res) => {
   try {
-    const { q, limit } = req.query;
+    const { q, limit, includeChain } = req.query;
     if (!q) {
       return res.status(400).json({ success: false, error: 'q is required' });
     }
     const messages = messageStore.searchMessages(q, parseInt(limit) || 50);
-    res.json({ success: true, count: messages.length, messages });
+    
+    // 附加引用消息内容
+    const messagesWithReply = messageStore.attachReplyToMessages(messages, includeChain === 'true');
+    
+    res.json({ success: true, count: messagesWithReply.length, messages: messagesWithReply });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -784,6 +793,32 @@ async function start() {
   // 注册管理后台路由
   const adminRoutes = require('./routes/admin')(messageStore, messageStore.db);
   app.use('/api/admin', adminRoutes);
+
+  // 订阅消息频道（自动同步其他 AI 的消息到本地数据库）
+  await redisClient.subscribe(config.channels.messages, async (message) => {
+    // 检查消息去重（基于 message.id）
+    if (messageStore.isDuplicate(message.id)) {
+      console.log(`[Server] 跳过重复消息: ${message.id}`);
+      return;
+    }
+
+    // 保存到本地数据库
+    const saved = await messageStore.addMessage(message);
+    if (saved) {
+      console.log(`[Server] 同步消息: ${message.sender} -> ${message.content?.substring(0, 30)}... [source: ${message.source}]`);
+      
+      // 通知 WebSocket 客户端
+      try {
+        const websocket = require('./websocket');
+        websocket.pushMessage(message);
+      } catch (e) {
+        // WebSocket 可能未初始化
+      }
+      
+      // 通知 SSE 客户端
+      sseManager.broadcast('message', message);
+    }
+  });
 
   // 订阅回复频道
   await redisClient.subscribe(config.channels.replies, async (message) => {

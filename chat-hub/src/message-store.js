@@ -495,6 +495,94 @@ class MessageStore {
     }
   }
 
+  // ==================== 引用回复功能 ====================
+
+  /**
+   * 获取单条消息（用于查询被引用的消息）
+   * @param {string} messageId 消息ID
+   */
+  getMessageById(messageId) {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM messages WHERE id = ?');
+      const row = stmt.get(messageId);
+      
+      if (!row) return null;
+      
+      return {
+        id: row.id,
+        type: row.type,
+        sender: row.sender,
+        content: row.content,
+        timestamp: row.timestamp,
+        source: row.source,
+        atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+        replyTo: row.reply_to
+      };
+    } catch (error) {
+      console.error('[Store] 获取消息失败:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * 获取引用链（递归查询被引用的所有消息）
+   * @param {string} messageId 起始消息ID
+   * @param {number} maxDepth 最大递归深度（默认5层）
+   */
+  getReplyChain(messageId, maxDepth = 5) {
+    try {
+      const chain = [];
+      let currentId = messageId;
+      let depth = 0;
+
+      while (currentId && depth < maxDepth) {
+        const message = this.getMessageById(currentId);
+        if (!message) break;
+        
+        chain.push(message);
+        currentId = message.replyTo;
+        depth++;
+      }
+
+      return chain;
+    } catch (error) {
+      console.error('[Store] 获取引用链失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 为消息列表附加引用消息内容
+   * @param {Array} messages 消息列表
+   * @param {boolean} includeChain 是否包含完整引用链（默认只包含直接引用）
+   */
+  attachReplyToMessages(messages, includeChain = false) {
+    try {
+      return messages.map(msg => {
+        if (!msg.replyTo) return msg;
+
+        if (includeChain) {
+          // 包含完整引用链
+          const chain = this.getReplyChain(msg.replyTo);
+          return {
+            ...msg,
+            replyToChain: chain
+          };
+        } else {
+          // 只包含直接引用的消息
+          const replyToMsg = this.getMessageById(msg.replyTo);
+          return {
+            ...msg,
+            replyToMessage: replyToMsg
+          };
+        }
+      });
+    } catch (error) {
+      console.error('[Store] 附加引用消息失败:', error.message);
+      return messages;
+    }
+  }
+
   /**
    * 关闭数据库
    */
