@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
@@ -11,6 +12,17 @@ const fileRoutes = require('./routes/files');
 const sseManager = require('./sse-manager');
 
 const app = express();
+
+// HTTP 压缩（gzip/brotli）
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  threshold: 1024 // 大于 1KB 才压缩
+}));
 
 // 静态文件服务 - 前端 SPA
 const webDistPath = path.resolve(__dirname, '../../chat-web/dist');
@@ -39,6 +51,53 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// ==================== 性能监控中间件 ====================
+const performanceStats = {
+  requests: 0,
+  slowQueries: [],
+  errors: 0
+};
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  performanceStats.requests++;
+
+  // 监听响应完成
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    
+    // 记录慢查询（超过 1 秒）
+    if (duration > 1000) {
+      const slowQuery = {
+        method: req.method,
+        path: req.path,
+        duration,
+        timestamp: Date.now()
+      };
+      
+      performanceStats.slowQueries.push(slowQuery);
+      
+      // 只保留最近 10 条慢查询
+      if (performanceStats.slowQueries.length > 10) {
+        performanceStats.slowQueries.shift();
+      }
+      
+      console.warn(`⚠️ 慢查询: ${req.method} ${req.path} 用时 ${duration}ms`);
+    }
+  });
+
+  next();
+});
+
+// 错误计数
+app.use((err, req, res, next) => {
+  performanceStats.errors++;
+  next(err);
+});
+
+// 缓存管理器
+const cacheManager = require('./cache-manager');
 
 // 用户认证模块
 const auth = require('./auth');
@@ -1113,17 +1172,90 @@ app.get('/api/read-summary', async (req, res) => {
 /**
  * 健康检查
  */
-app.get('/health', (req, res) => {
+/**
+ * 健康检查（增强版）
+ * GET /health
+ */
+app.get('/health', async (req, res) => {
   const stats = messageStore.getStats();
+  const memUsage = process.memoryUsage();
+  const uptime = process.uptime();
+  
+  // Redis 健康检查
+  let redisStatus = 'unknown';
+  let redisLatency = null;
+  try {
+    const redisStart = Date.now();
+    await redisClient.ping();
+    redisLatency = Date.now() - redisStart;
+    redisStatus = 'connected';
+  } catch (error) {
+    redisStatus = 'disconnected';
+  }
+  
+  // 缓存统计
+  const cacheStats = cacheManager.getStats();
+  
   res.json({ 
-    status: 'ok', 
+    status: 'ok',
+    version: '1.10.0',
     timestamp: Date.now(),
-    messageCount: stats.total,
-    todayCount: stats.today,
+    uptime: Math.floor(uptime),
+    
+    // 数据库统计
+    database: {
+      messages: stats.total,
+      today: stats.today,
+      images: messageStore.db.prepare('SELECT COUNT(*) as count FROM images').get().count,
+      reactions: messageStore.db.prepare('SELECT COUNT(*) as count FROM reactions').get().count
+    },
+    
+    // Redis 状态
+    redis: {
+      status: redisStatus,
+      latency: redisLatency
+    },
+    
+    // 缓存统计
+    cache: cacheStats,
+    
+    // 性能统计
+    performance: {
+      totalRequests: performanceStats.requests,
+      slowQueries: performanceStats.slowQueries.length,
+      errors: performanceStats.errors,
+      avgMemory: `${Math.round(memUsage.heapUsed / 1024 / 1024)} MB`
+    },
+    
+    // 内存使用
+    memory: {
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+      rss: Math.round(memUsage.rss / 1024 / 1024),
+      external: Math.round(memUsage.external / 1024 / 1024)
+    },
+    
+    // 配置信息
     config: {
       bot: config.bot?.name,
       storeDir: messageStore.storeDir,
       dbPath: messageStore.dbPath
+    }
+  });
+});
+
+/**
+ * 性能统计详情
+ * GET /api/performance
+ */
+app.get('/api/performance', (req, res) => {
+  res.json({
+    success: true,
+    stats: {
+      totalRequests: performanceStats.requests,
+      slowQueries: performanceStats.slowQueries,
+      errors: performanceStats.errors,
+      cache: cacheManager.getStats()
     }
   });
 });
@@ -1187,10 +1319,26 @@ app.get('/api/search', (req, res) => {
  * 获取统计信息
  * GET /api/stats
  */
-app.get('/api/stats', (req, res) => {
+/**
+ * 获取统计数据（带缓存）
+ * GET /api/stats
+ */
+app.get('/api/stats', async (req, res) => {
   try {
-    const stats = messageStore.getStats();
-    res.json({ success: true, stats });
+    const cacheKey = 'chat:stats:overview';
+    
+    // 尝试从缓存获取
+    let stats = await cacheManager.get(cacheKey);
+    
+    if (!stats) {
+      // 缓存未命中，查询数据库
+      stats = messageStore.getStats();
+      
+      // 缓存 60 秒
+      await cacheManager.set(cacheKey, stats, 60);
+    }
+    
+    res.json({ success: true, stats, cached: !!stats });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

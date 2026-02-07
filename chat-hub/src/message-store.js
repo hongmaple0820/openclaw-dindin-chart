@@ -54,6 +54,9 @@ class MessageStore {
 
       CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
       CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender);
+      CREATE INDEX IF NOT EXISTS idx_messages_timestamp_sender ON messages(timestamp DESC, sender);
+      CREATE INDEX IF NOT EXISTS idx_messages_type_timestamp ON messages(type, timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_messages_source ON messages(source);
 
       CREATE TABLE IF NOT EXISTS sync_state (
         participant_id TEXT PRIMARY KEY,
@@ -120,6 +123,7 @@ class MessageStore {
 
       CREATE INDEX IF NOT EXISTS idx_images_message ON images(message_id);
       CREATE INDEX IF NOT EXISTS idx_images_uploader ON images(uploaded_by);
+      CREATE INDEX IF NOT EXISTS idx_images_created_sender ON images(created_at DESC, uploaded_by);
     `);
     
     console.log('[Store] 图片上传功能已初始化');
@@ -138,6 +142,7 @@ class MessageStore {
 
       CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions(message_id);
       CREATE INDEX IF NOT EXISTS idx_reactions_reactor ON reactions(reactor_id);
+      CREATE INDEX IF NOT EXISTS idx_reactions_message_emoji ON reactions(message_id, emoji);
     `);
     
     console.log('[Store] 表情回应功能已初始化');

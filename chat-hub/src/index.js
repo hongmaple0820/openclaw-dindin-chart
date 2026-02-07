@@ -101,14 +101,34 @@ async function main() {
     }
     console.log('========================================\n');
 
+    // ==================== 内存监控 ====================
+    const memoryMonitorInterval = setInterval(() => {
+      const used = process.memoryUsage();
+      const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
+      const rssMB = Math.round(used.rss / 1024 / 1024);
+      
+      // 内存使用超过 500MB 时告警
+      if (heapUsedMB > 500) {
+        console.warn(`⚠️ 内存使用过高: Heap ${heapUsedMB}MB, RSS ${rssMB}MB`);
+        
+        // 记录到性能日志
+        if (global.gc) {
+          console.log('🔄 触发垃圾回收...');
+          global.gc();
+        }
+      }
+    }, 60000); // 每分钟检查一次
+
     // 优雅退出
     process.on('SIGINT', async () => {
       console.log('\n正在关闭服务...');
+      clearInterval(memoryMonitorInterval);
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
       console.log('\n收到终止信号，关闭服务...');
+      clearInterval(memoryMonitorInterval);
       process.exit(0);
     });
 
