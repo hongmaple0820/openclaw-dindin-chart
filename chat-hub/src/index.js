@@ -3,11 +3,23 @@ const OpenClawTrigger = require('./bots/openclaw-trigger');
 const SmartConversationManager = require('./bots/smart-conversation');
 const Analytics = require('./analytics');
 const config = require('./config');
+const PidLock = require('./utils/pid-lock');
 
 /**
  * 主入口
  */
 async function main() {
+  // 获取 PID 锁
+  const pidLock = new PidLock();
+  
+  try {
+    await pidLock.acquire();
+  } catch (error) {
+    console.error('❌ 无法获取锁:', error.message);
+    console.error('   另一个实例可能正在运行');
+    console.error('   提示: 如果确认没有其他实例，请删除 ~/.openclaw/chat-hub.pid');
+    process.exit(1);
+  }
   const botName = config.bot?.name || 'Bot';
   const mode = config.mode || 'storage';
   const triggerEnabled = config.trigger?.enabled ?? false;

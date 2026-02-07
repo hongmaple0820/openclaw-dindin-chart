@@ -27,8 +27,16 @@ class MessageStore {
     }
 
     // 连接数据库
-    this.db = new Database(this.dbPath);
+    this.db = new Database(this.dbPath, {
+      timeout: 10000, // 10 秒超时
+    });
+
+    // 启用 WAL 模式（写前日志，避免锁冲突）
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 10000');
+    
     console.log('[Store] 数据库:', this.dbPath);
+    console.log('[Store] WAL 模式:', this.db.pragma('journal_mode', { simple: true }));
 
     // 创建表
     this.db.exec(`
@@ -73,31 +81,52 @@ class MessageStore {
   }
 
   /**
-   * 添加消息
+   * 重试包装器
    */
-  addMessage(message) {
-    try {
-      const stmt = this.db.prepare(`
-        INSERT OR IGNORE INTO messages (id, type, sender, content, timestamp, source, at_targets, reply_to)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      
-      const result = stmt.run(
-        message.id,
-        message.type,
-        message.sender,
-        message.content,
-        message.timestamp,
-        message.source || null,
-        message.atTargets ? JSON.stringify(message.atTargets) : null,
-        message.replyTo || null
-      );
-      
-      return result.changes > 0;
-    } catch (error) {
-      console.error('[Store] 添加消息失败:', error.message);
-      return false;
+  async withRetry(fn, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return fn();
+      } catch (error) {
+        if (error.code === 'SQLITE_BUSY' && i < maxRetries - 1) {
+          const delay = Math.pow(2, i) * 100; // 100ms, 200ms, 400ms
+          console.warn(`[Store] 数据库忙，${delay}ms 后重试 (${i + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
     }
+  }
+
+  /**
+   * 添加消息（带重试）
+   */
+  async addMessage(message) {
+    return this.withRetry(() => {
+      try {
+        const stmt = this.db.prepare(`
+          INSERT OR IGNORE INTO messages (id, type, sender, content, timestamp, source, at_targets, reply_to)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        const result = stmt.run(
+          message.id,
+          message.type,
+          message.sender,
+          message.content,
+          message.timestamp,
+          message.source || null,
+          message.atTargets ? JSON.stringify(message.atTargets) : null,
+          message.replyTo || null
+        );
+        
+        return result.changes > 0;
+      } catch (error) {
+        console.error('[Store] 添加消息失败:', error.message);
+        throw error;
+      }
+    });
   }
 
   /**
