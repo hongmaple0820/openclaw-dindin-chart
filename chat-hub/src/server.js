@@ -869,6 +869,58 @@ async function start() {
     });
   });
 
+  // ============ 监控 API ============
+
+  /**
+   * 获取内存状态
+   * GET /api/monitor/memory
+   */
+  app.get('/api/monitor/memory', (req, res) => {
+    try {
+      const MemoryGuard = require('./utils/memory-guard');
+      const memoryGuard = new MemoryGuard();
+      const status = memoryGuard.getStatus();
+      res.json({ success: true, ...status });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * 获取系统状态（综合）
+   * GET /api/monitor/status
+   */
+  app.get('/api/monitor/status', async (req, res) => {
+    try {
+      const memory = process.memoryUsage();
+      const uptime = process.uptime();
+      const redisStatus = redisClient.getStatus();
+      const onlineUsers = sseManager.getOnlineUsers();
+
+      res.json({
+        success: true,
+        system: {
+          uptime: Math.round(uptime),
+          memory: {
+            heapUsed: Math.round(memory.heapUsed / 1024 / 1024),
+            heapTotal: Math.round(memory.heapTotal / 1024 / 1024),
+            rss: Math.round(memory.rss / 1024 / 1024),
+          },
+          node: process.version,
+          pid: process.pid,
+        },
+        redis: redisStatus,
+        sse: {
+          onlineCount: onlineUsers.length,
+          users: onlineUsers,
+        },
+        messages: messageStore.getStats(),
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // SPA fallback - 所有未匹配的路由返回 index.html
   app.get('*', (req, res, next) => {
     // 跳过 API 和 webhook 路由

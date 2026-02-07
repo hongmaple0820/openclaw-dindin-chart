@@ -4,6 +4,7 @@ const SmartConversationManager = require('./bots/smart-conversation');
 const Analytics = require('./analytics');
 const config = require('./config');
 const PidLock = require('./utils/pid-lock');
+const MemoryGuard = require('./utils/memory-guard');
 
 /**
  * 主入口
@@ -20,6 +21,15 @@ async function main() {
     console.error('   提示: 如果确认没有其他实例，请删除 ~/.openclaw/chat-hub.pid');
     process.exit(1);
   }
+
+  // 启动内存监控
+  const memoryGuard = new MemoryGuard({
+    maxMemoryMB: config.memory?.maxMemoryMB || 500,
+    warningThresholdPercent: config.memory?.warningThresholdPercent || 80,
+    gcThresholdPercent: config.memory?.gcThresholdPercent || 90,
+    checkIntervalMs: config.memory?.checkIntervalMs || 30000,
+  });
+  memoryGuard.start();
   const botName = config.bot?.name || 'Bot';
   const mode = config.mode || 'storage';
   const triggerEnabled = config.trigger?.enabled ?? false;
