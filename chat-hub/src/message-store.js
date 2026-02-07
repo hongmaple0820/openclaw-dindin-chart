@@ -401,7 +401,7 @@ class MessageStore {
         LEFT JOIN message_reads r ON m.id = r.message_id AND r.reader_id = ?
         WHERE r.message_id IS NULL
           AND m.sender != ?
-        ORDER BY m.timestamp ASC
+        ORDER BY m.timestamp DESC
         LIMIT ?
       `);
       const rows = stmt.all(readerId, readerId, limit);
