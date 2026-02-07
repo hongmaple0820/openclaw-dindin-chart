@@ -13,17 +13,21 @@ class PidLock {
       const oldPid = parseInt(fs.readFileSync(this.pidFile, 'utf8').trim());
       
       // 检查进程是否还在运行
+      let processExists = false;
       try {
         process.kill(oldPid, 0); // 信号 0 只检测，不杀死
-        throw new Error(`另一个实例正在运行 (PID: ${oldPid})`);
+        processExists = true; // 如果没抛异常，说明进程存在
       } catch (e) {
-        if (e.code === 'ESRCH') {
-          // 进程不存在，清理旧 PID 文件
-          console.log(`[PidLock] 清理陈旧 PID 文件`);
-          fs.unlinkSync(this.pidFile);
-        } else {
-          throw e;
-        }
+        // ESRCH: 进程不存在
+        // 其他错误也认为进程不存在
+        processExists = false;
+      }
+      
+      if (processExists) {
+        throw new Error(`另一个实例正在运行 (PID: ${oldPid})`);
+      } else {
+        console.log(`[PidLock] 清理陈旧 PID 文件 (PID: ${oldPid})`);
+        fs.unlinkSync(this.pidFile);
       }
     }
 

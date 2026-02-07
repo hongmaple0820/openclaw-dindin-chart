@@ -14,16 +14,20 @@ if [ -f "$HOME/.openclaw/chat-hub.pid" ]; then
         echo "停止旧进程 (PID: $OLD_PID)..."
         kill "$OLD_PID"
         sleep 2
+        # 强制删除 PID 文件
+        rm -f "$HOME/.openclaw/chat-hub.pid"
+    else
+        # 进程不存在，清理 PID 文件
+        rm -f "$HOME/.openclaw/chat-hub.pid"
     fi
 fi
 
-# 启动新进程
+# 启动新进程（不预写 PID，让进程自己写）
 echo "启动 chat-hub..."
 nohup node src/index.js > "$LOG_DIR/chat-hub.log" 2>&1 &
 NEW_PID=$!
-echo "$NEW_PID" > "$HOME/.openclaw/chat-hub.pid"
 
-sleep 2
+sleep 3
 
 # 验证启动
 if ps -p "$NEW_PID" > /dev/null 2>&1; then
