@@ -1,5 +1,5 @@
 <!--
-  登录页面
+  登录页面（含审核状态提示）
   @author 小琳
   @date 2026-02-06
 -->
@@ -13,6 +13,16 @@
         </div>
       </template>
 
+      <!-- 审核状态提示 -->
+      <el-alert 
+        v-if="statusMessage"
+        :type="statusType"
+        :title="statusMessage"
+        :closable="false"
+        show-icon
+        class="status-alert"
+      />
+
       <el-form
         ref="formRef"
         :model="form"
@@ -20,10 +30,10 @@
         label-position="top"
         @submit.prevent="handleSubmit"
       >
-        <el-form-item label="用户名/邮箱/手机" prop="username">
+        <el-form-item label="用户名" prop="username">
           <el-input
             v-model="form.username"
-            placeholder="请输入用户名、邮箱或手机号"
+            placeholder="请输入用户名"
             :prefix-icon="User"
             size="large"
           />
@@ -53,8 +63,6 @@
         </el-form-item>
 
         <div class="form-footer">
-          <router-link to="/forgot-password">忘记密码？</router-link>
-          <span class="divider">|</span>
           <router-link to="/register">没有账号？立即注册</router-link>
         </div>
       </el-form>
@@ -75,6 +83,8 @@ const userStore = useUserStore();
 
 const formRef = ref(null);
 const loading = ref(false);
+const statusMessage = ref('');
+const statusType = ref('info');
 
 const form = reactive({
   username: '',
@@ -94,7 +104,9 @@ const handleSubmit = async () => {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
 
+  statusMessage.value = '';
   loading.value = true;
+  
   try {
     const res = await userStore.login(form);
     if (res.success) {
@@ -102,10 +114,34 @@ const handleSubmit = async () => {
       const redirect = route.query.redirect || '/';
       router.push(redirect);
     } else {
-      ElMessage.error(res.error || '登录失败');
+      // 处理不同的错误状态
+      if (res.code === 'PENDING') {
+        statusMessage.value = '账号正在审核中，请耐心等待管理员审核';
+        statusType.value = 'warning';
+      } else if (res.code === 'REJECTED') {
+        statusMessage.value = res.error || '账号审核未通过';
+        statusType.value = 'error';
+      } else if (res.code === 'BANNED') {
+        statusMessage.value = '账号已被封禁，如有疑问请联系管理员';
+        statusType.value = 'error';
+      } else {
+        ElMessage.error(res.error || '登录失败');
+      }
     }
   } catch (error) {
-    ElMessage.error(error.error || '登录失败');
+    const errData = error.response?.data || error;
+    if (errData.code === 'PENDING') {
+      statusMessage.value = '账号正在审核中，请耐心等待管理员审核';
+      statusType.value = 'warning';
+    } else if (errData.code === 'REJECTED') {
+      statusMessage.value = errData.error || '账号审核未通过';
+      statusType.value = 'error';
+    } else if (errData.code === 'BANNED') {
+      statusMessage.value = '账号已被封禁';
+      statusType.value = 'error';
+    } else {
+      ElMessage.error(errData.error || '登录失败');
+    }
   } finally {
     loading.value = false;
   }
@@ -140,6 +176,10 @@ const handleSubmit = async () => {
   color: #909399;
 }
 
+.status-alert {
+  margin-bottom: 20px;
+}
+
 .submit-btn {
   width: 100%;
 }
@@ -149,7 +189,16 @@ const handleSubmit = async () => {
   color: #909399;
 }
 
-.divider {
-  margin: 0 8px;
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .login-page {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 60px;
+  }
+  
+  .login-card {
+    max-width: 100%;
+  }
 }
 </style>

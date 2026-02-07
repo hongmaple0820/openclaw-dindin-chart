@@ -1,5 +1,5 @@
 <!--
-  注册页面
+  注册页面（含审核提示）
   @author 小琳
   @date 2026-02-06
 -->
@@ -13,17 +13,49 @@
         </div>
       </template>
 
+      <!-- 注册成功提示 -->
+      <div v-if="registered" class="success-panel">
+        <el-result icon="success" title="注册成功！">
+          <template #sub-title>
+            <p>你的账号 <strong>{{ registeredUser }}</strong> 已提交</p>
+            <p class="pending-hint">
+              <el-icon><Clock /></el-icon>
+              请等待管理员审核，审核通过后即可登录
+            </p>
+          </template>
+          <template #extra>
+            <el-button type="primary" @click="router.push('/login')">
+              返回登录
+            </el-button>
+          </template>
+        </el-result>
+      </div>
+
+      <!-- 注册表单 -->
       <el-form
+        v-else
         ref="formRef"
         :model="form"
         :rules="rules"
         label-position="top"
         @submit.prevent="handleSubmit"
       >
+        <!-- 用户类型 -->
+        <el-form-item label="账号类型">
+          <el-radio-group v-model="form.type">
+            <el-radio value="human">
+              <el-icon><User /></el-icon> 普通用户
+            </el-radio>
+            <el-radio value="bot">
+              <el-icon><Monitor /></el-icon> 机器人
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+
         <el-form-item label="用户名" prop="username">
           <el-input
             v-model="form.username"
-            placeholder="3-20位字母、数字、下划线"
+            placeholder="2-20位字母、数字、下划线、中文"
             :prefix-icon="User"
             size="large"
           />
@@ -69,6 +101,17 @@
           />
         </el-form-item>
 
+        <el-alert 
+          type="info" 
+          :closable="false"
+          show-icon
+          class="audit-notice"
+        >
+          <template #title>
+            注册后需要管理员审核才能使用
+          </template>
+        </el-alert>
+
         <el-form-item>
           <el-button
             type="primary"
@@ -77,7 +120,7 @@
             native-type="submit"
             class="submit-btn"
           >
-            注册
+            提交注册
           </el-button>
         </el-form-item>
 
@@ -93,16 +136,18 @@
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { User, UserFilled, Lock, Message } from '@element-plus/icons-vue';
-import { useUserStore } from '@/stores/user';
+import { User, UserFilled, Lock, Message, Clock, Monitor } from '@element-plus/icons-vue';
+import api from '@/api';
 
 const router = useRouter();
-const userStore = useUserStore();
 
 const formRef = ref(null);
 const loading = ref(false);
+const registered = ref(false);
+const registeredUser = ref('');
 
 const form = reactive({
+  type: 'human',
   username: '',
   nickname: '',
   email: '',
@@ -121,7 +166,7 @@ const validateConfirmPassword = (rule, value, callback) => {
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]{3,20}$/, message: '3-20位字母、数字、下划线', trigger: 'blur' }
+    { min: 2, max: 20, message: '2-20个字符', trigger: 'blur' }
   ],
   nickname: [
     { max: 20, message: '昵称不能超过20个字符', trigger: 'blur' }
@@ -145,21 +190,23 @@ const handleSubmit = async () => {
 
   loading.value = true;
   try {
-    const res = await userStore.register({
+    const res = await api.post('/auth/register', {
       username: form.username,
       password: form.password,
       nickname: form.nickname || form.username,
-      email: form.email || undefined
+      email: form.email || undefined,
+      type: form.type
     });
     
     if (res.success) {
-      ElMessage.success('注册成功');
-      router.push('/');
+      registeredUser.value = form.username;
+      registered.value = true;
+      ElMessage.success(res.message || '注册成功，请等待审核');
     } else {
       ElMessage.error(res.error || '注册失败');
     }
   } catch (error) {
-    ElMessage.error(error.error || '注册失败');
+    ElMessage.error(error.response?.data?.error || error.message || '注册失败');
   } finally {
     loading.value = false;
   }
@@ -177,7 +224,7 @@ const handleSubmit = async () => {
 
 .register-card {
   width: 100%;
-  max-width: 450px;
+  max-width: 480px;
 }
 
 .card-header {
@@ -194,11 +241,41 @@ const handleSubmit = async () => {
   color: #909399;
 }
 
+.success-panel {
+  padding: 20px 0;
+}
+
+.pending-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #e6a23c;
+  margin-top: 12px;
+}
+
+.audit-notice {
+  margin-bottom: 20px;
+}
+
 .submit-btn {
   width: 100%;
 }
 
 .form-footer {
   text-align: center;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .register-page {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+  
+  .register-card {
+    max-width: 100%;
+  }
 }
 </style>

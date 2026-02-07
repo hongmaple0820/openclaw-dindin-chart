@@ -15,8 +15,24 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3000',
         changeOrigin: true
+      },
+      '/ws': {
+        target: 'ws://localhost:3000',
+        ws: true
+      }
+    }
+  },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-element': ['element-plus', '@element-plus/icons-vue'],
+          'vendor-utils': ['axios', 'marked', 'dompurify']
+        }
       }
     }
   }
