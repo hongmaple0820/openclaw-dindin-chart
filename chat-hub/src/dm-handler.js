@@ -65,9 +65,9 @@ class DMHandler {
         sender_id: message.senderId || message.senderStaffId || 'unknown',
         sender_name: message.senderNick || message.senderName || 'Unknown',
         receiver_id: message.receiverId || message.robotCode || config.bot?.name || 'unknown',
-        receiver_name: config.bot?.name || 'Bot',
+        receiver_name: message.receiverName || message.receiverNick || config.bot?.name || 'Bot',
         content: this.extractContent(message),
-        source: 'dingtalk',
+        source: message.source || 'dingtalk',
         created_at: message.createAt || Date.now()
       };
 

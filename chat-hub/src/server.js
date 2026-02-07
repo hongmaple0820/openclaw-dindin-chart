@@ -642,19 +642,14 @@ app.post('/api/dm/store', async (req, res) => {
       return res.status(400).json({ success: false, error: 'sender and senderId are required' });
     }
 
-    const dmData = {
-      sender_id: senderId,
-      sender_name: sender,
-      receiver_id: receiverId || config.bot?.name || 'bot',
-      receiver_name: receiver || config.bot?.name || 'Bot',
-      content,
-      source
-    };
-
-    // 构造消息对象用于存储
+    // 构造消息对象用于存储 - 使用 dmHandler 期望的字段名
     const messageData = {
-      ...dmData,
-      text: { content },
+      senderId: senderId,  // dmHandler 期望的字段名
+      senderNick: sender,
+      receiverId: receiverId || config.bot?.name || 'bot',
+      receiverName: receiver || config.bot?.name || 'Bot',
+      text: { content },  // dmHandler 会从这里提取内容
+      source: source,
       createAt: Date.now()
     };
 
