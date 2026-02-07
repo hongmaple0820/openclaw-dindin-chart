@@ -506,24 +506,82 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
 });
 
 /**
- * 获取图片文件
- * GET /api/images/:filename
+ * 获取图片统计
+ * GET /api/images/stats
  */
-app.get('/api/images/:filename', (req, res) => {
+app.get('/api/images/stats', (req, res) => {
   try {
-    const { filename } = req.params;
+    const totalStmt = messageStore.db.prepare('SELECT COUNT(*) as count, SUM(file_size) as totalSize FROM images');
+    const { count: total, totalSize } = totalStmt.get();
     
-    // 判断是原图还是缩略图
-    const isThumbnail = filename.startsWith('thumb_');
-    const imageDir = isThumbnail ? imageUpload.thumbnailDir : imageUpload.imageDir;
-    const filePath = path.join(imageDir, filename);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: '图片不存在' });
-    }
-
-    res.sendFile(filePath);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStmt = messageStore.db.prepare('SELECT COUNT(*) as count FROM images WHERE created_at >= ?');
+    const { count: today } = todayStmt.get(todayStart.getTime());
+    
+    res.json({
+      success: true,
+      stats: {
+        total: total || 0,
+        totalSize: totalSize || 0,
+        today: today || 0
+      }
+    });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取所有图片列表（分页）
+ * GET /api/images/list?page=1&limit=24&sender=xxx&startTime=xxx
+ */
+app.get('/api/images/list', (req, res) => {
+  try {
+    const { page = 1, limit = 24, sender, startTime } = req.query;
+    
+    let sql = `
+      SELECT i.*, m.sender, m.timestamp as message_time
+      FROM images i
+      JOIN messages m ON i.message_id = m.id
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (sender) {
+      sql += ' AND m.sender = ?';
+      params.push(sender);
+    }
+    
+    if (startTime) {
+      sql += ' AND i.created_at >= ?';
+      params.push(parseInt(startTime));
+    }
+    
+    // 计算总数
+    const countSql = sql.replace('SELECT i.*, m.sender, m.timestamp as message_time', 'SELECT COUNT(*) as total');
+    const countStmt = messageStore.db.prepare(countSql);
+    const { total } = countStmt.get(...params);
+    
+    // 分页查询
+    sql += ' ORDER BY i.created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
+    
+    const stmt = messageStore.db.prepare(sql);
+    const images = stmt.all(...params);
+    
+    res.json({
+      success: true,
+      images,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('[Server] 获取图片列表失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -544,6 +602,29 @@ app.get('/api/images/message/:messageId', (req, res) => {
     }));
     
     res.json({ success: true, count: images.length, images: imagesWithUrls });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取图片文件
+ * GET /api/images/:filename
+ */
+app.get('/api/images/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // 判断是原图还是缩略图
+    const isThumbnail = filename.startsWith('thumb_');
+    const imageDir = isThumbnail ? imageUpload.thumbnailDir : imageUpload.imageDir;
+    const filePath = path.join(imageDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: '图片不存在' });
+    }
+
+    res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
