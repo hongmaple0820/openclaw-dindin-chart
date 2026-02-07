@@ -102,6 +102,24 @@ class MessageStore {
     `);
     
     console.log('[Store] 图片上传功能已初始化');
+
+    // 创建表情回应表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS reactions (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL,
+        reactor_id TEXT NOT NULL,
+        emoji TEXT NOT NULL,
+        created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+        FOREIGN KEY (message_id) REFERENCES messages(id),
+        UNIQUE(message_id, reactor_id, emoji)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions(message_id);
+      CREATE INDEX IF NOT EXISTS idx_reactions_reactor ON reactions(reactor_id);
+    `);
+    
+    console.log('[Store] 表情回应功能已初始化');
   }
 
   /**
@@ -768,6 +786,137 @@ class MessageStore {
       });
     } catch (error) {
       console.error('[Store] 附加图片失败:', error.message);
+      return messages;
+    }
+  }
+
+  // ==================== 表情回应功能 ====================
+
+  /**
+   * 添加表情回应
+   * @param {string} messageId 消息ID
+   * @param {string} reactorId 回应者ID
+   * @param {string} emoji 表情（emoji 字符或名称）
+   */
+  async addReaction(messageId, reactorId, emoji) {
+    return this.withRetry(() => {
+      try {
+        const stmt = this.db.prepare(`
+          INSERT OR IGNORE INTO reactions (id, message_id, reactor_id, emoji)
+          VALUES (?, ?, ?, ?)
+        `);
+        
+        const id = require('uuid').v4();
+        const result = stmt.run(id, messageId, reactorId, emoji);
+        
+        return result.changes > 0;
+      } catch (error) {
+        console.error('[Store] 添加表情回应失败:', error.message);
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * 删除表情回应
+   * @param {string} messageId 消息ID
+   * @param {string} reactorId 回应者ID
+   * @param {string} emoji 表情
+   */
+  removeReaction(messageId, reactorId, emoji) {
+    try {
+      const stmt = this.db.prepare(`
+        DELETE FROM reactions 
+        WHERE message_id = ? AND reactor_id = ? AND emoji = ?
+      `);
+      const result = stmt.run(messageId, reactorId, emoji);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('[Store] 删除表情回应失败:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 获取消息的所有表情回应
+   * @param {string} messageId 消息ID
+   */
+  getMessageReactions(messageId) {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM reactions WHERE message_id = ?');
+      const rows = stmt.all(messageId);
+      return rows.map(row => ({
+        id: row.id,
+        messageId: row.message_id,
+        reactorId: row.reactor_id,
+        emoji: row.emoji,
+        createdAt: row.created_at
+      }));
+    } catch (error) {
+      console.error('[Store] 获取表情回应失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 获取消息的表情统计
+   * @param {string} messageId 消息ID
+   */
+  getReactionStats(messageId) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT emoji, COUNT(*) as count, GROUP_CONCAT(reactor_id) as reactors
+        FROM reactions
+        WHERE message_id = ?
+        GROUP BY emoji
+      `);
+      const rows = stmt.all(messageId);
+      return rows.map(row => ({
+        emoji: row.emoji,
+        count: row.count,
+        reactors: row.reactors ? row.reactors.split(',') : []
+      }));
+    } catch (error) {
+      console.error('[Store] 获取表情统计失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 检查用户是否已回应
+   * @param {string} messageId 消息ID
+   * @param {string} reactorId 回应者ID
+   * @param {string} emoji 表情
+   */
+  hasReacted(messageId, reactorId, emoji) {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT COUNT(*) as count FROM reactions
+        WHERE message_id = ? AND reactor_id = ? AND emoji = ?
+      `);
+      const row = stmt.get(messageId, reactorId, emoji);
+      return row.count > 0;
+    } catch (error) {
+      console.error('[Store] 检查表情回应失败:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 为消息列表附加表情统计
+   * @param {Array} messages 消息列表
+   */
+  attachReactions(messages) {
+    try {
+      return messages.map(msg => {
+        const reactions = this.getReactionStats(msg.id);
+        if (reactions.length > 0) {
+          return { ...msg, reactions };
+        }
+        return msg;
+      });
+    } catch (error) {
+      console.error('[Store] 附加表情失败:', error.message);
       return messages;
     }
   }

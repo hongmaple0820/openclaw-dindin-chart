@@ -579,6 +579,114 @@ app.delete('/api/images/:imageId', async (req, res) => {
   }
 });
 
+// ==================== 表情回应 API ====================
+
+/**
+ * 添加表情回应
+ * POST /api/reactions
+ * Body: { messageId, reactorId, emoji }
+ */
+app.post('/api/reactions', async (req, res) => {
+  try {
+    const { messageId, reactorId, emoji } = req.body;
+
+    if (!messageId || !reactorId || !emoji) {
+      return res.status(400).json({
+        success: false,
+        error: 'messageId, reactorId, and emoji are required'
+      });
+    }
+
+    // 检查消息是否存在
+    const message = messageStore.getMessageById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, error: '消息不存在' });
+    }
+
+    // 添加表情回应
+    const added = await messageStore.addReaction(messageId, reactorId, emoji);
+
+    if (added) {
+      // 获取更新后的表情统计
+      const stats = messageStore.getReactionStats(messageId);
+      
+      console.log('[Server] 表情回应已添加:', reactorId, '->', emoji, 'on', messageId);
+      
+      res.json({ success: true, reactions: stats });
+    } else {
+      // 已经存在相同的回应
+      res.json({ success: true, message: '表情回应已存在' });
+    }
+  } catch (error) {
+    console.error('[Server] 添加表情回应失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 删除表情回应
+ * DELETE /api/reactions
+ * Body: { messageId, reactorId, emoji }
+ */
+app.delete('/api/reactions', async (req, res) => {
+  try {
+    const { messageId, reactorId, emoji } = req.body;
+
+    if (!messageId || !reactorId || !emoji) {
+      return res.status(400).json({
+        success: false,
+        error: 'messageId, reactorId, and emoji are required'
+      });
+    }
+
+    const removed = messageStore.removeReaction(messageId, reactorId, emoji);
+
+    if (removed) {
+      // 获取更新后的表情统计
+      const stats = messageStore.getReactionStats(messageId);
+      
+      console.log('[Server] 表情回应已删除:', reactorId, '->', emoji, 'on', messageId);
+      
+      res.json({ success: true, reactions: stats });
+    } else {
+      res.status(404).json({ success: false, error: '表情回应不存在' });
+    }
+  } catch (error) {
+    console.error('[Server] 删除表情回应失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取消息的表情统计
+ * GET /api/reactions/:messageId
+ */
+app.get('/api/reactions/:messageId', (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const stats = messageStore.getReactionStats(messageId);
+    
+    res.json({ success: true, reactions: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取消息的所有表情回应（包含回应者信息）
+ * GET /api/reactions/:messageId/details
+ */
+app.get('/api/reactions/:messageId/details', (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const reactions = messageStore.getMessageReactions(messageId);
+    
+    res.json({ success: true, count: reactions.length, reactions });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ==================== 已读功能 API ====================
 
 /**
