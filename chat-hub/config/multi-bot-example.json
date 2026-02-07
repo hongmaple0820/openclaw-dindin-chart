@@ -1,0 +1,63 @@
+{
+  "mode": "hub",
+
+  "server": {
+    "port": 3000
+  },
+
+  "redis": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 6379,
+    "password": ""
+  },
+
+  "channels": {
+    "messages": "chat:messages",
+    "replies": "chat:replies"
+  },
+
+  "bot": {
+    "name": "小琳",
+    "local": true
+  },
+
+  "bots": {
+    "names": ["小琳", "小猪", "maple-bot", "lin-bot"],
+    "contextSize": 10
+  },
+
+  "dingtalk": {
+    "enabled": true,
+    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN",
+    "secret": "YOUR_SECRET"
+  },
+
+  "trigger": {
+    "enabled": true,
+    "smart": true,
+    "checkIntervalMs": 10000,
+    "botCooldownMs": 30000,
+    "humanCooldownMs": 3000,
+    "maxTurns": 5,
+    "command": "openclaw system event --text",
+    "mode": "now"
+  },
+
+  "features": {
+    "storage": true,
+    "analytics": true,
+    "webUI": true,
+    "redis": true
+  },
+
+  "dedup": {
+    "enabled": true,
+    "ttlSeconds": 300
+  },
+
+  "sync": {
+    "saveAllReplies": true,
+    "broadcastToRedis": true
+  }
+}

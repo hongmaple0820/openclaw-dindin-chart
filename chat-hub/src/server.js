@@ -6,7 +6,11 @@ const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
+const { errorHandler, asyncHandler, notFoundHandler } = require('./middleware/error-handler');
+const { validateMessage, validatePagination, validateSearchQuery, validateId } = require('./utils/validator');
+const Logger = require('./utils/logger');
 
+const logger = new Logger('Server');
 const app = express();
 
 // CORS 支持
@@ -38,16 +42,16 @@ function parseAtMentions(content) {
  */
 function isBotMessage(senderNick, content) {
   const botNames = config.bots?.names || [];
-  
+
   if (botNames.some(name => senderNick?.includes(name))) {
     return true;
   }
-  
+
   const signatureMatch = content?.match(/\[([^\]]+)\]\s*$/);
   if (signatureMatch && botNames.includes(signatureMatch[1])) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -87,13 +91,13 @@ app.post('/webhook/dingtalk', async (req, res) => {
         chatType,
         conversationTitle
       };
-      
+
       await dmHandler.storeDM(dmData);
-      
+
       // 返回成功响应，但不将其作为普通群聊消息处理
-      return res.json({ 
-        success: true, 
-        skipped: true, 
+      return res.json({
+        success: true,
+        skipped: true,
         reason: 'dm_handled',
         type: 'dm'
       });
@@ -105,7 +109,7 @@ app.post('/webhook/dingtalk', async (req, res) => {
     }
 
     const isBot = isBotMessage(senderNick, content);
-    
+
     // 解析 @ 提及
     const atTargets = parseAtMentions(content);
 
@@ -125,7 +129,7 @@ app.post('/webhook/dingtalk', async (req, res) => {
 
     // 发布到 Redis（仅用于中转通知）
     await redisClient.publish(config.channels.messages, message);
-    
+
     if (atTargets.length > 0) {
       console.log('[Server] @ 提及:', atTargets.join(', '));
     }
@@ -165,14 +169,14 @@ app.post('/api/send', async (req, res) => {
 
     // 保存到本地
     messageStore.addMessage(message);
-    
+
     // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
-    
+
     // 发送到钉钉群
     const dingtalkContent = `${sender}：${content}`;
     await dingtalk.sendText(dingtalkContent);
-    
+
     console.log('[Server] Web 消息已发送:', sender, '->', content.substring(0, 50));
     res.json({ success: true, message });
   } catch (error) {
@@ -206,7 +210,7 @@ app.post('/api/reply', async (req, res) => {
 
     // 发布到回复频道（订阅者会发送到钉钉）
     await redisClient.publish(config.channels.replies, message);
-    
+
     console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50));
     res.json({ success: true, message });
   } catch (error) {
@@ -246,10 +250,10 @@ app.post('/api/store', async (req, res) => {
 
     // 仅保存到本地，不发钉钉
     messageStore.addMessage(message);
-    
+
     // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
-    
+
     console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '');
     res.json({ success: true, message });
   } catch (error) {
@@ -318,19 +322,16 @@ app.get('/api/sync-status', async (req, res) => {
  * 删除消息
  * DELETE /api/message/:messageId
  */
-app.delete('/api/message/:messageId', async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const deleted = messageStore.deleteMessage(messageId);
-    if (deleted) {
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ success: false, error: 'Message not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+app.delete('/api/message/:messageId', asyncHandler(async (req, res) => {
+  const messageId = validateId(req.params.messageId, 'messageId');
+
+  const deleted = messageStore.deleteMessage(messageId);
+  if (deleted) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ success: false, error: 'Message not found' });
   }
-});
+}));
 
 // ==================== 已读功能 API ====================
 
@@ -387,10 +388,10 @@ app.get('/api/unread/:readerId', async (req, res) => {
     const messages = messageStore.getUnreadMessages(readerId, limit);
     const count = messageStore.getUnreadCount(readerId);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       count,
-      messages 
+      messages
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -443,8 +444,8 @@ app.get('/api/read-summary', async (req, res) => {
  */
 app.get('/health', (req, res) => {
   const stats = messageStore.getStats();
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: Date.now(),
     messageCount: stats.total,
     todayCount: stats.today,
@@ -460,18 +461,17 @@ app.get('/health', (req, res) => {
  * 搜索消息
  * GET /api/search?q=关键词&limit=50
  */
-app.get('/api/search', (req, res) => {
-  try {
-    const { q, limit } = req.query;
-    if (!q) {
-      return res.status(400).json({ success: false, error: 'q is required' });
-    }
-    const messages = messageStore.searchMessages(q, parseInt(limit) || 50);
-    res.json({ success: true, count: messages.length, messages });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+app.get('/api/search', asyncHandler(async (req, res) => {
+  const q = validateSearchQuery(req.query.q);
+  const limit = parseInt(req.query.limit) || 50;
+
+  if (limit < 1 || limit > 200) {
+    return res.status(400).json({ success: false, error: 'limit must be between 1 and 200' });
   }
-});
+
+  const messages = messageStore.searchMessages(q, limit);
+  res.json({ success: true, count: messages.length, messages });
+}));
 
 /**
  * 获取统计信息
@@ -496,14 +496,14 @@ app.get('/api/dm/conversations', async (req, res) => {
     if (!userId) {
       return res.status(400).json({ success: false, error: 'userId is required' });
     }
-    
+
     const limit = parseInt(req.query.limit) || 20;
     const conversations = await dmHandler.getUserConversations(userId, { limit });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       count: conversations.length,
-      conversations 
+      conversations
     });
   } catch (error) {
     console.error('[Server] 获取私聊会话失败:', error);
@@ -519,7 +519,7 @@ app.get('/api/dm/messages/:conversationId', async (req, res) => {
   try {
     const { conversationId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
-    
+
     // 验证用户是否有权访问此会话
     const userId = req.query.userId || req.query.sender;
     if (userId) {
@@ -528,13 +528,13 @@ app.get('/api/dm/messages/:conversationId', async (req, res) => {
         return res.status(403).json({ success: false, error: 'Unauthorized to access this conversation' });
       }
     }
-    
+
     const messages = await dmHandler.getConversationMessages(conversationId, { limit });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       count: messages.length,
-      messages 
+      messages
     });
   } catch (error) {
     console.error('[Server] 获取私聊消息失败:', error);
@@ -575,7 +575,7 @@ app.post('/api/dm/store', async (req, res) => {
     };
 
     const message = await dmHandler.storeDM(messageData);
-    
+
     if (message) {
       res.json({ success: true, message });
     } else {
@@ -592,7 +592,7 @@ app.post('/api/dm/store', async (req, res) => {
  */
 async function start() {
   const myBotName = config.bot?.name || '小琳';
-  
+
   // 注册文件路由
   app.use('/api/files', fileRoutes);
 
@@ -604,7 +604,7 @@ async function start() {
       id: `reply-${message.id}`,
       source: 'redis'
     };
-    
+
     if (!messageStore.isDuplicate(savedMessage.id)) {
       messageStore.addMessage(savedMessage);
       console.log(`[Server] 保存回复: ${message.sender} -> ${message.content?.substring(0, 30)}...`);
@@ -614,7 +614,7 @@ async function start() {
     if (message.sender !== myBotName) {
       return;
     }
-    
+
     console.log('[Server] 发送到钉钉:', message.sender, '->', message.content?.substring(0, 50));
 
     // 发送到钉钉
@@ -631,23 +631,30 @@ async function start() {
   });
 
   const port = config.server?.port || 3000;
+
+  // 添加错误处理中间件（必须在所有路由之后）
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
   app.listen(port, () => {
     const stats = messageStore.getStats();
-    console.log(`[Server] 消息中转服务已启动: http://localhost:${port}`);
-    console.log('[Server] 存储目录:', messageStore.storeDir);
-    console.log('[Server] 数据库:', messageStore.dbPath);
-    console.log('[Server] 已加载消息:', stats.total, '条');
-    console.log('[Server] 钉钉回调: POST /webhook/dingtalk');
-    console.log('[Server] 发送消息: POST /api/send');
-    console.log('[Server] 机器人回复: POST /api/reply');
-    console.log('[Server] 获取消息: GET /api/context');
-    console.log('[Server] 搜索消息: GET /api/search?q=关键词');
-    console.log('[Server] 统计信息: GET /api/stats');
-    console.log('[Server] 同步消息: GET /api/sync/:participantId');
-    console.log('[Server] 删除消息: DELETE /api/message/:messageId');
-    console.log('[Server] 文件上传: POST /api/files/upload/init');
-    console.log('[Server] 文件下载: GET /api/files/:id/download');
-    console.log('[Server] 文件列表: GET /api/files');
+    logger.info(`消息中转服务已启动: http://localhost:${port}`);
+    logger.info('存储目录: ' + messageStore.storeDir);
+    logger.info('数据库: ' + messageStore.dbPath);
+    logger.info(`已加载消息: ${stats.total} 条`);
+    logger.info('API 端点:');
+    logger.info('  - POST /webhook/dingtalk - 钉钉回调');
+    logger.info('  - POST /api/send - 发送消息');
+    logger.info('  - POST /api/reply - 机器人回复');
+    logger.info('  - POST /api/store - 存储消息');
+    logger.info('  - GET /api/context - 获取消息');
+    logger.info('  - GET /api/search?q=关键词 - 搜索消息');
+    logger.info('  - GET /api/stats - 统计信息');
+    logger.info('  - GET /api/sync/:participantId - 同步消息');
+    logger.info('  - DELETE /api/message/:messageId - 删除消息');
+    logger.info('  - POST /api/files/upload/init - 文件上传');
+    logger.info('  - GET /api/files/:id/download - 文件下载');
+    logger.info('  - GET /api/files - 文件列表');
   });
 }
 
