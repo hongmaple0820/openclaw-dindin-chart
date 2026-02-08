@@ -11,3 +11,20 @@ node_modules/
 # 环境变量
 .env
 .env.local
+
+# 备份文件
+*.bak
+*.backup
+*.backup.*
+
+# 临时文件
+users.json
+updated-server.js
+
+# 测试文件（保留在本地）
+test-*.js
+
+# 进度报告（本地文档）
+*PROGRESS*.md
+*PLAN*.md
+

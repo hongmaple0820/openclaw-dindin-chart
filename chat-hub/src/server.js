@@ -7,6 +7,7 @@ const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
+const imageRoutes = require('./routes/images');
 const sseManager = require('./sse-manager');
 
 const app = express();
@@ -812,6 +813,9 @@ async function start() {
   
   // 注册文件路由
   app.use('/api/files', fileRoutes);
+  
+  // 注册图片上传路由
+  app.use('/api/images', imageRoutes);
   
   // 注册管理后台路由
   const adminRoutes = require('./routes/admin')(messageStore, messageStore.db);
