@@ -1198,7 +1198,7 @@ app.get('/health', async (req, res) => {
   
   res.json({ 
     status: 'ok',
-    version: '1.10.0',
+    version: '1.0.0',
     timestamp: Date.now(),
     uptime: Math.floor(uptime),
     
@@ -1558,6 +1558,11 @@ async function start() {
   // 注册管理后台路由
   const adminRoutes = require('./routes/admin')(messageStore, messageStore.db);
   app.use('/api/admin', adminRoutes);
+
+  // 注册 Webhook 路由（接收 OpenClaw 钉钉消息）
+  const webhookRoutes = require('./routes/webhook');
+  app.set('messageStore', messageStore); // 让 webhook 能访问 messageStore
+  app.use('/api/webhook', webhookRoutes);
 
   // 订阅消息频道（自动同步其他 AI 的消息到本地数据库）
   await redisClient.subscribe(config.channels.messages, async (message) => {
