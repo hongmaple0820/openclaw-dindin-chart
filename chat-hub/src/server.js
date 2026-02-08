@@ -1,7 +1,5 @@
 const express = require('express');
-const compression = require('compression');
 const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
 const redisClient = require('./redis-client');
@@ -12,17 +10,6 @@ const fileRoutes = require('./routes/files');
 const sseManager = require('./sse-manager');
 
 const app = express();
-
-// HTTP 压缩（gzip/brotli）
-app.use(compression({
-  filter: (req, res) => {
-    if (req.headers['x-no-compression']) {
-      return false;
-    }
-    return compression.filter(req, res);
-  },
-  threshold: 1024 // 大于 1KB 才压缩
-}));
 
 // 静态文件服务 - 前端 SPA
 const webDistPath = path.resolve(__dirname, '../../chat-web/dist');
@@ -51,53 +38,6 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
-
-// ==================== 性能监控中间件 ====================
-const performanceStats = {
-  requests: 0,
-  slowQueries: [],
-  errors: 0
-};
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  performanceStats.requests++;
-
-  // 监听响应完成
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    
-    // 记录慢查询（超过 1 秒）
-    if (duration > 1000) {
-      const slowQuery = {
-        method: req.method,
-        path: req.path,
-        duration,
-        timestamp: Date.now()
-      };
-      
-      performanceStats.slowQueries.push(slowQuery);
-      
-      // 只保留最近 10 条慢查询
-      if (performanceStats.slowQueries.length > 10) {
-        performanceStats.slowQueries.shift();
-      }
-      
-      console.warn(`⚠️ 慢查询: ${req.method} ${req.path} 用时 ${duration}ms`);
-    }
-  });
-
-  next();
-});
-
-// 错误计数
-app.use((err, req, res, next) => {
-  performanceStats.errors++;
-  next(err);
-});
-
-// 缓存管理器
-const cacheManager = require('./cache-manager');
 
 // 用户认证模块
 const auth = require('./auth');
@@ -313,7 +253,7 @@ app.post('/api/send', async (req, res) => {
  */
 app.post('/api/reply', async (req, res) => {
   try {
-    const { content, sender = 'Bot', atTargets = null, replyTo = null } = req.body;
+    const { content, sender = 'Bot', atTargets = null } = req.body;
 
     if (!content) {
       return res.status(400).json({ success: false, error: 'content is required' });
@@ -327,7 +267,7 @@ app.post('/api/reply', async (req, res) => {
       timestamp: Date.now(),
       source: 'bot',
       atTargets,
-      replyTo  // 支持引用回复
+      replyTo: null
     };
 
     // WebSocket 推送新消息
@@ -342,7 +282,7 @@ app.post('/api/reply', async (req, res) => {
     // 发布到回复频道（订阅者会发送到钉钉）
     await redisClient.publish(config.channels.replies, message);
     
-    console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50), replyTo ? `(回复: ${replyTo})` : '');
+    console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50));
     res.json({ success: true, message });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -355,7 +295,7 @@ app.post('/api/reply', async (req, res) => {
  */
 app.post('/api/store', async (req, res) => {
   try {
-    const { content, sender, source = 'openclaw', timestamp, atTargets, replyTo } = req.body;
+    const { content, sender, source = 'openclaw', timestamp, atTargets } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, error: 'content is required' });
@@ -376,7 +316,7 @@ app.post('/api/store', async (req, res) => {
       timestamp: timestamp || Date.now(),
       source,
       atTargets: parsedAtTargets.length > 0 ? parsedAtTargets : null,
-      replyTo: replyTo || null  // 支持引用回复
+      replyTo: null
     };
 
     // 仅保存到本地，不发钉钉
@@ -394,7 +334,7 @@ app.post('/api/store', async (req, res) => {
     // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
     
-    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '', replyTo ? `(回复: ${replyTo})` : '');
+    console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '');
     res.json({ success: true, message });
   } catch (error) {
     console.error('[Server] 存储消息失败:', error);
@@ -476,588 +416,6 @@ app.delete('/api/message/:messageId', async (req, res) => {
   }
 });
 
-// ==================== 图片上传 API ====================
-
-const imageUpload = require('./image-upload');
-const upload = imageUpload.createUploadMiddleware();
-
-/**
- * 上传图片
- * POST /api/upload/image
- * Form-data: image (file), sender (string), messageId (string, optional)
- */
-app.post('/api/upload/image', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: '没有上传文件' });
-    }
-
-    const { sender, messageId } = req.body;
-    
-    if (!sender) {
-      // 删除已上传的文件
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      return res.status(400).json({ success: false, error: 'sender is required' });
-    }
-
-    // 如果没有提供 messageId，创建一个图片消息
-    let finalMessageId = messageId;
-    if (!finalMessageId) {
-      const message = {
-        id: uuidv4(),
-        type: 'image',
-        sender,
-        content: `[图片] ${req.file.originalname}`,
-        timestamp: Date.now(),
-        source: 'upload',
-        atTargets: null,
-        replyTo: null
-      };
-      
-      await messageStore.addMessage(message);
-      finalMessageId = message.id;
-      
-      // 推送消息
-      try {
-        const websocket = require('./websocket');
-        websocket.pushMessage(message);
-      } catch (e) {}
-      
-      // 发布到 Redis
-      await redisClient.publish(config.channels.messages, message);
-    }
-
-    // 处理上传的文件
-    const imageData = await imageUpload.processUploadedFile(req.file, sender, finalMessageId);
-    
-    // 存储图片记录
-    await messageStore.addImage(imageData);
-
-    console.log('[Server] 图片上传成功:', imageData.originalName, '->', imageData.filename);
-    
-    res.json({
-      success: true,
-      image: {
-        id: imageData.id,
-        messageId: finalMessageId,
-        filename: imageData.filename,
-        originalName: imageData.originalName,
-        url: `/api/images/${imageData.filename}`,
-        thumbnailUrl: imageData.thumbnailPath ? `/api/images/thumb_${imageData.filename}` : null,
-        mimeType: imageData.mimeType,
-        fileSize: imageData.fileSize,
-        width: imageData.width,
-        height: imageData.height
-      }
-    });
-  } catch (error) {
-    console.error('[Server] 图片上传失败:', error);
-    
-    // 清理已上传的文件
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 获取图片统计
- * GET /api/images/stats
- */
-app.get('/api/images/stats', (req, res) => {
-  try {
-    const totalStmt = messageStore.db.prepare('SELECT COUNT(*) as count, SUM(file_size) as totalSize FROM images');
-    const { count: total, totalSize } = totalStmt.get();
-    
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayStmt = messageStore.db.prepare('SELECT COUNT(*) as count FROM images WHERE created_at >= ?');
-    const { count: today } = todayStmt.get(todayStart.getTime());
-    
-    res.json({
-      success: true,
-      stats: {
-        total: total || 0,
-        totalSize: totalSize || 0,
-        today: today || 0
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 获取所有图片列表（分页）
- * GET /api/images/list?page=1&limit=24&sender=xxx&startTime=xxx
- */
-app.get('/api/images/list', (req, res) => {
-  try {
-    const { page = 1, limit = 24, sender, startTime } = req.query;
-    
-    let sql = `
-      SELECT i.*, m.sender, m.timestamp as message_time
-      FROM images i
-      JOIN messages m ON i.message_id = m.id
-      WHERE 1=1
-    `;
-    const params = [];
-    
-    if (sender) {
-      sql += ' AND m.sender = ?';
-      params.push(sender);
-    }
-    
-    if (startTime) {
-      sql += ' AND i.created_at >= ?';
-      params.push(parseInt(startTime));
-    }
-    
-    // 计算总数
-    const countSql = sql.replace('SELECT i.*, m.sender, m.timestamp as message_time', 'SELECT COUNT(*) as total');
-    const countStmt = messageStore.db.prepare(countSql);
-    const { total } = countStmt.get(...params);
-    
-    // 分页查询
-    sql += ' ORDER BY i.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
-    
-    const stmt = messageStore.db.prepare(sql);
-    const images = stmt.all(...params);
-    
-    res.json({
-      success: true,
-      images,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        totalPages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('[Server] 获取图片列表失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 获取消息的图片列表
- * GET /api/images/message/:messageId
- */
-app.get('/api/images/message/:messageId', (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const images = messageStore.getMessageImages(messageId);
-    
-    const imagesWithUrls = images.map(img => ({
-      ...img,
-      url: `/api/images/${img.filename}`,
-      thumbnailUrl: img.thumbnailPath ? `/api/images/thumb_${img.filename}` : null
-    }));
-    
-    res.json({ success: true, count: images.length, images: imagesWithUrls });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 获取图片文件
- * GET /api/images/:filename
- */
-app.get('/api/images/:filename', (req, res) => {
-  try {
-    const { filename } = req.params;
-    
-    // 判断是原图还是缩略图
-    const isThumbnail = filename.startsWith('thumb_');
-    const imageDir = isThumbnail ? imageUpload.thumbnailDir : imageUpload.imageDir;
-    const filePath = path.join(imageDir, filename);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: '图片不存在' });
-    }
-
-    res.sendFile(filePath);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 删除图片
- * DELETE /api/images/:imageId
- */
-app.delete('/api/images/:imageId', async (req, res) => {
-  try {
-    const { imageId } = req.params;
-    
-    // 获取图片信息
-    const image = messageStore.getImageById(imageId);
-    if (!image) {
-      return res.status(404).json({ success: false, error: '图片不存在' });
-    }
-
-    // 删除文件
-    imageUpload.deleteImageFiles(image.filePath, image.thumbnailPath);
-    
-    // 删除数据库记录
-    const deleted = messageStore.deleteImage(imageId);
-    
-    if (deleted) {
-      res.json({ success: true, message: '图片已删除' });
-    } else {
-      res.status(500).json({ success: false, error: '删除失败' });
-    }
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ==================== 表情回应 API ====================
-
-/**
- * 添加表情回应
- * POST /api/reactions
- * Body: { messageId, reactorId, emoji }
- */
-app.post('/api/reactions', async (req, res) => {
-  try {
-    const { messageId, reactorId, emoji } = req.body;
-
-    if (!messageId || !reactorId || !emoji) {
-      return res.status(400).json({
-        success: false,
-        error: 'messageId, reactorId, and emoji are required'
-      });
-    }
-
-    // 检查消息是否存在
-    const message = messageStore.getMessageById(messageId);
-    if (!message) {
-      return res.status(404).json({ success: false, error: '消息不存在' });
-    }
-
-    // 添加表情回应
-    const added = await messageStore.addReaction(messageId, reactorId, emoji);
-
-    if (added) {
-      // 获取更新后的表情统计
-      const stats = messageStore.getReactionStats(messageId);
-      
-      console.log('[Server] 表情回应已添加:', reactorId, '->', emoji, 'on', messageId);
-      
-      res.json({ success: true, reactions: stats });
-    } else {
-      // 已经存在相同的回应
-      res.json({ success: true, message: '表情回应已存在' });
-    }
-  } catch (error) {
-    console.error('[Server] 添加表情回应失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 删除表情回应
- * DELETE /api/reactions
- * Body: { messageId, reactorId, emoji }
- */
-app.delete('/api/reactions', async (req, res) => {
-  try {
-    const { messageId, reactorId, emoji } = req.body;
-
-    if (!messageId || !reactorId || !emoji) {
-      return res.status(400).json({
-        success: false,
-        error: 'messageId, reactorId, and emoji are required'
-      });
-    }
-
-    const removed = messageStore.removeReaction(messageId, reactorId, emoji);
-
-    if (removed) {
-      // 获取更新后的表情统计
-      const stats = messageStore.getReactionStats(messageId);
-      
-      console.log('[Server] 表情回应已删除:', reactorId, '->', emoji, 'on', messageId);
-      
-      res.json({ success: true, reactions: stats });
-    } else {
-      res.status(404).json({ success: false, error: '表情回应不存在' });
-    }
-  } catch (error) {
-    console.error('[Server] 删除表情回应失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 获取消息的表情统计
- * GET /api/reactions/:messageId
- */
-app.get('/api/reactions/:messageId', (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const stats = messageStore.getReactionStats(messageId);
-    
-    res.json({ success: true, reactions: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 获取消息的所有表情回应（包含回应者信息）
- * GET /api/reactions/:messageId/details
- */
-app.get('/api/reactions/:messageId/details', (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const reactions = messageStore.getMessageReactions(messageId);
-    
-    res.json({ success: true, count: reactions.length, reactions });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ==================== 消息导出 API ====================
-
-const exportService = require('./export-service');
-
-/**
- * 导出消息
- * POST /api/export
- * Body: { format, sender, startTime, endTime, includeImages, includeReactions, includeChain }
- */
-app.post('/api/export', async (req, res) => {
-  try {
-    const {
-      format = 'json',
-      sender = null,
-      startTime = null,
-      endTime = null,
-      source = null,
-      includeImages = false,
-      includeReactions = false,
-      includeChain = false,
-      limit = 1000
-    } = req.body;
-
-    // 验证格式
-    const validFormats = ['json', 'csv', 'markdown', 'html'];
-    if (!validFormats.includes(format)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid format. Must be one of: ${validFormats.join(', ')}`
-      });
-    }
-
-    // 构建查询条件
-    let sql = 'SELECT * FROM messages WHERE 1=1';
-    const params = [];
-
-    if (sender) {
-      sql += ' AND sender = ?';
-      params.push(sender);
-    }
-
-    if (startTime) {
-      sql += ' AND timestamp >= ?';
-      params.push(startTime);
-    }
-
-    if (endTime) {
-      sql += ' AND timestamp <= ?';
-      params.push(endTime);
-    }
-
-    if (source) {
-      sql += ' AND source = ?';
-      params.push(source);
-    }
-
-    sql += ' ORDER BY timestamp ASC LIMIT ?';
-    params.push(limit);
-
-    // 查询消息
-    const stmt = messageStore.db.prepare(sql);
-    let messages = stmt.all(...params);
-
-    // 转换格式
-    messages = messages.map(row => ({
-      id: row.id,
-      type: row.type,
-      sender: row.sender,
-      content: row.content,
-      timestamp: row.timestamp,
-      source: row.source,
-      atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
-      replyTo: row.reply_to
-    }));
-
-    // 附加引用链
-    if (includeChain) {
-      messages = messageStore.attachReplyToMessages(messages, true);
-    }
-
-    // 附加图片
-    if (includeImages) {
-      messages = messageStore.attachImages(messages);
-    }
-
-    // 附加表情
-    if (includeReactions) {
-      messages = messageStore.attachReactions(messages);
-    }
-
-    // 生成导出内容
-    let content, contentType, filename;
-
-    switch (format) {
-      case 'json':
-        content = exportService.exportJSON(messages, { includeImages, includeReactions });
-        contentType = 'application/json';
-        filename = `messages-${Date.now()}.json`;
-        break;
-
-      case 'csv':
-        content = exportService.exportCSV(messages);
-        contentType = 'text/csv';
-        filename = `messages-${Date.now()}.csv`;
-        break;
-
-      case 'markdown':
-        content = exportService.exportMarkdown(messages, { includeReactions });
-        contentType = 'text/markdown';
-        filename = `messages-${Date.now()}.md`;
-        break;
-
-      case 'html':
-        content = exportService.exportHTML(messages, { includeReactions });
-        contentType = 'text/html';
-        filename = `messages-${Date.now()}.html`;
-        break;
-    }
-
-    // 设置响应头
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(content);
-
-    console.log('[Server] 导出完成:', format, messages.length, '条消息');
-  } catch (error) {
-    console.error('[Server] 导出失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * 导出为 ZIP 压缩包（包含所有格式）
- * POST /api/export/zip
- */
-app.post('/api/export/zip', async (req, res) => {
-  try {
-    const options = req.body;
-
-    // 获取消息（同上）
-    let sql = 'SELECT * FROM messages WHERE 1=1';
-    const params = [];
-
-    if (options.sender) {
-      sql += ' AND sender = ?';
-      params.push(options.sender);
-    }
-
-    if (options.startTime) {
-      sql += ' AND timestamp >= ?';
-      params.push(options.startTime);
-    }
-
-    if (options.endTime) {
-      sql += ' AND timestamp <= ?';
-      params.push(options.endTime);
-    }
-
-    sql += ' ORDER BY timestamp ASC LIMIT ?';
-    params.push(options.limit || 1000);
-
-    const stmt = messageStore.db.prepare(sql);
-    let messages = stmt.all(...params);
-
-    messages = messages.map(row => ({
-      id: row.id,
-      type: row.type,
-      sender: row.sender,
-      content: row.content,
-      timestamp: row.timestamp,
-      source: row.source,
-      atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
-      replyTo: row.reply_to
-    }));
-
-    if (options.includeChain) {
-      messages = messageStore.attachReplyToMessages(messages, true);
-    }
-
-    if (options.includeImages) {
-      messages = messageStore.attachImages(messages);
-    }
-
-    if (options.includeReactions) {
-      messages = messageStore.attachReactions(messages);
-    }
-
-    // 生成所有格式
-    const files = [
-      {
-        name: 'messages.json',
-        content: exportService.exportJSON(messages, options)
-      },
-      {
-        name: 'messages.csv',
-        content: exportService.exportCSV(messages)
-      },
-      {
-        name: 'messages.md',
-        content: exportService.exportMarkdown(messages, options)
-      },
-      {
-        name: 'messages.html',
-        content: exportService.exportHTML(messages, options)
-      }
-    ];
-
-    // 创建 ZIP
-    const zipPath = path.join(exportService.exportDir, `export-${Date.now()}.zip`);
-    await exportService.createZip(files, zipPath);
-
-    // 发送文件
-    res.download(zipPath, `messages-${Date.now()}.zip`, (err) => {
-      if (err) {
-        console.error('[Server] ZIP 下载失败:', err);
-      }
-      // 下载完成后删除文件
-      setTimeout(() => {
-        if (fs.existsSync(zipPath)) {
-          fs.unlinkSync(zipPath);
-        }
-      }, 5000);
-    });
-
-    console.log('[Server] ZIP 导出完成:', messages.length, '条消息');
-  } catch (error) {
-    console.error('[Server] ZIP 导出失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // ==================== 已读功能 API ====================
 
 /**
@@ -1109,19 +467,14 @@ app.get('/api/unread/:readerId', async (req, res) => {
   try {
     const { readerId } = req.params;
     const limit = parseInt(req.query.limit) || 100;
-    const includeChain = req.query.includeChain === 'true'; // 是否包含完整引用链
 
     const messages = messageStore.getUnreadMessages(readerId, limit);
-    
-    // 附加引用消息内容
-    const messagesWithReply = messageStore.attachReplyToMessages(messages, includeChain);
-    
     const count = messageStore.getUnreadCount(readerId);
 
     res.json({ 
       success: true, 
       count,
-      messages: messagesWithReply
+      messages 
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1172,70 +525,13 @@ app.get('/api/read-summary', async (req, res) => {
 /**
  * 健康检查
  */
-/**
- * 健康检查（增强版）
- * GET /health
- */
-app.get('/health', async (req, res) => {
+app.get('/health', (req, res) => {
   const stats = messageStore.getStats();
-  const memUsage = process.memoryUsage();
-  const uptime = process.uptime();
-  
-  // Redis 健康检查
-  let redisStatus = 'unknown';
-  let redisLatency = null;
-  try {
-    const redisStart = Date.now();
-    await redisClient.ping();
-    redisLatency = Date.now() - redisStart;
-    redisStatus = 'connected';
-  } catch (error) {
-    redisStatus = 'disconnected';
-  }
-  
-  // 缓存统计
-  const cacheStats = cacheManager.getStats();
-  
   res.json({ 
-    status: 'ok',
-    version: '1.10.0',
+    status: 'ok', 
     timestamp: Date.now(),
-    uptime: Math.floor(uptime),
-    
-    // 数据库统计
-    database: {
-      messages: stats.total,
-      today: stats.today,
-      images: messageStore.db.prepare('SELECT COUNT(*) as count FROM images').get().count,
-      reactions: messageStore.db.prepare('SELECT COUNT(*) as count FROM reactions').get().count
-    },
-    
-    // Redis 状态
-    redis: {
-      status: redisStatus,
-      latency: redisLatency
-    },
-    
-    // 缓存统计
-    cache: cacheStats,
-    
-    // 性能统计
-    performance: {
-      totalRequests: performanceStats.requests,
-      slowQueries: performanceStats.slowQueries.length,
-      errors: performanceStats.errors,
-      avgMemory: `${Math.round(memUsage.heapUsed / 1024 / 1024)} MB`
-    },
-    
-    // 内存使用
-    memory: {
-      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
-      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
-      rss: Math.round(memUsage.rss / 1024 / 1024),
-      external: Math.round(memUsage.external / 1024 / 1024)
-    },
-    
-    // 配置信息
+    messageCount: stats.total,
+    todayCount: stats.today,
     config: {
       bot: config.bot?.name,
       storeDir: messageStore.storeDir,
@@ -1245,72 +541,51 @@ app.get('/health', async (req, res) => {
 });
 
 /**
- * 性能统计详情
- * GET /api/performance
- */
-app.get('/api/performance', (req, res) => {
-  res.json({
-    success: true,
-    stats: {
-      totalRequests: performanceStats.requests,
-      slowQueries: performanceStats.slowQueries,
-      errors: performanceStats.errors,
-      cache: cacheManager.getStats()
-    }
-  });
-});
-
-/**
- * 搜索消息
+ * 搜索消息（基础版）
  * GET /api/search?q=关键词&limit=50
- */
-/**
- * 搜索消息（增强版）
- * GET /api/search?q=关键词&sender=发送者&startTime=开始时间&endTime=结束时间&source=来源&limit=50&offset=0&highlight=true&includeChain=false
  */
 app.get('/api/search', (req, res) => {
   try {
-    const { 
-      q, 
-      sender, 
-      startTime, 
-      endTime, 
-      source, 
-      limit, 
-      offset, 
-      highlight, 
-      includeChain 
-    } = req.query;
-    
+    const { q, limit } = req.query;
     if (!q) {
       return res.status(400).json({ success: false, error: 'q is required' });
     }
+    const messages = messageStore.searchMessages(q, parseInt(limit) || 50);
+    res.json({ success: true, count: messages.length, messages });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
-    // 构建搜索选项
-    const options = {
-      limit: parseInt(limit) || 50,
-      offset: parseInt(offset) || 0,
-      sender: sender || null,
+/**
+ * 高级搜索消息（支持多条件筛选、高亮、分页）
+ * GET /api/search/advanced?q=关键词&sender=小琳&startTime=1770000000000&endTime=1770999999999&page=1&pageSize=20&highlight=true
+ * 
+ * 参数说明：
+ * - q: 关键词（可选）
+ * - sender: 发送者筛选（可选）
+ * - startTime: 开始时间戳（可选，毫秒）
+ * - endTime: 结束时间戳（可选，毫秒）
+ * - page: 页码，从1开始（默认1）
+ * - pageSize: 每页数量（默认20，最大100）
+ * - highlight: 是否高亮关键词（默认true）
+ */
+app.get('/api/search/advanced', (req, res) => {
+  try {
+    const { q, sender, startTime, endTime, page, pageSize, highlight } = req.query;
+    
+    const result = messageStore.advancedSearch({
+      q: q || '',
+      sender: sender || '',
       startTime: startTime ? parseInt(startTime) : null,
       endTime: endTime ? parseInt(endTime) : null,
-      source: source || null,
-      highlight: highlight === 'true'
-    };
-
-    const messages = messageStore.searchMessages(q, options);
-    
-    // 附加引用消息内容
-    const messagesWithReply = messageStore.attachReplyToMessages(messages, includeChain === 'true');
-    
-    res.json({ 
-      success: true, 
-      count: messagesWithReply.length, 
-      messages: messagesWithReply,
-      query: q,
-      options 
+      page: page ? parseInt(page) : 1,
+      pageSize: pageSize ? parseInt(pageSize) : 20,
+      highlight: highlight !== 'false'
     });
+    
+    res.json({ success: true, ...result });
   } catch (error) {
-    console.error('[Server] 搜索失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -1319,26 +594,10 @@ app.get('/api/search', (req, res) => {
  * 获取统计信息
  * GET /api/stats
  */
-/**
- * 获取统计数据（带缓存）
- * GET /api/stats
- */
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', (req, res) => {
   try {
-    const cacheKey = 'chat:stats:overview';
-    
-    // 尝试从缓存获取
-    let stats = await cacheManager.get(cacheKey);
-    
-    if (!stats) {
-      // 缓存未命中，查询数据库
-      stats = messageStore.getStats();
-      
-      // 缓存 60 秒
-      await cacheManager.set(cacheKey, stats, 60);
-    }
-    
-    res.json({ success: true, stats, cached: !!stats });
+    const stats = messageStore.getStats();
+    res.json({ success: true, stats });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
