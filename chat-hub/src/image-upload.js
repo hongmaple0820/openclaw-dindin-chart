@@ -3,14 +3,20 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const config = require('./config');
 
 /**
  * 图片上传服务
  */
 class ImageUploadService {
   constructor() {
-    // 上传目录
-    this.uploadDir = path.join(process.env.HOME, '.openclaw', 'chat-data', 'uploads');
+    // 从配置文件获取存储路径
+    const storagePath = config.storage?.path || '~/.openclaw/chat-data/messages.db';
+    // 提取目录部分
+    const storageDir = path.dirname(storagePath.replace('~', process.env.HOME));
+    
+    // 上传目录（与数据库同目录下的 uploads）
+    this.uploadDir = path.join(storageDir, 'uploads');
     this.imageDir = path.join(this.uploadDir, 'images');
     this.thumbnailDir = path.join(this.uploadDir, 'thumbnails');
     
@@ -21,6 +27,8 @@ class ImageUploadService {
         console.log('[ImageUpload] 创建目录:', dir);
       }
     });
+
+    console.log('[ImageUpload] 存储目录:', this.uploadDir);
 
     // 支持的图片类型
     this.allowedMimeTypes = [
