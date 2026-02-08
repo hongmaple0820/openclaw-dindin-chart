@@ -1555,6 +1555,10 @@ async function start() {
   // 注册文件路由
   app.use('/api/files', fileRoutes);
   
+  // 注册私聊路由
+  const dmRoutes = require('./routes/dm');
+  app.use('/api/chat/dm', dmRoutes);
+  
   // 注册管理后台路由
   const adminRoutes = require('./routes/admin')(messageStore, messageStore.db);
   app.use('/api/admin', adminRoutes);
