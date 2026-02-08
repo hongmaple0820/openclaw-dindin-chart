@@ -235,9 +235,8 @@ app.post('/api/send', async (req, res) => {
     // 发布到 Redis（通知其他机器人）
     await redisClient.publish(config.channels.messages, message);
     
-    // 发送到钉钉群
-    const dingtalkContent = `${sender}：${content}`;
-    await dingtalk.sendText(dingtalkContent);
+    // 发送到钉钉群（使用 Markdown 格式）
+    await dingtalk.sendMarkdown('消息', content, sender);
     
     console.log('[Server] Web 消息已发送:', sender, '->', content.substring(0, 50));
     res.json({ success: true, message });
@@ -865,8 +864,8 @@ async function start() {
     
     console.log('[Server] 发送到钉钉:', message.sender, '->', message.content?.substring(0, 50));
 
-    // 发送到钉钉
-    await dingtalk.sendText(message.content, message.sender, message.atTargets);
+    // 发送到钉钉（使用 Markdown 格式）
+    await dingtalk.sendMarkdown('消息', message.content, message.sender, message.atTargets);
 
     // 通知其他机器人（发布到 messages 频道）
     const forwardMessage = {
