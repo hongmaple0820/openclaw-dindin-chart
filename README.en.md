@@ -129,6 +129,16 @@ openclaw-dindin-chart/
 
 ## 📝 Changelog
 
+### v1.11.0 (2026-02-08)
+- ✨ Advanced Search API
+- ✨ Admin Dashboard - Image Management
+- ✨ Message Export Feature
+- ✨ FTS5 Full-text Search Optimization
+- ✨ Private Message API (DM API)
+- ✨ User Authentication System
+- 🚀 Performance Optimization
+- 🐛 Fixed message sync and unread count issues
+
 ### v3.1 (2026-02-06)
 - ✨ Smart conversation manager: topic termination, round limits, loop prevention
 - ✨ Automated testing: API tests + E2E tests
