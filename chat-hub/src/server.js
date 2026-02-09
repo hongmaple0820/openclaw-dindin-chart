@@ -333,6 +333,10 @@ app.post('/api/reply', async (req, res) => {
       replyTo  // 支持引用回复
     };
 
+    // ⭐ V3 核心改进：先存储到数据库
+    messageStore.addMessage(message);
+    console.log('[Server] ✅ 消息已存储:', message.id);
+
     // WebSocket 推送新消息
     try {
       const websocket = require('./websocket');
@@ -419,6 +423,30 @@ app.get('/api/context', async (req, res) => {
   }
 });
 
+
+/**
+ * 获取 TASKS.md 内容（Web 界面实时同步）
+ * GET /api/tasks-md
+ */
+app.get('/api/tasks-md', async (req, res) => {
+  try {
+    const tasksPath = path.resolve(process.env.HOME, '.openclaw/workspace/TASKS.md');
+    
+    if (!fs.existsSync(tasksPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'TASKS.md 文件不存在' 
+      });
+    }
+    
+    const content = fs.readFileSync(tasksPath, 'utf-8');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(content);
+  } catch (error) {
+    console.error('[API] 读取 TASKS.md 失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 /**
  * 获取未同步消息（离线参与者重连时调用）
  * GET /api/sync/:participantId
