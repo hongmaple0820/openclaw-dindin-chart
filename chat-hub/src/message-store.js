@@ -344,7 +344,7 @@ class MessageStore {
   }
 
   /**
-   * 搜索消息
+   * 搜索消息（基础版，保持向后兼容）
    */
   /**
    * 搜索消息（使用 FTS5 全文索引）
@@ -470,6 +470,129 @@ class MessageStore {
     } catch (error) {
       console.error('[Store] 传统搜索失败:', error.message);
       return [];
+    }
+  }
+
+  /**
+   * 高级搜索消息（支持多条件筛选、高亮、分页）
+   * @param {Object} options - 搜索选项
+   * @param {string} options.q - 关键词（可选）
+   * @param {string} options.sender - 发送者筛选（可选）
+   * @param {number} options.startTime - 开始时间戳（可选）
+   * @param {number} options.endTime - 结束时间戳（可选）
+   * @param {number} options.page - 页码，从1开始（默认1）
+   * @param {number} options.pageSize - 每页数量（默认20，最大100）
+   * @param {boolean} options.highlight - 是否高亮关键词（默认true）
+   * @returns {Object} 搜索结果，包含 messages, total, page, pageSize, totalPages
+   */
+  advancedSearch(options = {}) {
+    try {
+      const {
+        q = '',
+        sender = '',
+        startTime = null,
+        endTime = null,
+        page = 1,
+        pageSize = 20,
+        highlight = true
+      } = options;
+
+      // 限制每页数量
+      const limitedPageSize = Math.min(Math.max(1, pageSize), 100);
+      const offset = (Math.max(1, page) - 1) * limitedPageSize;
+
+      // 构建动态 SQL
+      const conditions = [];
+      const params = [];
+
+      // 关键词搜索
+      if (q && q.trim()) {
+        conditions.push('content LIKE ?');
+        params.push(`%${q.trim()}%`);
+      }
+
+      // 发送者筛选
+      if (sender && sender.trim()) {
+        conditions.push('sender = ?');
+        params.push(sender.trim());
+      }
+
+      // 时间范围筛选
+      if (startTime) {
+        conditions.push('timestamp >= ?');
+        params.push(startTime);
+      }
+      if (endTime) {
+        conditions.push('timestamp <= ?');
+        params.push(endTime);
+      }
+
+      // 构建 WHERE 子句
+      const whereClause = conditions.length > 0 
+        ? `WHERE ${conditions.join(' AND ')}`
+        : '';
+
+      // 查询总数
+      const countSql = `SELECT COUNT(*) as total FROM messages ${whereClause}`;
+      const countStmt = this.db.prepare(countSql);
+      const totalResult = countStmt.get(...params);
+      const total = totalResult ? totalResult.total : 0;
+
+      // 查询分页数据
+      const dataSql = `
+        SELECT * FROM messages 
+        ${whereClause}
+        ORDER BY timestamp DESC 
+        LIMIT ? OFFSET ?
+      `;
+      const dataStmt = this.db.prepare(dataSql);
+      const rows = dataStmt.all(...params, limitedPageSize, offset);
+
+      // 格式化结果
+      const messages = rows.map(row => {
+        let content = row.content;
+        
+        // 高亮关键词
+        if (highlight && q && q.trim()) {
+          const keyword = q.trim();
+          const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+          content = content.replace(regex, '**$1**');
+        }
+
+        return {
+          id: row.id,
+          type: row.type,
+          sender: row.sender,
+          content: content,
+          originalContent: row.content,
+          timestamp: row.timestamp,
+          source: row.source,
+          atTargets: row.at_targets ? JSON.parse(row.at_targets) : null,
+          replyTo: row.reply_to
+        };
+      });
+
+      const totalPages = Math.ceil(total / limitedPageSize);
+
+      return {
+        messages,
+        total,
+        page: Math.max(1, page),
+        pageSize: limitedPageSize,
+        totalPages,
+        hasMore: page < totalPages
+      };
+    } catch (error) {
+      console.error('[Store] 高级搜索失败:', error.message);
+      return {
+        messages: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0,
+        hasMore: false,
+        error: error.message
+      };
     }
   }
 
