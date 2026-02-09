@@ -253,7 +253,7 @@ app.post('/webhook/dingtalk', async (req, res) => {
     messageStore.addMessage(message);
 
     // 发布到 Redis（仅用于中转通知）
-    await redisClient.publish(config.channels.messages, message);
+    await transportManager.send(message, config.channels.messages);
     
     if (atTargets.length > 0) {
       console.log('[Server] @ 提及:', atTargets.join(', '));
@@ -296,7 +296,7 @@ app.post('/api/send', async (req, res) => {
     messageStore.addMessage(message);
     
     // 发布到 Redis（通知其他机器人）
-    await redisClient.publish(config.channels.messages, message);
+    await transportManager.send(message, config.channels.messages);
     
     // 发送到钉钉群
     const dingtalkContent = `${sender}：${content}`;
@@ -343,7 +343,7 @@ app.post('/api/reply', async (req, res) => {
     sseManager.broadcast('message', message);
 
     // 发布到回复频道（订阅者会发送到钉钉）
-    await redisClient.publish(config.channels.replies, message);
+    await transportManager.send(message, config.channels.replies);
     
     console.log('[Server] 机器人回复:', sender, '->', content.substring(0, 50), replyTo ? `(回复: ${replyTo})` : '');
     res.json({ success: true, message });
@@ -395,7 +395,7 @@ app.post('/api/store', async (req, res) => {
     }
     
     // 发布到 Redis（通知其他机器人）
-    await redisClient.publish(config.channels.messages, message);
+    await transportManager.send(message, config.channels.messages);
     
     console.log('[Server] 存储消息:', sender, '->', content.substring(0, 50), atTargets ? `(@${parsedAtTargets.join(', @')})` : '', replyTo ? `(回复: ${replyTo})` : '');
     res.json({ success: true, message });
@@ -529,7 +529,7 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
       } catch (e) {}
       
       // 发布到 Redis
-      await redisClient.publish(config.channels.messages, message);
+      await transportManager.send(message, config.channels.messages);
     }
 
     // 处理上传的文件
@@ -1189,7 +1189,7 @@ app.get('/health', async (req, res) => {
   let redisLatency = null;
   try {
     const redisStart = Date.now();
-    await redisClient.ping();
+    await transportManager.healthCheck();
     redisLatency = Date.now() - redisStart;
     redisStatus = 'connected';
   } catch (error) {
@@ -1712,7 +1712,7 @@ async function start() {
     try {
       const memory = process.memoryUsage();
       const uptime = process.uptime();
-      const redisStatus = redisClient.getStatus();
+      const redisStatus = transportManager.getStatus();
       const onlineUsers = sseManager.getOnlineUsers();
 
       res.json({
