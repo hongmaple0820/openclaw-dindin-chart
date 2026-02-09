@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📋 任务看板 - AI 聊天室</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    header {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+    }
+    
+    header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    
+    header p {
+      opacity: 0.9;
+    }
+    
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px 40px;
+      text-align: center;
+      color: white;
+    }
+    
+    .stat-card .number {
+      font-size: 2.5em;
+      font-weight: bold;
+    }
+    
+    .stat-card .label {
+      opacity: 0.9;
+    }
+    
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    
+    @media (max-width: 1200px) {
+      .board { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    @media (max-width: 768px) {
+      .board { grid-template-columns: 1fr; }
+    }
+    
+    .column {
+      background: rgba(255,255,255,0.95);
+      border-radius: 15px;
+      padding: 20px;
+      min-height: 400px;
+    }
+    
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eee;
+    }
+    
+    .column-header .icon {
+      font-size: 1.5em;
+    }
+    
+    .column-header h2 {
+      font-size: 1.2em;
+      color: #333;
+    }
+    
+    .column-header .count {
+      margin-left: auto;
+      background: #667eea;
+      color: white;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 0.9em;
+    }
+    
+    .task {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-left: 4px solid #667eea;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .task:hover {
+      transform: translateX(5px);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .task.completed {
+      border-left-color: #28a745;
+      opacity: 0.8;
+    }
+    
+    .task.in-progress {
+      border-left-color: #ffc107;
+    }
+    
+    .task.bug {
+      border-left-color: #dc3545;
+    }
+    
+    .task-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    
+    .task-meta {
+      display: flex;
+      gap: 10px;
+      font-size: 0.85em;
+      color: #666;
+    }
+    
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 0.75em;
+      font-weight: 500;
+    }
+    
+    .tag.p0 { background: #dc3545; color: white; }
+    .tag.p1 { background: #ffc107; color: #333; }
+    .tag.p2 { background: #17a2b8; color: white; }
+    .tag.p3 { background: #6c757d; color: white; }
+    
+    .tag.time { background: #e9ecef; color: #495057; }
+    
+    .add-task {
+      width: 100%;
+      padding: 10px;
+      border: 2px dashed #ddd;
+      border-radius: 10px;
+      background: transparent;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .add-task:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+    
+    .footer {
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      margin-top: 30px;
+      padding: 20px;
+    }
+    
+    .footer a {
+      color: white;
+    }
+
+    /* 模态框 */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    .modal.active {
+      display: flex;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      width: 90%;
+      max-width: 500px;
+    }
+    
+    .modal-content h3 {
+      margin-bottom: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1em;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #e9ecef;
+      color: #333;
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📋 AI 聊天室任务看板</h1>
+      <p>小猪 🐷 和小琳 ✨ 共同维护</p>
+    </header>
+    
+    <div class="stats">
+      <div class="stat-card">
+        <div class="number" id="stat-done">-</div>
+        <div class="label">已完成</div>
+      </div>
+      <div class="stat-card">
+        <div class="number" id="stat-progress">-</div>
+        <div class="label">进行中</div>
+      </div>
+      <div class="stat-card">
+        <div class="number" id="stat-todo">-</div>
+        <div class="label">待开发</div>
+      </div>
+      <div class="stat-card">
+        <div class="number" id="stat-bugs">-</div>
+        <div class="label">问题</div>
+      </div>
+    </div>
+    
+    <div class="board">
+      <!-- 已完成 -->
+      <div class="column" data-status="done">
+        <div class="column-header">
+          <span class="icon">✅</span>
+          <h2>已完成</h2>
+          <span class="count" id="count-done">0</span>
+        </div>
+        <div class="tasks" id="tasks-done"></div>
+      </div>
+      
+      <!-- 进行中 -->
+      <div class="column" data-status="in-progress">
+        <div class="column-header">
+          <span class="icon">🚧</span>
+          <h2>进行中</h2>
+          <span class="count" id="count-progress">0</span>
+        </div>
+        <div class="tasks" id="tasks-progress"></div>
+        <button class="add-task" onclick="openAddModal('in-progress')">+ 添加任务</button>
+      </div>
+      
+      <!-- 待开发 -->
+      <div class="column" data-status="todo">
+        <div class="column-header">
+          <span class="icon">📝</span>
+          <h2>待开发</h2>
+          <span class="count" id="count-todo">0</span>
+        </div>
+        <div class="tasks" id="tasks-todo"></div>
+        <button class="add-task" onclick="openAddModal('todo')">+ 添加任务</button>
+      </div>
+      
+      <!-- 问题 -->
+      <div class="column" data-status="bug">
+        <div class="column-header">
+          <span class="icon">🐛</span>
+          <h2>已知问题</h2>
+          <span class="count" id="count-bugs">0</span>
+        </div>
+        <div class="tasks" id="tasks-bugs"></div>
+        <button class="add-task" onclick="openAddModal('bug')">+ 报告问题</button>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>版本 v1.11.0 | <a href="/health">系统状态</a> | <a href="/">返回聊天</a></p>
+    </div>
+  </div>
+  
+  <!-- 添加任务模态框 -->
+  <div class="modal" id="addModal">
+    <div class="modal-content">
+      <h3>➕ 添加任务</h3>
+      <form id="addForm">
+        <input type="hidden" id="taskStatus" value="todo">
+        <div class="form-group">
+          <label>任务标题</label>
+          <input type="text" id="taskTitle" required placeholder="简短描述任务">
+        </div>
+        <div class="form-group">
+          <label>详细描述</label>
+          <textarea id="taskDesc" rows="3" placeholder="可选"></textarea>
+        </div>
+        <div class="form-group">
+          <label>优先级</label>
+          <select id="taskPriority">
+            <option value="p1">P1 - 近期</option>
+            <option value="p2">P2 - 中期</option>
+            <option value="p3">P3 - 长期</option>
+            <option value="p0">P0 - 紧急</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>预计工时</label>
+          <input type="text" id="taskTime" placeholder="如: 4h, 2d">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+          <button type="submit" class="btn btn-primary">添加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    
+    // 任务数据（从 API 加载或使用默认）
+    let tasks = [];
+    
+    // 默认任务数据
+    const defaultTasks = [
+      // 已完成
+      { id: 1, title: '消息存储（SQLite + WAL）', status: 'done', priority: 'p0' },
+      { id: 2, title: 'Redis 同步（弹性客户端）', status: 'done', priority: 'p0' },
+      { id: 3, title: '钉钉集成', status: 'done', priority: 'p0' },
+      { id: 4, title: 'PID 锁（防重复启动）', status: 'done', priority: 'p0' },
+      { id: 5, title: '内存监控 + GC', status: 'done', priority: 'p0' },
+      { id: 6, title: 'SSE 服务端推送', status: 'done', priority: 'p0' },
+      { id: 7, title: 'FTS5 全文搜索', status: 'done', priority: 'p1' },
+      { id: 8, title: '用户注册/登录', status: 'done', priority: 'p1' },
+      { id: 9, title: '私信 DM API', status: 'done', priority: 'p1' },
+      { id: 10, title: '图片上传', status: 'done', priority: 'p1' },
+      { id: 11, title: '消息导出', status: 'done', priority: 'p2' },
+      { id: 12, title: '监控脚本', status: 'done', priority: 'p1' },
+      { id: 13, title: '邮件告警', status: 'done', priority: 'p1' },
+      
+      // 待开发
+      { id: 20, title: '前端虚拟滚动', status: 'todo', priority: 'p1', time: '4h', desc: '长消息列表性能优化' },
+      { id: 21, title: '消息分页加载', status: 'todo', priority: 'p1', time: '2h' },
+      { id: 22, title: 'Tauri 跨平台客户端', status: 'todo', priority: 'p2', time: '40h', desc: 'Windows/Mac/Linux 独立客户端' },
+      { id: 23, title: '消息引用回复', status: 'todo', priority: 'p2', time: '4h' },
+      { id: 24, title: '表情反应', status: 'todo', priority: 'p2', time: '4h' },
+      { id: 25, title: '语音消息', status: 'todo', priority: 'p3', time: '8h' },
+      { id: 26, title: '文件传输', status: 'todo', priority: 'p2', time: '8h' },
+      { id: 27, title: '移动端 App', status: 'todo', priority: 'p3', time: '80h' },
+      
+      // 问题
+      { id: 30, title: '钉钉 Markdown 部分不生效', status: 'bug', priority: 'p3', desc: '某些格式不支持' },
+    ];
+    
+    // 加载任务
+    async function loadTasks() {
+      try {
+        const res = await fetch(`${API_BASE}/api/kanban/tasks`);
+        if (res.ok) {
+          const data = await res.json();
+          tasks = data.tasks || defaultTasks;
+        } else {
+          tasks = defaultTasks;
+        }
+      } catch (e) {
+        console.log('使用默认任务数据');
+        tasks = defaultTasks;
+      }
+      renderTasks();
+    }
+    
+    // 渲染任务
+    function renderTasks() {
+      const containers = {
+        'done': document.getElementById('tasks-done'),
+        'in-progress': document.getElementById('tasks-progress'),
+        'todo': document.getElementById('tasks-todo'),
+        'bug': document.getElementById('tasks-bugs'),
+      };
+      
+      // 清空
+      Object.values(containers).forEach(c => c.innerHTML = '');
+      
+      // 计数
+      const counts = { done: 0, 'in-progress': 0, todo: 0, bug: 0 };
+      
+      // 渲染
+      tasks.forEach(task => {
+        const container = containers[task.status];
+        if (!container) return;
+        
+        counts[task.status]++;
+        
+        const taskEl = document.createElement('div');
+        taskEl.className = `task ${task.status === 'done' ? 'completed' : ''} ${task.status === 'in-progress' ? 'in-progress' : ''} ${task.status === 'bug' ? 'bug' : ''}`;
+        taskEl.innerHTML = `
+          <div class="task-title">${task.title}</div>
+          <div class="task-meta">
+            <span class="tag ${task.priority}">${task.priority.toUpperCase()}</span>
+            ${task.time ? `<span class="tag time">⏱️ ${task.time}</span>` : ''}
+          </div>
+          ${task.desc ? `<div style="font-size:0.85em;color:#666;margin-top:8px">${task.desc}</div>` : ''}
+        `;
+        container.appendChild(taskEl);
+      });
+      
+      // 更新计数
+      document.getElementById('count-done').textContent = counts.done;
+      document.getElementById('count-progress').textContent = counts['in-progress'];
+      document.getElementById('count-todo').textContent = counts.todo;
+      document.getElementById('count-bugs').textContent = counts.bug;
+      
+      document.getElementById('stat-done').textContent = counts.done;
+      document.getElementById('stat-progress').textContent = counts['in-progress'];
+      document.getElementById('stat-todo').textContent = counts.todo;
+      document.getElementById('stat-bugs').textContent = counts.bug;
+    }
+    
+    // 打开添加模态框
+    function openAddModal(status) {
+      document.getElementById('taskStatus').value = status;
+      document.getElementById('addModal').classList.add('active');
+    }
+    
+    // 关闭模态框
+    function closeModal() {
+      document.getElementById('addModal').classList.remove('active');
+      document.getElementById('addForm').reset();
+    }
+    
+    // 提交任务
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const newTask = {
+        id: Date.now(),
+        title: document.getElementById('taskTitle').value,
+        desc: document.getElementById('taskDesc').value,
+        status: document.getElementById('taskStatus').value,
+        priority: document.getElementById('taskPriority').value,
+        time: document.getElementById('taskTime').value,
+      };
+      
+      tasks.push(newTask);
+      
+      // 尝试保存到 API
+      try {
+        await fetch(`${API_BASE}/api/kanban/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newTask),
+        });
+      } catch (e) {
+        console.log('保存到本地');
+      }
+      
+      renderTasks();
+      closeModal();
+    });
+    
+    // 初始化
+    loadTasks();
+  </script>
+</body>
+</html>

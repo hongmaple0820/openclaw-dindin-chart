@@ -522,6 +522,96 @@ app.get('/api/read-summary', async (req, res) => {
   }
 });
 
+// ============ 任务看板 ============
+
+// 看板页面
+app.get('/kanban', (req, res) => {
+  res.sendFile(path.join(__dirname, '../kanban.html'));
+});
+
+// 看板数据文件路径
+const kanbanDataPath = path.join(__dirname, '../kanban-data.json');
+
+// 获取任务列表
+app.get('/api/kanban/tasks', (req, res) => {
+  try {
+    const fs = require('fs');
+    if (fs.existsSync(kanbanDataPath)) {
+      const data = JSON.parse(fs.readFileSync(kanbanDataPath, 'utf8'));
+      res.json({ success: true, tasks: data.tasks || [] });
+    } else {
+      res.json({ success: true, tasks: [] });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 保存任务
+app.post('/api/kanban/tasks', (req, res) => {
+  try {
+    const fs = require('fs');
+    let data = { tasks: [] };
+    
+    if (fs.existsSync(kanbanDataPath)) {
+      data = JSON.parse(fs.readFileSync(kanbanDataPath, 'utf8'));
+    }
+    
+    data.tasks.push(req.body);
+    fs.writeFileSync(kanbanDataPath, JSON.stringify(data, null, 2));
+    
+    res.json({ success: true, task: req.body });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 更新任务状态
+app.put('/api/kanban/tasks/:id', (req, res) => {
+  try {
+    const fs = require('fs');
+    const taskId = parseInt(req.params.id);
+    
+    if (!fs.existsSync(kanbanDataPath)) {
+      return res.status(404).json({ success: false, error: 'No tasks found' });
+    }
+    
+    const data = JSON.parse(fs.readFileSync(kanbanDataPath, 'utf8'));
+    const taskIndex = data.tasks.findIndex(t => t.id === taskId);
+    
+    if (taskIndex === -1) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+    
+    data.tasks[taskIndex] = { ...data.tasks[taskIndex], ...req.body };
+    fs.writeFileSync(kanbanDataPath, JSON.stringify(data, null, 2));
+    
+    res.json({ success: true, task: data.tasks[taskIndex] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 删除任务
+app.delete('/api/kanban/tasks/:id', (req, res) => {
+  try {
+    const fs = require('fs');
+    const taskId = parseInt(req.params.id);
+    
+    if (!fs.existsSync(kanbanDataPath)) {
+      return res.status(404).json({ success: false, error: 'No tasks found' });
+    }
+    
+    const data = JSON.parse(fs.readFileSync(kanbanDataPath, 'utf8'));
+    data.tasks = data.tasks.filter(t => t.id !== taskId);
+    fs.writeFileSync(kanbanDataPath, JSON.stringify(data, null, 2));
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 /**
  * 健康检查
  */
