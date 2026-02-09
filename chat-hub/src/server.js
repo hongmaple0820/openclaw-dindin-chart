@@ -430,7 +430,7 @@ app.get('/api/context', async (req, res) => {
  */
 app.get('/api/tasks-md', async (req, res) => {
   try {
-    const tasksPath = path.resolve(process.env.HOME, '.openclaw/workspace/TASKS.md');
+    const tasksPath = path.resolve(process.env.HOME, '.openclaw/ai-chat-room/TASKS.md');
     
     if (!fs.existsSync(tasksPath)) {
       return res.status(404).json({ 
