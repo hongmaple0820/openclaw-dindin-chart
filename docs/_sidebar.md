@@ -10,6 +10,9 @@
 - **📐 设计**
   - [私聊功能设计](private-chat-design.md)
   - [用量统计方案](usage-tracking-plan.md)
+- **📋 更新**
+  - [更新日志](CHANGELOG.md)
+  - [V2 开发计划](v2-development-plan.md)
 - **🔗 相关链接**
   - [Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart)
   - [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart)
