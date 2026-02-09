@@ -1,0 +1,36 @@
+{
+  "transport": {
+    "mode": "sse-cloud",
+    "sse": {
+      "cloud": {
+        "enabled": true,
+        "endpoint": "http://localhost:4000",
+        "apiKey": "test-key-xiaolin",
+        "reconnect": {
+          "enabled": true,
+          "maxRetries": 10
+        }
+      }
+    },
+    "redis": {
+      "enabled": false
+    }
+  },
+  "bot": {
+    "name": "小琳-SSE测试",
+    "local": true
+  },
+  "trigger": {
+    "enabled": false
+  },
+  "dingtalk": {
+    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=3ab840ed422ef13ffb92e57b8a1ee54c5824991f0a13795b52ed4c7674ef2a1c",
+    "secret": "SEC3db7f7176e4bb09ef67520af23f3834c9baeb6f9636a231443afcc3514ce76dd"
+  },
+  "userPhones": {
+    "maple": "19976618156",
+    "鸿枫": "19976618156",
+    "lin": "16670151072",
+    "琳琳": "16670151072"
+  }
+}

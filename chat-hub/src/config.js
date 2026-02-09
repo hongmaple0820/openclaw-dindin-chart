@@ -56,4 +56,30 @@ function loadConfig() {
   return config;
 }
 
-module.exports = loadConfig();
+const config = loadConfig();
+
+// ========== 配置迁移（V2 兼容性） ==========
+// 如果存在旧的 redis 配置，自动迁移到新的 transport.redis
+if (config.redis && !config.transport) {
+  console.log('[Config] 检测到旧版 Redis 配置，自动迁移到 V2 格式');
+  config.transport = {
+    mode: 'auto',
+    redis: {
+      enabled: config.redis.enabled !== false, // 默认启用
+      host: config.redis.host,
+      port: config.redis.port,
+      password: config.redis.password
+    }
+  };
+  config.fallback = {
+    enabled: true,
+    order: ['redis']
+  };
+}
+
+// 如果 transport.redis 存在但没有 enabled 字段，默认启用
+if (config.transport?.redis && config.transport.redis.enabled === undefined) {
+  config.transport.redis.enabled = true;
+}
+
+module.exports = config;
