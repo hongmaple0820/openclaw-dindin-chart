@@ -1,4 +1,5 @@
 const RedisTransport = require('./redis-transport')
+const SSECloudTransport = require('./sse-cloud-transport')
 
 /**
  * 传输管理器
@@ -9,7 +10,7 @@ class TransportManager {
     this.config = config
     this.currentTransport = null
     this.mode = config.transport?.mode || 'auto'
-    this.fallbackOrder = config.fallback?.order || ['redis']
+    this.fallbackOrder = config.fallback?.order || ['sse-cloud', 'redis']
     this.messageHandlers = []
   }
 
@@ -70,9 +71,15 @@ class TransportManager {
         }
         return new RedisTransport(this.config.transport.redis)
 
+      case 'sse-cloud':
+        if (!this.config.transport?.sse?.cloud?.enabled) {
+          throw new Error('SSE Cloud 未启用')
+        }
+        return new SSECloudTransport(this.config.transport.sse.cloud)
+
       // 后续添加更多传输方式
-      // case 'sse-local':
-      //   return new SSELocalTransport(this.config.transport.sse.local)
+      // case 'sse-self':
+      //   return new SSESelfTransport(this.config.transport.sse.self)
       
       default:
         throw new Error(`未知传输方式: ${mode}`)
@@ -80,13 +87,16 @@ class TransportManager {
   }
 
   /**
-   * 订阅频道（Redis 专用）
+   * 订阅频道（Redis 专用，SSE 自动推送无需订阅）
    */
   async subscribe(channel) {
+    const RedisTransport = require('./redis-transport')
+    
     if (this.currentTransport instanceof RedisTransport) {
       return this.currentTransport.subscribe(channel)
     } else {
-      console.warn('[TransportManager] 当前传输方式不支持 subscribe()')
+      // SSE 等其他传输方式不需要订阅
+      console.log(`[TransportManager] ${this.mode} 模式无需手动订阅（自动推送）`)
     }
   }
 
