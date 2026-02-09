@@ -4,15 +4,12 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
-const TransportManager = require('./transport');
+const redisClient = require('./redis-client');
 const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
 const sseManager = require('./sse-manager');
-
-// 创建传输管理器
-const transportManager = new TransportManager(config);
 
 const app = express();
 
@@ -1571,76 +1568,65 @@ async function start() {
   app.set('messageStore', messageStore); // 让 webhook 能访问 messageStore
   app.use('/api/webhook', webhookRoutes);
 
-  // 连接传输层（支持自动降级）
-  await transportManager.connect();
-  console.log(`[Server] 传输层已连接:`, transportManager.getStatus());
-
   // 订阅消息频道（自动同步其他 AI 的消息到本地数据库）
-  await transportManager.subscribe(config.channels.messages);
-  
-  transportManager.onMessage(async (message) => {
-    // 判断消息来源频道
-    const isReply = message._channel === config.channels.replies;
-    
-    if (isReply) {
-      // 回复频道的消息处理
-      const savedMessage = {
-        ...message,
-        id: `reply-${message.id}`,
-        source: 'redis'
-      };
-      
-      if (!messageStore.isDuplicate(savedMessage.id)) {
-        messageStore.addMessage(savedMessage);
-        console.log(`[Server] 保存回复: ${message.sender} -> ${message.content?.substring(0, 30)}...`);
-      }
+  await redisClient.subscribe(config.channels.messages, async (message) => {
+    // 检查消息去重（基于 message.id）
+    if (messageStore.isDuplicate(message.id)) {
+      console.log(`[Server] 跳过重复消息: ${message.id}`);
+      return;
+    }
 
-      // 只转发自己的回复到钉钉
-      if (message.sender !== myBotName) {
-        return;
+    // 保存到本地数据库
+    const saved = await messageStore.addMessage(message);
+    if (saved) {
+      console.log(`[Server] 同步消息: ${message.sender} -> ${message.content?.substring(0, 30)}... [source: ${message.source}]`);
+      
+      // 通知 WebSocket 客户端
+      try {
+        const websocket = require('./websocket');
+        websocket.pushMessage(message);
+      } catch (e) {
+        // WebSocket 可能未初始化
       }
       
-      console.log('[Server] 发送到钉钉:', message.sender, '->', message.content?.substring(0, 50));
-
-      // 发送到钉钉
-      await dingtalk.sendText(message.content, message.sender, message.atTargets);
-
-      // 通知其他机器人（发布到 messages 频道）
-      const forwardMessage = {
-        ...message,
-        id: uuidv4(),
-        type: 'bot',
-        forwarded: true
-      };
-      await transportManager.send(forwardMessage, config.channels.messages);
-    } else {
-      // 普通消息频道的处理
-      if (messageStore.isDuplicate(message.id)) {
-        console.log(`[Server] 跳过重复消息: ${message.id}`);
-        return;
-      }
-
-      // 保存到本地数据库
-      const saved = await messageStore.addMessage(message);
-      if (saved) {
-        console.log(`[Server] 同步消息: ${message.sender} -> ${message.content?.substring(0, 30)}... [source: ${message.source}]`);
-        
-        // 通知 WebSocket 客户端
-        try {
-          const websocket = require('./websocket');
-          websocket.pushMessage(message);
-        } catch (e) {
-          // WebSocket 可能未初始化
-        }
-        
-        // 通知 SSE 客户端
-        sseManager.broadcast('message', message);
-      }
+      // 通知 SSE 客户端
+      sseManager.broadcast('message', message);
     }
   });
 
   // 订阅回复频道
-  await transportManager.subscribe(config.channels.replies);
+  await redisClient.subscribe(config.channels.replies, async (message) => {
+    // 保存所有回复到本地数据库（不管是谁发的）
+    const savedMessage = {
+      ...message,
+      id: `reply-${message.id}`,
+      source: 'redis'
+    };
+    
+    if (!messageStore.isDuplicate(savedMessage.id)) {
+      messageStore.addMessage(savedMessage);
+      console.log(`[Server] 保存回复: ${message.sender} -> ${message.content?.substring(0, 30)}...`);
+    }
+
+    // 只转发自己的回复到钉钉
+    if (message.sender !== myBotName) {
+      return;
+    }
+    
+    console.log('[Server] 发送到钉钉:', message.sender, '->', message.content?.substring(0, 50));
+
+    // 发送到钉钉
+    await dingtalk.sendText(message.content, message.sender, message.atTargets);
+
+    // 通知其他机器人（发布到 messages 频道）
+    const forwardMessage = {
+      ...message,
+      id: uuidv4(),
+      type: 'bot',
+      forwarded: true
+    };
+    await redisClient.publish(config.channels.messages, forwardMessage);
+  });
 
   // ============ SSE 实时推送 ============
 
