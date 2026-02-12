@@ -1,16 +1,16 @@
-# 🤖 AI 聊天室搭建教程：让多个 AI 在钉钉群里协同工作
+# 🤖 枫琳 AI 聊天室搭建教程：让多个 AI 在钉钉群里协同工作
 
-> **作者**：鸿枫 & 小琳（AI 助手）  
-> **更新**：2026-02-06  
-> **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart) | [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)  
-> **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)  
+> **作者**：鸿枫 & 枫琳 AI 助手
+> **更新**：2026-02-13
+> **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart) | [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)
+> **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
 > **许可证**：非商业使用许可证（商业使用需授权）
 
 ---
 
 ## 📖 前言
 
-这是一个真实的实践案例：我和两个 AI 助手（小琳 🌸、小猪 🐷）在钉钉群里协同开发了一套 AI 聊天室系统。
+这是一个真实的实践案例：我和两个 AI 助手（枫琳 🍁、小猪 🐷）在钉钉群里协同开发了一套 AI 聊天室系统。
 
 > [!tip] 你将学到什么？
 > 1. **技术架构**：如何让多个 AI 在同一个群里实时对话
@@ -24,17 +24,17 @@
 
 想象一下这个场景：
 - 你有一个钉钉群
-- 群里有两个 AI 助手：小琳和小猪
-- 你可以 @小琳 让她做事，@小猪 让他帮忙
+- 群里有两个 AI 助手：枫琳和小猪
+- 你可以 @枫琳 让她做事，@小猪 让他帮忙
 - 两个 AI 之间也可以互相对话、协作
 - **AI 能智能判断何时回复、何时沉默**
 
 ```
-鸿枫：@小琳 帮我写个 API 文档
-小琳：好的！文档已写入 docs/API.md，@小猪 你来写前端调用示例
+鸿枫：@枫琳 帮我写个 API 文档
+枫琳：好的！文档已写入 docs/API.md，@小猪 你来写前端调用示例
 小猪：收到！示例代码已添加
 鸿枫：不错，你们继续，我去睡觉了
-小琳：晚安！我们会按计划推进的
+枫琳：晚安！我们会按计划推进的
 ```
 
 ---
@@ -53,6 +53,8 @@
 | **Chat-Hub** | 消息中转 + 存储 | Express + SQLite |
 | **Redis** | 多机器人消息同步 | Redis 6.x |
 | **chat-web** | 聊天室前端 | Vue 3 + Vite |
+| **chat-admin-api** | 后台管理 API | Express + SQLite |
+| **chat-admin-ui** | 后台管理界面 | Vue 3 + Element Plus |
 
 ### 消息流程
 
@@ -79,7 +81,7 @@
 ### 前置准备
 
 > [!important] 环境要求
-> - **服务器**：Linux（Ubuntu/Debian）
+> - **服务器**：Linux（Ubuntu/Debian）/ macOS / Windows
 > - **Node.js**：v18+
 > - **Redis**：用于多机器人消息同步
 > - **钉钉开发者账号**
@@ -148,6 +150,68 @@ npm start
 
 ---
 
+## 📋 完整配置说明
+
+### Chat-Hub 配置详解
+
+```json
+{
+  "mode": "storage",
+  "server": {
+    "port": 3000
+  },
+  "storage": {
+    "type": "sqlite",
+    "path": "~/.openclaw/chat-data/messages.db"
+  },
+  "redis": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 6379,
+    "password": ""
+  },
+  "bot": {
+    "name": "枫琳",
+    "local": true,
+    "prefix": ""
+  },
+  "dingtalk": {
+    "enabled": true,
+    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
+    "secret": "SECxxx"
+  },
+  "trigger": {
+    "enabled": false,
+    "command": "openclaw system event --text"
+  },
+  "features": {
+    "storage": true,
+    "analytics": true,
+    "webUI": true,
+    "redis": true
+  }
+}
+```
+
+### 配置项说明
+
+| 配置项 | 类型 | 说明 | 示例 |
+|:------|:------|:------|:------|
+| `mode` | string | 运行模式 | `storage` / `hub` |
+| `server.port` | number | 服务端口 | `3000` |
+| `redis.host` | string | Redis 地址 | `localhost` |
+| `redis.port` | number | Redis 端口 | `6379` |
+| `redis.password` | string | Redis 密码 | `your_password` |
+| `bot.name` | string | 机器人名称 | `枫琳` |
+| `dingtalk.webhookBase` | string | 钉钉 Webhook | `https://oapi.dingtalk.com/robot/send?access_token=xxx` |
+| `dingtalk.secret` | string | 钉钉签名密钥 | `SECxxx` |
+| `trigger.enabled` | boolean | 是否启用触发器 | `false` |
+| `features.storage` | boolean | 启用消息存储 | `true` |
+| `features.analytics` | boolean | 启用分析功能 | `true` |
+| `features.webUI` | boolean | 启用 Web 界面 | `true` |
+
+---
+
 ## 🤖 添加第二个 AI
 
 > [!note] 多机器人协同
@@ -193,7 +257,7 @@ openclaw init
 const conversationManager = {
   maxTurns: 5,           // 单轮最多 5 次 AI 对话
   cooldownMs: 60000,     // 话题冷却 1 分钟
-  
+
   endingPhrases: [       // 话题终结词
     '收到', '明白', '好的', 'OK', '了解',
     '晚安', '再见', '感谢'
@@ -204,9 +268,71 @@ const conversationManager = {
 ### 效果
 
 ```
-小琳：@小猪 这个任务交给你
+枫琳：@小猪 这个任务交给你
 小猪：收到！    ← 检测到终结词，对话结束
 # 不会无限循环
+```
+
+---
+
+## 📡 API 接口文档
+
+### 消息相关 API
+
+| 接口 | 方法 | 说明 | 示例 |
+|------|------|------|------|
+| `/api/messages` | GET | 获取聊天记录（分页） | `?page=1&limit=20` |
+| `/api/reply` | POST | 机器人发送回复 | 发送消息到钉钉 |
+| `/api/send` | POST | Web 用户发送消息 | 发送到 Redis |
+| `/api/store` | POST | 仅存储消息 | 不发送，仅存储 |
+| `/api/search` | GET | 搜索消息 | `?q=关键词` |
+| `/api/search/advanced` | GET | 高级搜索 | FTS5 全文索引 |
+| `/api/stats` | GET | 统计数据 | 消息数量、用户统计 |
+| `/api/export` | GET | 导出消息 | `?format=json&days=7` |
+
+### 私聊 API
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/dm/conversations` | GET | 获取私聊会话列表 |
+| `/api/dm/messages/:conversationId` | GET | 获取私聊消息 |
+| `/api/dm/store` | POST | 存储私聊消息 |
+| `/api/dm/unread` | GET | 获取未读数 |
+
+### 用户认证 API
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/auth/register` | POST | 用户注册 |
+| `/api/auth/login` | POST | 用户登录 |
+| `/api/auth/logout` | POST | 用户登出 |
+
+### Webhook
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/webhook/dingtalk` | POST | 钉钉 Outgoing 回调 |
+
+### API 使用示例
+
+```bash
+# 发送回复
+curl -X POST http://localhost:3000/api/reply \
+  -H "Content-Type: application/json" \
+  -d '{"content": "你好！", "sender": "枫琳"}'
+
+# 搜索消息
+curl "http://localhost:3000/api/search?q=关键词&limit=20"
+
+# 高级搜索
+curl "http://localhost:3000/api/search/advanced?q=关键词&sender=枫琳&days=7"
+
+# 导出消息
+curl "http://localhost:3000/api/export?format=json&days=7" -o messages.json
+curl "http://localhost:3000/api/export?format=csv&days=30" -o messages.csv
+
+# 获取统计数据
+curl "http://localhost:3000/api/stats"
 ```
 
 ---
@@ -217,24 +343,43 @@ const conversationManager = {
 openclaw-dindin-chart/
 ├── chat-hub/           # 消息中转服务
 │   ├── src/
-│   │   ├── server.js       # 主服务
-│   │   ├── storage.js      # SQLite 存储
+│   │   ├── index.js       # 主入口
+│   │   ├── server.js      # Express 服务
+│   │   ├── storage.js     # SQLite 存储
+│   │   ├── message-store.js  # 消息存储模块
 │   │   ├── redis-client.js # Redis 客户端
-│   │   └── dingtalk.js     # 钉钉 API
-│   └── config/
-│       ├── default.json    # 默认配置
-│       └── local.json      # 本地配置（不提交）
+│   │   ├── dingtalk.js    # 钉钉 API
+│   │   └── bots/          # 机器人模块
+│   │       └── openclaw-trigger.js
+│   ├── config/
+│   │   ├── default.json   # 默认配置
+│   │   └── local.json     # 本地配置（不提交）
+│   └── docs/
+│       ├── API.md         # API 文档
+│       └── QUICK-START.md # 快速开始
 │
 ├── chat-web/           # Web 聊天室
 │   └── src/
-│       ├── views/
-│       └── components/
+│       ├── views/         # 页面视图
+│       ├── components/    # 组件
+│       ├── api/           # API 调用
+│       └── stores/        # 状态管理
 │
-├── chat-admin-ui/      # 管理后台
+├── chat-admin-api/     # 后台管理 API
+│   └── src/
+│       ├── routes/        # 路由
+│       ├── models/        # 数据模型
+│       └── services/      # 服务
+│
+├── chat-admin-ui/      # 管理后台界面
+│   └── src/
+│       ├── views/         # 管理页面
+│       └── components/    # 组件
 │
 └── docs/               # 文档
     ├── AI-ChatRoom-Tutorial.md  # 本文
-    └── ...
+    ├── CHANGELOG.md      # 更新日志
+    └── images/           # 教程图片
 ```
 
 ---
@@ -260,18 +405,27 @@ openclaw-dindin-chart/
 > fc-cache -fv
 > ```
 
+> [!faq]- Q: SQLite 数据库如何迁移？
+> **A**: 数据库文件位于 `~/.openclaw/chat-data/messages.db`。迁移时直接复制数据库文件即可。
+
+> [!faq]- Q: 如何开启消息导出功能？
+> **A**: 使用 `/api/export` 接口，支持 JSON 和 CSV 两种格式，可指定时间范围。
+
+> [!faq]- Q: 如何配置私聊功能？
+> **A**: 私聊功能需要启动 chat-admin-api，并在配置中启用 `features.dm`。
+
 ---
 
 ## 📊 项目数据
 
-经过 4 天的协同开发：
+经过一段时间的协同开发：
 
 | 指标 | 数值 |
 |:------|:------|
-| 代码量 | 8000+ 行 |
-| 功能模块 | 20+ 个 |
-| AI 对话轮次 | 500+ 次 |
-| 参与者 | 1 人类 + 2 AI |
+| 代码量 | 10000+ 行 |
+| 功能模块 | 30+ 个 |
+| AI 对话轮次 | 1000+ 次 |
+| 参与者 | 1 人类 + 多个 AI |
 
 ---
 
@@ -307,10 +461,10 @@ openclaw-dindin-chart/
 
 ---
 
-> [!quote] 
+> [!quote]
 > AI 不只是工具，可以是**队友**。
 > 当 AI 学会协作，人类的创造力得到**无限放大**。
 
 ---
 
-*最后更新：2026-02-06*
+*最后更新：2026-02-13*

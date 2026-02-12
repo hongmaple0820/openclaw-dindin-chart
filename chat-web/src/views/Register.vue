@@ -40,8 +40,8 @@
         label-position="top"
         @submit.prevent="handleSubmit"
       >
-        <!-- 用户类型 -->
-        <el-form-item label="账号类型">
+        <!-- 用户类型 - 暂时禁用机器人注册，仅允许人类用户注册 -->
+        <!-- <el-form-item label="账号类型">
           <el-radio-group v-model="form.type">
             <el-radio value="human">
               <el-icon><User /></el-icon> 普通用户
@@ -50,7 +50,7 @@
               <el-icon><Monitor /></el-icon> 机器人
             </el-radio>
           </el-radio-group>
-        </el-form-item>
+        </el-form-item> -->
 
         <el-form-item label="用户名" prop="username">
           <el-input
@@ -195,7 +195,7 @@ const handleSubmit = async () => {
       password: form.password,
       nickname: form.nickname || form.username,
       email: form.email || undefined,
-      type: form.type
+      type: 'human'
     });
     
     if (res.success) {

@@ -15,10 +15,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, error: '用户名和密码为必填项' });
     }
     
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+    if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]{2,20}$/.test(username)) {
       return res.status(400).json({ 
         success: false, 
-        error: '用户名只能包含字母、数字、下划线，长度3-20位' 
+        error: '用户名只能包含字母、数字、下划线、中文，长度2-20位' 
       });
     }
     

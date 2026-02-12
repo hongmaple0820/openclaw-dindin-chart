@@ -1,12 +1,12 @@
-# 🤖 AI 聊天室 - 让多个 AI 在钉钉群里协同工作
+# 🤖 枫琳 AI 聊天室 - 让多个 AI 在钉钉群里协同工作
 
-让多个 AI 机器人在钉钉群中与人类实时聊天、互相对话、智能协作。
+让多个 AI 机器人在钉钉群中与人类实时聊天、智能协作。
 
 [![License](https://img.shields.io/badge/License-非商业使用-blue.svg)](LICENSE.md)
 [![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
 [![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/openclaw-dindin-chart?style=social)](https://github.com/hongmaple0820/openclaw-dindin-chart)
 
-> 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)  
+> 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)
 > 📚 **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
 
 [English](README.en.md)
@@ -25,11 +25,12 @@
 
 ## ✨ 核心功能
 
-- **多 AI 实时对话**：多个 AI 助手在同一个群里协作
-- **智能对话管理**：话题终结检测、轮次限制、防无限循环
-- **消息持久化**：SQLite 存储 + Redis 同步
-- **后台管理**：用户认证、消息搜索、数据统计
-- **私聊功能**：用户间私聊、AI 私聊、钉钉私聊集成
+- **多 AI 实时对话**：多个 AI 助手在同一个群里协作，互相配合完成任务
+- **智能对话管理**：话题终结检测、轮次限制、防无限循环，AI 能智能判断何时回复
+- **消息持久化**：SQLite 本地存储 + Redis 实时同步，支持全文搜索
+- **后台管理系统**：用户认证、消息搜索、数据统计、图片管理
+- **私聊功能**：支持用户间私聊、AI 私聊、钉钉私聊集成
+- **消息导出**：支持 JSON/CSV 格式导出聊天记录
 
 ## 🚀 快速开始
 
@@ -155,9 +156,8 @@ openclaw-dindin-chart/
 │   ├── src/
 │   │   ├── index.js       # 入口
 │   │   ├── server.js      # Express 服务
-│   │   ├── storage.js     # SQLite 存储
-│   │   ├── redis-client.js # Redis 消息总线
 │   │   ├── dingtalk.js    # 钉钉 Webhook 发送
+│   │   ├── message-store.js # SQLite 消息存储
 │   │   └── bots/
 │   │       └── openclaw-trigger.js  # OpenClaw 触发器
 │   ├── config/
@@ -168,9 +168,9 @@ openclaw-dindin-chart/
 ├── chat-admin-api/        # 后台：管理 API
 ├── chat-admin-ui/         # 后台：管理界面
 └── docs/
-    ├── mode-guide.md      # 模式切换指南
-    ├── dingtalk-plugin-guide.md  # 钉钉插件配置指南
-    └── new-bot-guide.md   # 新机器人接入指南
+    ├── AI-ChatRoom-Tutorial.md  # 完整搭建教程
+    ├── CHANGELOG.md      # 版本更新日志
+    └── images/           # 教程图片
 ```
 
 ---
@@ -209,33 +209,33 @@ cp config/default.json config/local.json
 
 ```json
 {
-  "mode": "storage",  // storage | hub
-  
+  "mode": "storage",
+
   "server": {
     "port": 3000
   },
-  
+
   "redis": {
     "host": "你的Redis地址",
     "port": 6379,
     "password": "你的密码"
   },
-  
+
   "bot": {
     "name": "小琳",
     "local": true
   },
-  
+
   "dingtalk": {
     "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
     "secret": "SECxxx"
   },
-  
+
   "trigger": {
-    "enabled": false,  // 模式A设为false，模式B设为true
+    "enabled": false,
     "command": "openclaw system event --text"
   },
-  
+
   "features": {
     "storage": true,
     "analytics": true,
@@ -265,12 +265,14 @@ cd ../chat-admin-ui && npm run dev -- --host
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/context` | GET | 获取聊天记录 |
+| `/api/messages` | GET | 获取聊天记录（分页） |
 | `/api/reply` | POST | 机器人发送回复（同步到钉钉） |
 | `/api/send` | POST | Web 用户发送消息 |
 | `/api/store` | POST | 仅存储消息（不发送） |
-| `/api/search` | GET | 搜索消息 |
+| `/api/search` | GET | 搜索消息（支持关键词） |
+| `/api/search/advanced` | GET | 高级搜索（FTS5 全文索引） |
 | `/api/stats` | GET | 统计信息 |
+| `/api/export` | GET | 导出消息（JSON/CSV） |
 
 ### 私聊相关
 
@@ -279,6 +281,15 @@ cd ../chat-admin-ui && npm run dev -- --host
 | `/api/dm/conversations` | GET | 获取私聊会话列表 |
 | `/api/dm/messages/:conversationId` | GET | 获取私聊会话消息 |
 | `/api/dm/store` | POST | 存储私聊消息 |
+| `/api/dm/unread` | GET | 获取未读消息数 |
+
+### 用户认证
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/auth/register` | POST | 用户注册 |
+| `/api/auth/login` | POST | 用户登录 |
+| `/api/auth/logout` | POST | 用户登出 |
 
 ### Webhook
 
@@ -293,6 +304,12 @@ cd ../chat-admin-ui && npm run dev -- --host
 curl -X POST http://localhost:3000/api/reply \
   -H "Content-Type: application/json" \
   -d '{"content": "你好！", "sender": "小琳"}'
+
+# 搜索消息
+curl "http://localhost:3000/api/search?q=关键词&limit=20"
+
+# 导出消息
+curl "http://localhost:3000/api/export?format=json&days=7" -o messages.json
 
 # 仅存储（用于模式A同步消息）
 curl -X POST http://localhost:3000/api/store \

@@ -1,6 +1,6 @@
-# Chat-Hub：多 AI 机器人实时聊天中转站
+# Chat-Hub：枫琳 AI 聊天室消息中转站
 
-基于 Node.js + Redis + SQLite 的消息中转服务，让多个 AI 机器人（OpenClaw）能够在钉钉群中与人类实时聊天、互相对话。
+基于 Node.js + Redis + SQLite 的消息中转服务，让多个 AI 机器人（OpenClaw）能够在钉钉群中与人类实时聊天、智能协作。
 
 ## 📖 文档导航
 
@@ -10,13 +10,16 @@
 ## ✨ 功能特性
 
 - 🚀 **实时触发** - 收到消息立即触发 OpenClaw，无需等待心跳
-- 🤖 **多机器人支持** - 小琳、小猪等多个 AI 可同时在线
+- 🤖 **多机器人支持** - 枫琳、小猪等多个 AI 可同时在线
 - 💬 **钉钉集成** - 接收/发送钉钉群消息
 - 📡 **Redis 消息总线** - 多机器人共享消息，跨机器通信
 - 🗄️ **SQLite 持久化** - 消息本地存储，支持搜索和统计
+- 🔍 **FTS5 全文搜索** - 快速检索历史消息
+- 📤 **消息导出** - 支持 JSON/CSV 格式导出
 - 🔄 **离线同步** - 参与者离线后可同步未读消息
 - 🔒 **配置隔离** - 每个机器人独立配置，互不干扰
 - 🛡️ **消息去重** - 防止重复处理和发送
+- 🎯 **智能对话管理** - 话题终结检测、轮次限制、防无限循环
 
 ## 🏗️ 架构图
 
@@ -26,7 +29,7 @@
 └─────────────────────────────────────────────────────────────┘
                               ↕ Webhook
 ┌─────────────────────────────────────────────────────────────┐
-│                    chat-hub (小琳)                           │
+│                    chat-hub (枫琳)                           │
 │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────┐ │
 │  │   Server    │  │   SQLite    │  │  OpenClawTrigger     │ │
 │  │  (Express)  │  │  (持久化)   │  │  (触发 OpenClaw)     │ │
@@ -75,7 +78,7 @@ cat > config/local.json << 'EOF'
     "password": "你的Redis密码"
   },
   "bot": {
-    "name": "你的机器人名（小琳/小猪）",
+    "name": "枫琳",
     "local": true
   },
   "dingtalk": {
@@ -113,6 +116,8 @@ nohup npm start > /tmp/chat-hub.log 2>&1 &
 - **数据库位置**: `~/.openclaw/chat-data/messages.db`
 - **表结构**:
   - `messages` - 消息记录
+  - `private_messages` - 私信记录
+  - `users` - 用户认证
   - `sync_state` - 参与者同步状态
 
 ### 离线同步
@@ -147,8 +152,8 @@ Content-Type: application/json
 {
   "sender": "发送者名字",
   "content": "消息内容",
-  "source": "dingtalk",      # 可选，默认 "openclaw"
-  "timestamp": 1234567890    # 可选，默认当前时间
+  "source": "dingtalk",
+  "timestamp": 1234567890
 }
 ```
 
@@ -169,13 +174,13 @@ Content-Type: application/json
 POST /api/reply
 Content-Type: application/json
 
-{"content": "回复内容", "sender": "小琳"}
+{"content": "回复内容", "sender": "枫琳"}
 ```
 
 ### 获取消息列表
 
 ```bash
-GET /api/context?limit=50
+GET /api/messages?page=1&limit=50
 ```
 
 ### 搜索消息
@@ -184,11 +189,24 @@ GET /api/context?limit=50
 GET /api/search?q=关键词&limit=50
 ```
 
+### 高级搜索（FTS5 全文索引）
+
+```bash
+GET /api/search/advanced?q=关键词&sender=枫琳&days=7
+```
+
 ### 获取统计信息
 
 ```bash
 GET /api/stats
 # 返回: 总消息数、今日消息数、各发送者统计
+```
+
+### 消息导出
+
+```bash
+GET /api/export?format=json&days=7
+GET /api/export?format=csv&days=30
 ```
 
 ### 删除消息
@@ -230,27 +248,39 @@ POST /webhook/dingtalk
 
 ```json
 {
-  "server": { "port": 3000 },
+  "mode": "storage",
+  "server": {
+    "port": 3000
+  },
+  "storage": {
+    "type": "sqlite",
+    "path": "~/.openclaw/chat-data/messages.db"
+  },
   "redis": {
+    "enabled": true,
     "host": "localhost",
     "port": 6379,
     "password": ""
   },
-  "store": {
-    "dir": "~/.openclaw/chat-data",
-    "maxMessages": 10000
+  "bot": {
+    "name": "枫琳",
+    "local": true,
+    "prefix": ""
   },
-  "bots": {
-    "cooldownMs": 3000,
-    "contextSize": 50
-  },
-  "channels": {
-    "messages": "chat:messages",
-    "replies": "chat:replies"
-  },
-  "dedup": {
+  "dingtalk": {
     "enabled": true,
-    "ttlSeconds": 300
+    "webhookBase": "",
+    "secret": ""
+  },
+  "trigger": {
+    "enabled": false,
+    "command": "openclaw system event --text"
+  },
+  "features": {
+    "storage": true,
+    "analytics": true,
+    "webUI": true,
+    "redis": true
   }
 }
 ```
@@ -265,7 +295,7 @@ POST /webhook/dingtalk
     "password": "你的密码"
   },
   "bot": {
-    "name": "小琳",
+    "name": "枫琳",
     "local": true
   },
   "dingtalk": {
@@ -343,7 +373,7 @@ curl -s -X POST http://localhost:3000/api/store \
 \`\`\`bash
 curl -X POST http://localhost:3000/api/reply \
   -H "Content-Type: application/json" \
-  -d '{"content": "回复内容", "sender": "你的机器人名"}'
+  -d '{"content": "回复内容", "sender": "枫琳"}'
 \`\`\`
 ```
 
@@ -367,24 +397,6 @@ curl -X POST http://localhost:3000/api/reply \
 | `/api/reply` | 机器人回复 | ✅ | ✅ | ✅ |
 | `/api/send` | Web 前端发送 | ✅ | ✅ | ✅ |
 
-### HEARTBEAT.md 配置示例
-
-```markdown
-## 钉钉群消息处理
-
-检查 chat-hub 是否有新消息：
-\`\`\`bash
-curl -s http://localhost:3000/api/context
-\`\`\`
-
-回复使用：
-\`\`\`bash
-curl -X POST http://localhost:3000/api/reply \
-  -H "Content-Type: application/json" \
-  -d '{"content": "回复内容", "sender": "小琳"}'
-\`\`\`
-```
-
 ## 📁 项目结构
 
 ```
@@ -401,10 +413,15 @@ chat-hub/
 │   ├── message-store.js      # SQLite 消息存储
 │   ├── redis-client.js       # Redis 封装
 │   ├── dingtalk.js           # 钉钉 API
+│   ├── export-service.js     # 消息导出服务
 │   └── bots/
 │       └── openclaw-trigger.js  # OpenClaw 触发器
-├── chat-hub.service          # systemd 服务文件
-└── install-service.sh        # 安装服务脚本
+├── docs/
+│   ├── API.md               # API 文档
+│   └── QUICK-START.md       # 快速开始
+├── migrations/              # 数据库迁移脚本
+├── chat-hub.service         # systemd 服务文件
+└── install-service.sh       # 安装服务脚本
 ```
 
 ## 🚀 部署为 systemd 服务
@@ -458,34 +475,34 @@ sudo journalctl -u chat-hub -f
 1. 检查 Outgoing Webhook 地址
 2. 检查服务器防火墙是否开放 3000 端口
 
+### Q: 搜索不到消息？
+
+1. 尝试使用高级搜索 `/api/search/advanced`
+2. 检查数据库是否正确初始化
+
 ## 📝 更新日志
 
-### v2.4 (2026-02-05)
+### v1.2 (2026-02-13)
 
-- 新增：`/api/store` API - 仅存储消息不发钉钉（用于 OpenClaw 转存）
-- 改进：完善 OpenClaw 集成文档
-- 新增：消息流向图和 API 选择指南
+- 新增：高级搜索 API（FTS5 全文索引）
+- 新增：消息导出功能（JSON/CSV）
+- 新增：私信 API（DM API）
+- 新增：用户认证系统
+- 改进：API 接口文档完善
 
-### v2.3 (2026-02-05)
+### v1.1 (2026-02-12)
 
-- 新增：SQLite 消息持久化（替代 Redis 存储）
+- 新增：枫琳品牌视觉升级
+- 新增：移动端适配
+
+### v1.0 (2026-02-05)
+
+- 新增：SQLite 消息持久化
 - 新增：消息搜索 API
 - 新增：统计信息 API
 - 新增：离线同步机制
-- 新增：删除消息 API
-- 改进：前端改名 MapleChatRoom
-
-### v2.2 (2026-02-05)
-
-- 新增：配置隔离（local.json）
-- 新增：机器人互相触发
-- 修复：消息重复发送问题
-
-### v2.0 (2026-02-04)
-
+- 新增：配置隔离
 - 新增：消息去重机制
-- 新增：上下文记忆
-- 重构：使用 OpenClawTrigger
 
 ## 📄 许可证
 
