@@ -216,6 +216,25 @@ class DMHandler {
       return { success: false };
     }
   }
+
+  /**
+   * 获取私聊未读消息数量
+   */
+  async getUnreadCount(userId) {
+    try {
+      const stmt = db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM private_messages 
+        WHERE receiver_id = ? AND read_at IS NULL
+      `);
+      
+      const result = stmt.get(userId);
+      return result ? result.count : 0;
+    } catch (error) {
+      console.error('[DM Handler] 获取私聊未读数量失败:', error);
+      return 0;
+    }
+  }
 }
 
 // 创建单例

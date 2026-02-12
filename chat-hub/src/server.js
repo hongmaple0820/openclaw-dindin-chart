@@ -1160,14 +1160,30 @@ app.get('/api/unread/:readerId', async (req, res) => {
 });
 
 /**
- * 获取未读消息数量
+ * 获取未读消息数量（包括群聊和私聊）
  * GET /api/unread-count/:readerId
  */
 app.get('/api/unread-count/:readerId', async (req, res) => {
   try {
     const { readerId } = req.params;
-    const count = messageStore.getUnreadCount(readerId);
-    res.json({ success: true, count });
+    
+    // 获取群聊未读数
+    const groupUnreadCount = messageStore.getUnreadCount(readerId);
+    
+    // 获取私聊未读数
+    const dmUnreadCount = await dmHandler.getUnreadCount(readerId);
+    
+    // 总未读数
+    const totalCount = groupUnreadCount + dmUnreadCount;
+    
+    res.json({ 
+      success: true, 
+      count: totalCount,
+      details: {
+        group: groupUnreadCount,
+        dm: dmUnreadCount
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
