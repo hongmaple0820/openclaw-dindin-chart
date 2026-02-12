@@ -155,11 +155,46 @@ const handleSubmit = async () => {
   justify-content: center;
   align-items: center;
   padding: 20px;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.03) 0%, rgba(212, 160, 23, 0.03) 100%);
+  position: relative;
+}
+
+/* 枫叶背景装饰 */
+.login-page::before {
+  content: '🍁';
+  position: absolute;
+  top: 10%;
+  right: 10%;
+  font-size: 120px;
+  opacity: 0.03;
+  transform: rotate(-20deg);
+  pointer-events: none;
+}
+
+.login-page::after {
+  content: '🍁';
+  position: absolute;
+  bottom: 15%;
+  left: 8%;
+  font-size: 100px;
+  opacity: 0.03;
+  transform: rotate(30deg);
+  pointer-events: none;
 }
 
 .login-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  border-radius: var(--fenlin-radius-lg, 16px);
+  box-shadow: var(--fenlin-shadow-lg, 0 8px 32px rgba(196, 30, 58, 0.16));
+  border: 1px solid rgba(196, 30, 58, 0.1);
+  overflow: hidden;
+}
+
+.login-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #C41E3A 0%, #E63950 100%);
+  padding: 32px 24px;
+  border-bottom: none;
 }
 
 .card-header {
@@ -168,25 +203,81 @@ const handleSubmit = async () => {
 
 .card-header h2 {
   margin: 0 0 8px;
-  color: #303133;
+  color: white;
+  font-size: 28px;
+  font-weight: 700;
 }
 
 .card-header p {
   margin: 0;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+}
+
+.login-card :deep(.el-card__body) {
+  padding: 32px 24px;
 }
 
 .status-alert {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  border-radius: var(--fenlin-radius-md, 12px);
+}
+
+.login-card :deep(.el-form-item__label) {
+  color: var(--fenlin-text-primary, #2C3E50);
+  font-weight: 500;
+}
+
+.login-card :deep(.el-input__wrapper) {
+  border-radius: var(--fenlin-radius-sm, 8px);
+  box-shadow: 0 0 0 1px rgba(196, 30, 58, 0.1) inset;
+  transition: var(--fenlin-transition);
+}
+
+.login-card :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(196, 30, 58, 0.3) inset;
+}
+
+.login-card :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(196, 30, 58, 0.5) inset;
 }
 
 .submit-btn {
   width: 100%;
+  background: linear-gradient(135deg, #C41E3A 0%, #E63950 100%);
+  border: none;
+  border-radius: var(--fenlin-radius-md, 12px);
+  font-weight: 600;
+  font-size: 16px;
+  height: 48px;
+  box-shadow: var(--fenlin-shadow-md, 0 4px 16px rgba(196, 30, 58, 0.3));
+  transition: var(--fenlin-transition);
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--fenlin-shadow-lg, 0 8px 24px rgba(196, 30, 58, 0.4));
+}
+
+.submit-btn:active {
+  transform: translateY(0);
 }
 
 .form-footer {
   text-align: center;
-  color: #909399;
+  margin-top: 20px;
+}
+
+.form-footer a {
+  color: #C41E3A;
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--fenlin-transition);
+}
+
+.form-footer a:hover {
+  color: #E63950;
+  text-decoration: underline;
 }
 
 /* 移动端适配 */
@@ -194,11 +285,23 @@ const handleSubmit = async () => {
   .login-page {
     padding: 16px;
     align-items: flex-start;
-    padding-top: 60px;
+    padding-top: 40px;
   }
   
   .login-card {
     max-width: 100%;
+  }
+  
+  .card-header h2 {
+    font-size: 24px;
+  }
+  
+  .login-card :deep(.el-card__header) {
+    padding: 24px 20px;
+  }
+  
+  .login-card :deep(.el-card__body) {
+    padding: 24px 20px;
   }
 }
 </style>

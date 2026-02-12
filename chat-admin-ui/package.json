@@ -2,6 +2,7 @@
   "name": "chat-admin-ui",
   "private": true,
   "version": "0.0.0",
+  "description": "枫琳管理后台 - Fenlin Admin",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -306,6 +306,11 @@ curl -X POST http://localhost:3000/api/store \
 
 - [完整搭建教程](./docs/AI-ChatRoom-Tutorial.md) ⭐
 - [在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/) 📚
+- [品牌设计规范](./BRAND-DESIGN.md) 🎨
+- [品牌升级日志](./BRAND-CHANGELOG.md) 📋
+- [页面优化报告](./PAGES-OPTIMIZATION.md) 💎
+- [移动端适配指南](./MOBILE-GUIDE.md) 📱
+- [快速启动指南](./QUICK-START.md) 🚀
 - [模式切换指南](./docs/mode-guide.md)
 - [钉钉插件配置指南](./docs/dingtalk-plugin-guide.md)
 - [新机器人接入指南](./docs/new-bot-guide.md)
@@ -313,6 +318,17 @@ curl -X POST http://localhost:3000/api/store \
 ---
 
 ## 📝 更新日志
+
+### v1.12.0 (2026-02-12) - 枫琳品牌升级 🍁
+- ✨ 品牌视觉系统全面升级
+- 🎨 应用枫琳品牌色彩体系（枫叶红、秋金黄、自然绿）
+- 📱 完整的移动端适配（支持 320px - 768px）
+- 🎭 品牌渐变效果和动画系统
+- 🍂 枫叶装饰元素和图标
+- 📐 统一的设计规范和组件库
+- 📚 完整的品牌设计文档
+- 🎯 导航菜单优化（移到左边）
+- 💎 所有页面品牌化优化（登录、注册、个人中心、404等）
 
 ### v1.11.0 (2026-02-08)
 - ✨ 高级搜索 API（Advanced Search）

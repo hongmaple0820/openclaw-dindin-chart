@@ -12,6 +12,8 @@ import App from './App.vue';
 import router from './router';
 import pinia from './stores';
 import './styles/global.css';
+import './styles/brand.css';
+import './styles/mobile.css';
 
 const app = createApp(App);
 

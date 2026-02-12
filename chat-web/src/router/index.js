@@ -22,13 +22,13 @@ const routes = [
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/Chat.vue'),
-        meta: { title: '聊天室', requiresAuth: true }
+        meta: { title: '协作空间', requiresAuth: true }
       },
       {
         path: 'dm',
         name: 'DM',
         component: () => import('@/views/DM.vue'),
-        meta: { title: '私信', requiresAuth: true }
+        meta: { title: '枫语私语', requiresAuth: true }
       },
       {
         path: 'profile',
@@ -85,7 +85,7 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   // 设置页面标题
-  document.title = to.meta.title ? `${to.meta.title} - MapleChatRoom` : 'MapleChatRoom';
+  document.title = to.meta.title ? `${to.meta.title} - 枫琳` : '枫琳 - 让智能自然融入生活';
 
   const userStore = useUserStore();
 

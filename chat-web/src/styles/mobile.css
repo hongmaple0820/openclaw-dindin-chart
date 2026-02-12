@@ -1,0 +1,405 @@
+/**
+ * 枫琳移动端适配样式
+ * Fenlin Mobile Responsive Styles
+ */
+
+/* 移动端断点 */
+@media (max-width: 768px) {
+  /* 全局字体调整 */
+  body {
+    font-size: 14px;
+  }
+
+  /* 容器内边距 */
+  .main {
+    padding: 16px !important;
+  }
+
+  /* 首页适配 */
+  .home {
+    padding: 0 16px;
+  }
+
+  .hero {
+    padding: 60px 16px 40px !important;
+  }
+
+  .hero h1 {
+    font-size: 36px !important;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    font-size: 20px !important;
+  }
+
+  .description {
+    font-size: 15px !important;
+    padding: 0 8px;
+  }
+
+  .actions {
+    flex-direction: column !important;
+    width: 100%;
+    padding: 0 16px;
+  }
+
+  .actions .el-button {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .features {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+    padding: 40px 16px !important;
+  }
+
+  .feature-card {
+    padding: 32px 24px !important;
+  }
+
+  /* 导航栏适配 */
+  .header {
+    padding: 0 16px !important;
+  }
+
+  .header-left .logo {
+    font-size: 16px !important;
+  }
+
+  .header-left .logo .el-icon {
+    font-size: 20px !important;
+  }
+
+  .header-center {
+    display: none !important;
+  }
+
+  .header-right {
+    gap: 8px !important;
+  }
+
+  .header-right .el-button {
+    padding: 8px 16px !important;
+    font-size: 14px !important;
+  }
+
+  .user-info {
+    padding: 4px 8px !important;
+  }
+
+  .username {
+    display: none;
+  }
+
+  /* 聊天页面适配 */
+  .chat-page {
+    height: calc(100vh - 60px);
+  }
+
+  .chat-container {
+    flex-direction: column;
+  }
+
+  .user-list {
+    position: fixed;
+    left: -280px;
+    top: 60px;
+    bottom: 0;
+    width: 280px;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    background: white;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .user-list.show-mobile {
+    left: 0;
+  }
+
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .mobile-overlay.show {
+    display: block;
+    opacity: 1;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+
+  .chat-area {
+    width: 100% !important;
+    height: 100%;
+  }
+
+  .chat-header {
+    padding: 12px 16px !important;
+  }
+
+  .chat-header h3 {
+    font-size: 16px !important;
+  }
+
+  .messages {
+    padding: 12px !important;
+  }
+
+  .message-item {
+    padding: 12px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .message-sender {
+    font-size: 13px !important;
+  }
+
+  .message-content {
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+  }
+
+  .message-time {
+    font-size: 11px !important;
+  }
+
+  .input-area {
+    padding: 12px !important;
+  }
+
+  .input-area .el-textarea {
+    font-size: 14px !important;
+  }
+
+  .input-actions {
+    gap: 8px !important;
+  }
+
+  .input-actions .el-button {
+    padding: 8px 16px !important;
+  }
+
+  /* 私信页面适配 */
+  .dm-page {
+    flex-direction: column;
+  }
+
+  .conversation-list {
+    width: 100% !important;
+    height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid var(--fenlin-border);
+  }
+
+  .conversation-detail {
+    width: 100% !important;
+    height: 60vh;
+  }
+
+  /* 个人中心适配 */
+  .profile-page {
+    padding: 16px !important;
+  }
+
+  .profile-card {
+    padding: 20px !important;
+  }
+
+  .profile-avatar {
+    width: 80px !important;
+    height: 80px !important;
+  }
+
+  /* 文件管理适配 */
+  .file-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .file-item {
+    padding: 12px !important;
+  }
+
+  /* 表单适配 */
+  .el-form-item__label {
+    font-size: 14px !important;
+  }
+
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: 14px !important;
+  }
+
+  /* 对话框适配 */
+  .el-dialog {
+    width: 90% !important;
+    margin: 0 auto !important;
+  }
+
+  .el-dialog__header {
+    padding: 16px !important;
+  }
+
+  .el-dialog__body {
+    padding: 16px !important;
+  }
+
+  /* 卡片适配 */
+  .el-card {
+    margin-bottom: 16px !important;
+  }
+
+  .el-card__body {
+    padding: 16px !important;
+  }
+
+  /* 底部适配 */
+  .footer {
+    padding: 16px !important;
+    font-size: 12px !important;
+  }
+
+  .footer::before {
+    font-size: 20px !important;
+    top: -12px !important;
+  }
+}
+
+/* 小屏手机适配 (< 375px) */
+@media (max-width: 375px) {
+  .hero h1 {
+    font-size: 28px !important;
+  }
+
+  .subtitle {
+    font-size: 18px !important;
+  }
+
+  .description {
+    font-size: 14px !important;
+  }
+
+  .feature-card {
+    padding: 24px 16px !important;
+  }
+
+  .feature-card h3 {
+    font-size: 18px !important;
+  }
+
+  .feature-card p {
+    font-size: 13px !important;
+  }
+}
+
+/* 平板适配 (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .hero h1 {
+    font-size: 44px;
+  }
+
+  .features {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  .chat-container {
+    flex-direction: row;
+  }
+
+  .user-list {
+    width: 240px;
+  }
+
+  .chat-area {
+    flex: 1;
+  }
+}
+
+/* 横屏适配 */
+@media (max-height: 600px) and (orientation: landscape) {
+  .hero {
+    padding: 40px 16px !important;
+  }
+
+  .hero h1 {
+    font-size: 32px !important;
+  }
+
+  .features {
+    padding: 30px 16px !important;
+  }
+
+  .feature-card {
+    padding: 20px !important;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 增大可点击区域 */
+  .el-button {
+    min-height: 44px;
+    padding: 12px 20px;
+  }
+
+  .nav-item {
+    min-height: 48px;
+  }
+
+  .user-item {
+    min-height: 48px;
+    padding: 12px;
+  }
+
+  /* 移除悬停效果 */
+  .feature-card:hover {
+    transform: none;
+  }
+
+  /* 点击反馈 */
+  .el-button:active {
+    transform: scale(0.98);
+  }
+
+  .feature-card:active {
+    transform: scale(0.98);
+  }
+}
+
+/* 暗色模式支持 (预留) */
+@media (prefers-color-scheme: dark) {
+  /* 暗色模式样式将在后续版本添加 */
+}
+
+/* 减少动画 (用户偏好) */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .feature-card {
+    border: 2px solid var(--fenlin-primary);
+  }
+
+  .el-button--primary {
+    border: 2px solid var(--fenlin-primary-dark);
+  }
+}

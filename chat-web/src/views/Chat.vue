@@ -212,7 +212,7 @@
           @ TA
         </el-button>
         <el-button type="primary" @click="startPrivateChat(selectedUser)">
-          发起私聊
+          枫语私语
         </el-button>
       </template>
     </el-dialog>
@@ -273,7 +273,7 @@ const showMobileMenu = ref(false);
 const isPrivateChat = ref(false);
 const privateChatTarget = ref(null);
 const chatTitle = computed(() => 
-  isPrivateChat.value ? `与 ${privateChatTarget.value?.name} 私聊` : '公共聊天室'
+  isPrivateChat.value ? `枫语私语 - ${privateChatTarget.value?.name}` : '协作空间'
 );
 
 // 用户操作弹窗
@@ -438,7 +438,7 @@ function startPrivateChat(user) {
   userActionDialog.value = false;
   messages.value = []; // 清空消息，加载私聊消息
   loadPrivateMessages(user);
-  ElMessage.success(`开始与 ${user.name || user.nickname} 私聊`);
+  ElMessage.success(`开始与 ${user.name || user.nickname} 的枫语私语`);
 }
 
 // 退出私聊

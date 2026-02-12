@@ -1,0 +1,156 @@
+/**
+ * 枫琳品牌视觉系统
+ * Fenlin Brand Visual System
+ */
+
+:root {
+  /* 品牌主色 - 枫叶红 */
+  --fenlin-primary: #C41E3A;
+  --fenlin-primary-light: #E63950;
+  --fenlin-primary-lighter: #FF6B7A;
+  --fenlin-primary-dark: #A01830;
+  
+  /* 辅助色 - 秋金黄 */
+  --fenlin-secondary: #D4A017;
+  --fenlin-secondary-light: #F5C842;
+  --fenlin-secondary-lighter: #FFE082;
+  
+  /* 点缀色 - 自然绿 */
+  --fenlin-accent: #228B22;
+  --fenlin-accent-light: #32CD32;
+  --fenlin-accent-lighter: #90EE90;
+  
+  /* 中性色 */
+  --fenlin-bg: #FAFAFA;
+  --fenlin-bg-secondary: #F5F5F5;
+  --fenlin-surface: #FFFFFF;
+  --fenlin-border: #E0E0E0;
+  
+  /* 文字色 */
+  --fenlin-text-primary: #2C3E50;
+  --fenlin-text-secondary: #5A6C7D;
+  --fenlin-text-tertiary: #95A5A6;
+  
+  /* 渐变 */
+  --fenlin-gradient-primary: linear-gradient(135deg, #C41E3A 0%, #E63950 100%);
+  --fenlin-gradient-warm: linear-gradient(135deg, #C41E3A 0%, #D4A017 100%);
+  --fenlin-gradient-nature: linear-gradient(135deg, #228B22 0%, #D4A017 100%);
+  
+  /* 阴影 */
+  --fenlin-shadow-sm: 0 2px 8px rgba(196, 30, 58, 0.08);
+  --fenlin-shadow-md: 0 4px 16px rgba(196, 30, 58, 0.12);
+  --fenlin-shadow-lg: 0 8px 32px rgba(196, 30, 58, 0.16);
+  
+  /* 圆角 */
+  --fenlin-radius-sm: 8px;
+  --fenlin-radius-md: 12px;
+  --fenlin-radius-lg: 16px;
+  --fenlin-radius-xl: 24px;
+  
+  /* 动画 */
+  --fenlin-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background: var(--fenlin-bg);
+  color: var(--fenlin-text-primary);
+  line-height: 1.6;
+}
+
+/* 枫叶装饰元素 */
+.maple-leaf-decoration {
+  position: relative;
+}
+
+.maple-leaf-decoration::before {
+  content: '🍁';
+  position: absolute;
+  opacity: 0.05;
+  font-size: 120px;
+  pointer-events: none;
+}
+
+/* 品牌按钮样式 */
+.fenlin-btn-primary {
+  background: var(--fenlin-gradient-primary);
+  border: none;
+  color: white;
+  padding: 12px 32px;
+  border-radius: var(--fenlin-radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--fenlin-transition);
+  box-shadow: var(--fenlin-shadow-sm);
+}
+
+.fenlin-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--fenlin-shadow-md);
+}
+
+/* 品牌卡片样式 */
+.fenlin-card {
+  background: var(--fenlin-surface);
+  border-radius: var(--fenlin-radius-lg);
+  padding: 24px;
+  box-shadow: var(--fenlin-shadow-sm);
+  transition: var(--fenlin-transition);
+  border: 1px solid var(--fenlin-border);
+}
+
+.fenlin-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--fenlin-shadow-md);
+  border-color: var(--fenlin-primary-light);
+}
+
+/* 渐变文字 */
+.fenlin-gradient-text {
+  background: var(--fenlin-gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 枫叶图标动画 */
+@keyframes maple-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+.maple-icon-animated {
+  animation: maple-float 3s ease-in-out infinite;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fenlin-bg-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fenlin-primary-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fenlin-primary);
+}

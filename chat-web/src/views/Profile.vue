@@ -293,20 +293,102 @@ onMounted(() => {
 .profile-page {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 24px;
+}
+
+.profile-page :deep(.el-card) {
+  border-radius: var(--fenlin-radius-lg, 16px);
+  box-shadow: var(--fenlin-shadow-sm, 0 2px 8px rgba(196, 30, 58, 0.08));
+  border: 1px solid rgba(196, 30, 58, 0.1);
+  transition: var(--fenlin-transition);
+}
+
+.profile-page :deep(.el-card:hover) {
+  box-shadow: var(--fenlin-shadow-md, 0 4px 16px rgba(196, 30, 58, 0.12));
+}
+
+.profile-page :deep(.el-card__header) {
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.05) 0%, rgba(212, 160, 23, 0.05) 100%);
+  border-bottom: 2px solid rgba(196, 30, 58, 0.1);
+  padding: 20px 24px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-weight: 600;
+  color: var(--fenlin-text-primary, #2C3E50);
+  font-size: 18px;
+}
+
+.card-header :deep(.el-button) {
+  border-radius: var(--fenlin-radius-sm, 8px);
+}
+
+.profile-page :deep(.el-descriptions__label) {
+  font-weight: 500;
+  color: var(--fenlin-text-secondary, #5A6C7D);
+}
+
+.profile-page :deep(.el-descriptions__content) {
+  color: var(--fenlin-text-primary, #2C3E50);
+}
+
+.profile-page :deep(.el-tag) {
+  border-radius: var(--fenlin-radius-sm, 8px);
+}
+
+.profile-page :deep(.el-input__wrapper) {
+  border-radius: var(--fenlin-radius-sm, 8px);
+  box-shadow: 0 0 0 1px rgba(196, 30, 58, 0.1) inset;
+  transition: var(--fenlin-transition);
+}
+
+.profile-page :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(196, 30, 58, 0.3) inset;
+}
+
+.profile-page :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(196, 30, 58, 0.5) inset;
+}
+
+.profile-page :deep(.el-button--primary) {
+  background: linear-gradient(135deg, #C41E3A 0%, #E63950 100%);
+  border: none;
+  box-shadow: var(--fenlin-shadow-sm, 0 2px 8px rgba(196, 30, 58, 0.3));
+}
+
+.profile-page :deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: var(--fenlin-shadow-md, 0 4px 12px rgba(196, 30, 58, 0.4));
 }
 
 .text-muted {
-  color: #909399;
+  color: var(--fenlin-text-tertiary, #95A5A6);
   font-size: 12px;
 }
 
 .mt-2 {
-  margin-top: 16px;
+  margin-top: 24px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .profile-page {
+    padding: 16px;
+  }
+  
+  .profile-page :deep(.el-card__header) {
+    padding: 16px;
+  }
+  
+  .card-header {
+    font-size: 16px;
+  }
+  
+  .mt-2 {
+    margin-top: 16px;
+  }
 }
 </style>

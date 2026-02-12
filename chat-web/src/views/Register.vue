@@ -220,11 +220,46 @@ const handleSubmit = async () => {
   justify-content: center;
   align-items: center;
   padding: 20px;
+  background: linear-gradient(135deg, rgba(212, 160, 23, 0.03) 0%, rgba(34, 139, 34, 0.03) 100%);
+  position: relative;
+}
+
+/* 枫叶背景装饰 */
+.register-page::before {
+  content: '🍁';
+  position: absolute;
+  top: 8%;
+  left: 12%;
+  font-size: 140px;
+  opacity: 0.03;
+  transform: rotate(15deg);
+  pointer-events: none;
+}
+
+.register-page::after {
+  content: '🍁';
+  position: absolute;
+  bottom: 10%;
+  right: 10%;
+  font-size: 110px;
+  opacity: 0.03;
+  transform: rotate(-25deg);
+  pointer-events: none;
 }
 
 .register-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 500px;
+  border-radius: var(--fenlin-radius-lg, 16px);
+  box-shadow: var(--fenlin-shadow-lg, 0 8px 32px rgba(212, 160, 23, 0.16));
+  border: 1px solid rgba(212, 160, 23, 0.1);
+  overflow: hidden;
+}
+
+.register-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #D4A017 0%, #F5C842 100%);
+  padding: 32px 24px;
+  border-bottom: none;
 }
 
 .card-header {
@@ -233,37 +268,126 @@ const handleSubmit = async () => {
 
 .card-header h2 {
   margin: 0 0 8px;
-  color: #303133;
+  color: white;
+  font-size: 28px;
+  font-weight: 700;
 }
 
 .card-header p {
   margin: 0;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 15px;
+}
+
+.register-card :deep(.el-card__body) {
+  padding: 32px 24px;
 }
 
 .success-panel {
   padding: 20px 0;
 }
 
+.success-panel :deep(.el-result__icon svg) {
+  color: #228B22;
+}
+
+.success-panel :deep(.el-result__title) {
+  color: var(--fenlin-text-primary, #2C3E50);
+}
+
 .pending-hint {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: #e6a23c;
+  gap: 8px;
+  color: #D4A017;
   margin-top: 12px;
+  font-weight: 500;
 }
 
 .audit-notice {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  border-radius: var(--fenlin-radius-md, 12px);
+}
+
+.register-card :deep(.el-form-item__label) {
+  color: var(--fenlin-text-primary, #2C3E50);
+  font-weight: 500;
+}
+
+.register-card :deep(.el-input__wrapper) {
+  border-radius: var(--fenlin-radius-sm, 8px);
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.1) inset;
+  transition: var(--fenlin-transition);
+}
+
+.register-card :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.3) inset;
+}
+
+.register-card :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.5) inset;
+}
+
+.register-card :deep(.el-radio-group) {
+  display: flex;
+  gap: 16px;
+}
+
+.register-card :deep(.el-radio) {
+  margin-right: 0;
+  padding: 12px 20px;
+  border: 2px solid rgba(212, 160, 23, 0.2);
+  border-radius: var(--fenlin-radius-md, 12px);
+  transition: var(--fenlin-transition);
+}
+
+.register-card :deep(.el-radio:hover) {
+  border-color: rgba(212, 160, 23, 0.5);
+  background: rgba(212, 160, 23, 0.05);
+}
+
+.register-card :deep(.el-radio.is-checked) {
+  border-color: #D4A017;
+  background: rgba(212, 160, 23, 0.1);
 }
 
 .submit-btn {
   width: 100%;
+  background: linear-gradient(135deg, #D4A017 0%, #F5C842 100%);
+  border: none;
+  border-radius: var(--fenlin-radius-md, 12px);
+  font-weight: 600;
+  font-size: 16px;
+  height: 48px;
+  box-shadow: var(--fenlin-shadow-md, 0 4px 16px rgba(212, 160, 23, 0.3));
+  transition: var(--fenlin-transition);
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--fenlin-shadow-lg, 0 8px 24px rgba(212, 160, 23, 0.4));
+}
+
+.submit-btn:active {
+  transform: translateY(0);
 }
 
 .form-footer {
   text-align: center;
+  margin-top: 20px;
+}
+
+.form-footer a {
+  color: #D4A017;
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--fenlin-transition);
+}
+
+.form-footer a:hover {
+  color: #F5C842;
+  text-decoration: underline;
 }
 
 /* 移动端适配 */
@@ -276,6 +400,22 @@ const handleSubmit = async () => {
   
   .register-card {
     max-width: 100%;
+  }
+  
+  .card-header h2 {
+    font-size: 24px;
+  }
+  
+  .register-card :deep(.el-card__header) {
+    padding: 24px 20px;
+  }
+  
+  .register-card :deep(.el-card__body) {
+    padding: 24px 20px;
+  }
+  
+  .register-card :deep(.el-radio-group) {
+    flex-direction: column;
   }
 }
 </style>
