@@ -76,19 +76,6 @@ npm run dev -- --host
 
 在手机浏览器中访问该地址
 
-### 方法 3: 真机调试
-```bash
-# iOS (需要 Mac)
-1. 手机连接电脑
-2. Safari → 开发 → 选择设备
-3. 选择页面进行调试
-
-# Android
-1. 手机开启 USB 调试
-2. Chrome 访问 chrome://inspect
-3. 选择设备和页面
-```
-
 ## 🎨 查看品牌效果
 
 ### 首页
@@ -139,10 +126,9 @@ npm run dev
 
 ## 📚 更多文档
 
-- [品牌设计规范](./BRAND-DESIGN.md) - 完整的视觉规范
-- [品牌升级日志](./BRAND-CHANGELOG.md) - 详细的更新记录
-- [移动端适配指南](./MOBILE-GUIDE.md) - 移动端开发指南
-- [项目 README](./README.md) - 项目完整文档
+- [品牌设计规范](../design/brand.md) - 完整的视觉规范
+- [品牌升级日志](../design/brand-changelog.md) - 详细的更新记录
+- [项目 README](../../README.md) - 项目完整文档
 
 ## 🎯 下一步
 

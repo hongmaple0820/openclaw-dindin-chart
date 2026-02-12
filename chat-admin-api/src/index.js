@@ -3,13 +3,18 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const Redis = require('ioredis');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 数据库连接
-const dbPath = process.env.DB_PATH || path.join(process.env.HOME, '.openclaw', 'chat-data', 'messages.db');
+const dbPath = process.env.DB_PATH || path.join(os.homedir(), '.openclaw', 'chat-data', 'messages.db');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 const db = new sqlite3.Database(dbPath);
 
 // Redis 连接（用于获取在线状态）

@@ -9,17 +9,12 @@ const PrivateMessageModel = require('../models/private-message');
 const { authenticate } = require('../middleware/auth');
 const { notifyNewDM } = require('../services/redis');
 
-// 初始化模型
 const pmModel = new PrivateMessageModel();
 
-/**
- * 发送私信
- * POST /api/dm/send
- */
 router.post('/send', authenticate, async (req, res) => {
   try {
     const { receiverId, receiverName, content, messageType } = req.body;
-    const senderId = req.user.id;  // 注意：是 id 不是 userId
+    const senderId = req.user.id;
     const senderName = req.user.nickname || req.user.username;
 
     if (!receiverId || !content) {
@@ -29,7 +24,7 @@ router.post('/send', authenticate, async (req, res) => {
       });
     }
 
-    const message = pmModel.send({
+    const message = await pmModel.send({
       senderId,
       senderName,
       receiverId,
@@ -39,7 +34,6 @@ router.post('/send', authenticate, async (req, res) => {
       source: 'web'
     });
 
-    // 发送 Redis 通知
     await notifyNewDM(message);
 
     res.json({
@@ -55,16 +49,12 @@ router.post('/send', authenticate, async (req, res) => {
   }
 });
 
-/**
- * 获取会话列表
- * GET /api/dm/conversations
- */
 router.get('/conversations', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const { limit = 20, offset = 0 } = req.query;
 
-    const conversations = pmModel.getConversations(userId, {
+    const conversations = await pmModel.getConversations(userId, {
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
@@ -82,17 +72,12 @@ router.get('/conversations', authenticate, async (req, res) => {
   }
 });
 
-/**
- * 获取会话消息
- * GET /api/dm/messages/:conversationId
- */
 router.get('/messages/:conversationId', authenticate, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
     const { limit = 50, before } = req.query;
 
-    // 验证用户是会话参与者
     if (!conversationId.includes(userId)) {
       return res.status(403).json({
         success: false,
@@ -100,13 +85,12 @@ router.get('/messages/:conversationId', authenticate, async (req, res) => {
       });
     }
 
-    const messages = pmModel.getMessages(conversationId, {
+    const messages = await pmModel.getMessages(conversationId, {
       limit: parseInt(limit),
       before: before ? parseInt(before) : null
     });
 
-    // 标记为已读
-    pmModel.markAsRead(conversationId, userId);
+    await pmModel.markAsRead(conversationId, userId);
 
     res.json({
       success: true,
@@ -121,16 +105,12 @@ router.get('/messages/:conversationId', authenticate, async (req, res) => {
   }
 });
 
-/**
- * 标记会话已读
- * POST /api/dm/read/:conversationId
- */
 router.post('/read/:conversationId', authenticate, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
-    const count = pmModel.markAsRead(conversationId, userId);
+    const count = await pmModel.markAsRead(conversationId, userId);
 
     res.json({
       success: true,
@@ -145,16 +125,12 @@ router.post('/read/:conversationId', authenticate, async (req, res) => {
   }
 });
 
-/**
- * 删除消息
- * DELETE /api/dm/message/:messageId
- */
 router.delete('/message/:messageId', authenticate, async (req, res) => {
   try {
     const { messageId } = req.params;
     const userId = req.user.id;
 
-    const deleted = pmModel.delete(messageId, userId);
+    const deleted = await pmModel.delete(messageId, userId);
 
     if (deleted) {
       res.json({
@@ -176,14 +152,10 @@ router.delete('/message/:messageId', authenticate, async (req, res) => {
   }
 });
 
-/**
- * 获取未读数
- * GET /api/dm/unread
- */
 router.get('/unread', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
-    const count = pmModel.getUnreadCount(userId);
+    const count = await pmModel.getUnreadCount(userId);
 
     res.json({
       success: true,
@@ -198,10 +170,6 @@ router.get('/unread', authenticate, async (req, res) => {
   }
 });
 
-/**
- * 搜索私信
- * GET /api/dm/search
- */
 router.get('/search', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -214,7 +182,7 @@ router.get('/search', authenticate, async (req, res) => {
       });
     }
 
-    const results = pmModel.search(userId, q, { limit: parseInt(limit) });
+    const results = await pmModel.search(userId, q, { limit: parseInt(limit) });
 
     res.json({
       success: true,

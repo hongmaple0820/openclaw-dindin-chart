@@ -11,15 +11,16 @@ const { v4: uuidv4 } = require('uuid');
 class PrivateMessageModel {
   constructor(dbPath) {
     this.dbPath = dbPath || path.join(process.env.HOME, '.openclaw/chat-data/messages.db');
-    this.db = new Database(this.dbPath);
-    this.init();
+    this.dbPromise = this.init();
   }
 
-  /**
-   * 初始化数据库表
-   */
-  init() {
-    this.db.exec(`
+  async init() {
+    const db = await open({
+      filename: this.dbPath,
+      driver: sqlite3.Database
+    });
+
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS private_messages (
         id TEXT PRIMARY KEY,
         conversation_id TEXT NOT NULL,
@@ -41,30 +42,24 @@ class PrivateMessageModel {
       CREATE INDEX IF NOT EXISTS idx_pm_created ON private_messages(created_at DESC);
     `);
     console.log('[PrivateMessageModel] 数据库表初始化完成');
+    return db;
   }
 
-  /**
-   * 生成会话 ID（两个用户之间唯一）
-   */
   generateConversationId(userId1, userId2) {
     return [userId1, userId2].sort().join('_');
   }
 
-  /**
-   * 发送私信
-   */
-  send({ senderId, senderName, receiverId, receiverName, content, messageType = 'text', source = 'web' }) {
+  async send({ senderId, senderName, receiverId, receiverName, content, messageType = 'text', source = 'web' }) {
+    const db = await this.dbPromise;
     const id = uuidv4();
     const conversationId = this.generateConversationId(senderId, receiverId);
     const now = Date.now();
 
-    const stmt = this.db.prepare(`
+    await db.run(`
       INSERT INTO private_messages 
       (id, conversation_id, sender_id, sender_name, receiver_id, receiver_name, content, message_type, source, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(id, conversationId, senderId, senderName, receiverId, receiverName, content, messageType, source, now, now);
+    `, [id, conversationId, senderId, senderName, receiverId, receiverName, content, messageType, source, now, now]);
 
     return {
       id,
@@ -82,12 +77,10 @@ class PrivateMessageModel {
     };
   }
 
-  /**
-   * 获取用户的会话列表
-   */
-  getConversations(userId, { limit = 20, offset = 0 } = {}) {
-    // 获取每个会话的最后一条消息
-    const stmt = this.db.prepare(`
+  async getConversations(userId, { limit = 20, offset = 0 } = {}) {
+    const db = await this.dbPromise;
+    
+    const rows = await db.all(`
       SELECT 
         pm.*,
         (SELECT COUNT(*) FROM private_messages 
@@ -104,14 +97,11 @@ class PrivateMessageModel {
       AND (pm.sender_id = ? OR pm.receiver_id = ?)
       ORDER BY pm.created_at DESC
       LIMIT ? OFFSET ?
-    `);
-
-    const rows = stmt.all(userId, userId, userId, limit, offset);
+    `, [userId, userId, userId, limit, offset]);
     
     return rows.map(row => ({
       id: row.id,
       conversationId: row.conversation_id,
-      // 对方的信息
       partnerId: row.sender_id === userId ? row.receiver_id : row.sender_id,
       partnerName: row.sender_id === userId ? row.receiver_name : row.sender_name,
       lastMessage: {
@@ -124,10 +114,9 @@ class PrivateMessageModel {
     }));
   }
 
-  /**
-   * 获取会话消息
-   */
-  getMessages(conversationId, { limit = 50, before = null } = {}) {
+  async getMessages(conversationId, { limit = 50, before = null } = {}) {
+    const db = await this.dbPromise;
+    
     let sql = `
       SELECT * FROM private_messages 
       WHERE conversation_id = ?
@@ -142,8 +131,7 @@ class PrivateMessageModel {
     sql += ` ORDER BY created_at DESC LIMIT ?`;
     params.push(limit);
 
-    const stmt = this.db.prepare(sql);
-    const rows = stmt.all(...params);
+    const rows = await db.all(sql, params);
 
     return rows.map(row => ({
       id: row.id,
@@ -158,66 +146,56 @@ class PrivateMessageModel {
       readAt: row.read_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
-    })).reverse(); // 返回正序
+    })).reverse();
   }
 
-  /**
-   * 标记消息已读
-   */
-  markAsRead(conversationId, userId) {
+  async markAsRead(conversationId, userId) {
+    const db = await this.dbPromise;
     const now = Date.now();
-    const stmt = this.db.prepare(`
+    
+    const result = await db.run(`
       UPDATE private_messages 
       SET read_at = ?, updated_at = ?
       WHERE conversation_id = ? 
       AND receiver_id = ? 
       AND read_at IS NULL
-    `);
-
-    const result = stmt.run(now, now, conversationId, userId);
+    `, [now, now, conversationId, userId]);
+    
     return result.changes;
   }
 
-  /**
-   * 删除消息
-   */
-  delete(messageId, userId) {
-    // 只能删除自己发的消息
-    const stmt = this.db.prepare(`
+  async delete(messageId, userId) {
+    const db = await this.dbPromise;
+    
+    const result = await db.run(`
       DELETE FROM private_messages 
       WHERE id = ? AND sender_id = ?
-    `);
-
-    const result = stmt.run(messageId, userId);
+    `, [messageId, userId]);
+    
     return result.changes > 0;
   }
 
-  /**
-   * 获取未读消息数
-   */
-  getUnreadCount(userId) {
-    const stmt = this.db.prepare(`
+  async getUnreadCount(userId) {
+    const db = await this.dbPromise;
+    
+    const row = await db.get(`
       SELECT COUNT(*) as count FROM private_messages 
       WHERE receiver_id = ? AND read_at IS NULL
-    `);
-
-    const row = stmt.get(userId);
+    `, [userId]);
+    
     return row.count;
   }
 
-  /**
-   * 搜索私信
-   */
-  search(userId, query, { limit = 20 } = {}) {
-    const stmt = this.db.prepare(`
+  async search(userId, query, { limit = 20 } = {}) {
+    const db = await this.dbPromise;
+    
+    const rows = await db.all(`
       SELECT * FROM private_messages 
       WHERE (sender_id = ? OR receiver_id = ?)
       AND content LIKE ?
       ORDER BY created_at DESC
       LIMIT ?
-    `);
-
-    const rows = stmt.all(userId, userId, `%${query}%`, limit);
+    `, [userId, userId, `%${query}%`, limit]);
 
     return rows.map(row => ({
       id: row.id,
@@ -231,11 +209,9 @@ class PrivateMessageModel {
     }));
   }
 
-  /**
-   * 关闭数据库连接
-   */
-  close() {
-    this.db.close();
+  async close() {
+    const db = await this.dbPromise;
+    await db.close();
   }
 }
 

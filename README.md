@@ -304,16 +304,25 @@ curl -X POST http://localhost:3000/api/store \
 
 ## 🔗 相关文档
 
+### 📚 项目规范 (.sisyphus/)
+- [项目核心规范](./.sisyphus/AGENTS.md) - 编码规范 + 协作规范 ⭐
+- [文档导航](./.sisyphus/README.md) - 完整文档索引
+
+### 🚀 指南文档
+- [快速启动指南](./.sisyphus/guides/quick-start.md) 🚀
+- [模式切换指南](./.sisyphus/guides/mode-guide.md)
+- [钉钉插件配置](./.sisyphus/guides/dingtalk-plugin.md)
+- [新机器人接入](./.sisyphus/guides/new-bot.md)
+- [多机器人配置](./.sisyphus/guides/multi-bot.md)
+
+### 🎨 设计文档
+- [品牌设计规范](./.sisyphus/design/brand.md) 🎨
+- [品牌升级日志](./.sisyphus/design/brand-changelog.md) 📋
+- [私聊功能设计](./.sisyphus/design/private-chat.md)
+
+### 📖 其他资源
 - [完整搭建教程](./docs/AI-ChatRoom-Tutorial.md) ⭐
 - [在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/) 📚
-- [品牌设计规范](./BRAND-DESIGN.md) 🎨
-- [品牌升级日志](./BRAND-CHANGELOG.md) 📋
-- [页面优化报告](./PAGES-OPTIMIZATION.md) 💎
-- [移动端适配指南](./MOBILE-GUIDE.md) 📱
-- [快速启动指南](./QUICK-START.md) 🚀
-- [模式切换指南](./docs/mode-guide.md)
-- [钉钉插件配置指南](./docs/dingtalk-plugin-guide.md)
-- [新机器人接入指南](./docs/new-bot-guide.md)
 
 ---
 
