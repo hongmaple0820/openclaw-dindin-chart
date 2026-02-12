@@ -3,7 +3,8 @@
  * @author 小琳
  * @date 2026-02-06
  */
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 

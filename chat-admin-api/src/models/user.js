@@ -1,7 +1,8 @@
 /**
  * 用户模型 - SQLite 数据库操作
  */
-const Database = require('better-sqlite3');
+const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
