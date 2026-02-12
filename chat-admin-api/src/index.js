@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
 const Redis = require('ioredis');
 const path = require('path');
 
@@ -11,10 +10,10 @@ app.use(express.json());
 
 // 数据库连接
 const dbPath = process.env.DB_PATH || path.join(process.env.HOME, '.openclaw', 'chat-data', 'messages.db');
-const db = new Database(dbPath);
+const db = new sqlite3.Database(dbPath);
 
 // Redis 连接（用于获取在线状态）
-// 从环境变量读取配置，保护隐私
+// 从环境变量读取配置，保护隐���
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
   port: process.env.REDIS_PORT || 6379,
@@ -69,26 +68,37 @@ app.get('/api/messages', (req, res) => {
     const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
     // 获取总数
-    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM messages ${whereClause}`);
-    const { total } = countStmt.get(...params);
-
-    // 获取数据
-    const dataStmt = db.prepare(`
-      SELECT * FROM messages ${whereClause}
-      ORDER BY timestamp DESC
-      LIMIT ? OFFSET ?
-    `);
-    const messages = dataStmt.all(...params, limit, offset);
-
-    res.json({
-      success: true,
-      data: messages,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
+    db.get(`SELECT COUNT(*) as total FROM messages ${whereClause}`, params, (err, row) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
       }
+      
+      const total = row.total;
+      
+      // 获取数据
+      const sql = `
+        SELECT * FROM messages ${whereClause}
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+      `;
+      params.push(limit, offset);
+      
+      db.all(sql, params, (err, rows) => {
+        if (err) {
+          return res.status(500).json({ success: false, error: err.message });
+        }
+        
+        res.json({
+          success: true,
+          data: rows,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+          }
+        });
+      });
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -101,9 +111,12 @@ app.get('/api/messages', (req, res) => {
  */
 app.delete('/api/messages/:id', (req, res) => {
   try {
-    const stmt = db.prepare('DELETE FROM messages WHERE id = ?');
-    const result = stmt.run(req.params.id);
-    res.json({ success: result.changes > 0 });
+    db.run('DELETE FROM messages WHERE id = ?', [req.params.id], function(err) {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      res.json({ success: this.changes > 0 });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -119,10 +132,16 @@ app.post('/api/messages/batch-delete', (req, res) => {
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ success: false, error: 'ids required' });
     }
+    
     const placeholders = ids.map(() => '?').join(',');
-    const stmt = db.prepare(`DELETE FROM messages WHERE id IN (${placeholders})`);
-    const result = stmt.run(...ids);
-    res.json({ success: true, deleted: result.changes });
+    const sql = `DELETE FROM messages WHERE id IN (${placeholders})`;
+    
+    db.run(sql, ids, function(err) {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      res.json({ success: true, deleted: this.changes });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -143,23 +162,42 @@ app.get('/api/stats/overview', (req, res) => {
     weekStart.setDate(weekStart.getDate() - 7);
     weekStart.setHours(0, 0, 0, 0);
 
-    const total = db.prepare('SELECT COUNT(*) as count FROM messages').get().count;
-    const today = db.prepare('SELECT COUNT(*) as count FROM messages WHERE timestamp >= ?').get(todayStart.getTime()).count;
-    const week = db.prepare('SELECT COUNT(*) as count FROM messages WHERE timestamp >= ?').get(weekStart.getTime()).count;
-    const humanCount = db.prepare("SELECT COUNT(*) as count FROM messages WHERE type = 'human'").get().count;
-    const botCount = db.prepare("SELECT COUNT(*) as count FROM messages WHERE type = 'bot'").get().count;
-
-    res.json({
-      success: true,
-      data: {
-        total,
-        today,
-        week,
-        humanCount,
-        botCount,
-        humanRatio: total > 0 ? (humanCount / total * 100).toFixed(1) : 0,
-        botRatio: total > 0 ? (botCount / total * 100).toFixed(1) : 0
-      }
+    db.get('SELECT COUNT(*) as count FROM messages', (err, row) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      const total = row.count;
+      
+      db.get('SELECT COUNT(*) as count FROM messages WHERE timestamp >= ?', [todayStart.getTime()], (err, row) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        const today = row.count;
+        
+        db.get('SELECT COUNT(*) as count FROM messages WHERE timestamp >= ?', [weekStart.getTime()], (err, row) => {
+          if (err) return res.status(500).json({ success: false, error: err.message });
+          const week = row.count;
+          
+          db.get("SELECT COUNT(*) as count FROM messages WHERE type = 'human'", (err, row) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            const humanCount = row.count;
+            
+            db.get("SELECT COUNT(*) as count FROM messages WHERE type = 'bot'", (err, row) => {
+              if (err) return res.status(500).json({ success: false, error: err.message });
+              const botCount = row.count;
+              
+              res.json({
+                success: true,
+                data: {
+                  total,
+                  today,
+                  week,
+                  humanCount,
+                  botCount,
+                  humanRatio: total > 0 ? (humanCount / total * 100).toFixed(1) : 0,
+                  botRatio: total > 0 ? (botCount / total * 100).toFixed(1) : 0
+                }
+              });
+            });
+          });
+        });
+      });
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -172,16 +210,19 @@ app.get('/api/stats/overview', (req, res) => {
  */
 app.get('/api/stats/by-sender', (req, res) => {
   try {
-    const stmt = db.prepare(`
+    db.all(`
       SELECT sender, type, COUNT(*) as count, 
              MIN(timestamp) as firstMessage, 
              MAX(timestamp) as lastMessage
       FROM messages 
       GROUP BY sender 
       ORDER BY count DESC
-    `);
-    const data = stmt.all();
-    res.json({ success: true, data });
+    `, (err, rows) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      res.json({ success: true, data: rows });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -193,14 +234,17 @@ app.get('/api/stats/by-sender', (req, res) => {
  */
 app.get('/api/stats/by-source', (req, res) => {
   try {
-    const stmt = db.prepare(`
+    db.all(`
       SELECT source, COUNT(*) as count
       FROM messages 
       GROUP BY source 
       ORDER BY count DESC
-    `);
-    const data = stmt.all();
-    res.json({ success: true, data });
+    `, (err, rows) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      res.json({ success: true, data: rows });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -216,22 +260,27 @@ app.get('/api/stats/by-time', (req, res) => {
     const days = parseInt(req.query.days) || 7;
     const startTime = Date.now() - days * 24 * 60 * 60 * 1000;
 
-    let groupBy, format;
+    let groupBy;
     if (interval === 'hour') {
       groupBy = "strftime('%Y-%m-%d %H:00', datetime(timestamp/1000, 'unixepoch', 'localtime'))";
     } else {
       groupBy = "strftime('%Y-%m-%d', datetime(timestamp/1000, 'unixepoch', 'localtime'))";
     }
 
-    const stmt = db.prepare(`
+    const sql = `
       SELECT ${groupBy} as time, COUNT(*) as count
       FROM messages 
       WHERE timestamp >= ?
       GROUP BY ${groupBy}
       ORDER BY time ASC
-    `);
-    const data = stmt.all(startTime);
-    res.json({ success: true, data });
+    `;
+    
+    db.all(sql, [startTime], (err, rows) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      res.json({ success: true, data: rows });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -245,7 +294,7 @@ app.get('/api/stats/by-time', (req, res) => {
  */
 app.get('/api/users', (req, res) => {
   try {
-    const stmt = db.prepare(`
+    db.all(`
       SELECT 
         sender as name,
         type,
@@ -255,18 +304,21 @@ app.get('/api/users', (req, res) => {
       FROM messages 
       GROUP BY sender 
       ORDER BY lastSeen DESC
-    `);
-    const users = stmt.all();
-
-    // 添加在线状态
-    const now = Date.now();
-    const usersWithStatus = users.map(user => ({
-      ...user,
-      online: userStatus.has(user.name) && (now - userStatus.get(user.name) < 5 * 60 * 1000),
-      lastActivity: userStatus.get(user.name) || user.lastSeen
-    }));
-
-    res.json({ success: true, data: usersWithStatus });
+    `, (err, rows) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      
+      // 添加在线状态
+      const now = Date.now();
+      const usersWithStatus = rows.map(user => ({
+        ...user,
+        online: userStatus.has(user.name) && (now - userStatus.get(user.name) < 5 * 60 * 1000),
+        lastActivity: userStatus.get(user.name) || user.lastSeen
+      }));
+      
+      res.json({ success: true, data: usersWithStatus });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -304,20 +356,37 @@ app.get('/api/users/online', (req, res) => {
  */
 app.get('/api/sync-status', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM sync_state');
-    const data = stmt.all();
-    
-    const status = data.map(row => {
-      const unsynced = db.prepare('SELECT COUNT(*) as count FROM messages WHERE timestamp > ?').get(row.last_sync).count;
-      return {
-        participantId: row.participant_id,
-        lastSync: row.last_sync,
-        lastSyncTime: new Date(row.last_sync).toISOString(),
-        unsyncedCount: unsynced
-      };
+    db.all('SELECT * FROM sync_state', (err, rows) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      
+      const statusPromises = rows.map(row => {
+        return new Promise((resolve) => {
+          db.get('SELECT COUNT(*) as count FROM messages WHERE timestamp > ?', [row.last_sync], (err, countRow) => {
+            if (err) {
+              resolve({
+                participantId: row.participant_id,
+                lastSync: row.last_sync,
+                lastSyncTime: new Date(row.last_sync).toISOString(),
+                unsyncedCount: 0
+              });
+            } else {
+              resolve({
+                participantId: row.participant_id,
+                lastSync: row.last_sync,
+                lastSyncTime: new Date(row.last_sync).toISOString(),
+                unsyncedCount: countRow.count
+              });
+            }
+          });
+        });
+      });
+      
+      Promise.all(statusPromises).then(status => {
+        res.json({ success: true, data: status });
+      });
     });
-
-    res.json({ success: true, data: status });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
