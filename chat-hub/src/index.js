@@ -54,6 +54,19 @@ async function main() {
   console.log(`  - 使用统计: ${analytics.enabled ? '✓' : '✗'}`);
   console.log('========================================\n');
 
+  // 配置验证 - 使用权限模块
+  const permissions = require('./permissions');
+  const configStatus = permissions.getConfigSummary();
+  
+  if (!configStatus.webhook.configured) {
+    console.log('⚠️ Webhook 未配置，部分功能受限:');
+    console.log('   - 第三方集成功能');
+    console.log('   - 机器人自动回复功能');
+    console.log('   - 消息同步功能');
+    console.log('💡 运行 "openclaw skill chat-hub-config setup" 配置 webhook');
+    console.log('');
+  }
+
   // 记录启动事件
   analytics.trackStartup();
   analytics.trackDaily();

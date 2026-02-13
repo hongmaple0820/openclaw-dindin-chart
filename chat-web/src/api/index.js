@@ -71,4 +71,8 @@ api.interceptors.response.use(
   }
 );
 
+export const configApi = {
+  getStatus: () => api.get('/config/status')
+};
+
 export default api;

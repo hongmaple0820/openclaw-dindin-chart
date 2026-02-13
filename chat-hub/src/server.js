@@ -10,6 +10,7 @@ const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
 const sseManager = require('./sse-manager');
+const permissions = require('./permissions');
 
 // 创建传输管理器
 const transportManager = new TransportManager(config);
@@ -298,9 +299,13 @@ app.post('/api/send', async (req, res) => {
     // 发布到 Redis（通知其他机器人）
     await transportManager.send(message, config.channels.messages);
     
-    // 发送到钉钉群
-    const dingtalkContent = `${sender}：${content}`;
-    await dingtalk.sendText(dingtalkContent);
+    // 检查 webhook 是否配置，如果已配置则发送到钉钉
+    if (permissions.isWebhookConfigured()) {
+      const dingtalkContent = `${sender}：${content}`;
+      await dingtalk.sendText(dingtalkContent);
+    } else {
+      console.log('[Server] Webhook 未配置，跳过发送到钉钉');
+    }
     
     console.log('[Server] Web 消息已发送:', sender, '->', content.substring(0, 50));
     res.json({ success: true, message });
@@ -314,7 +319,7 @@ app.post('/api/send', async (req, res) => {
  * 机器人发送回复（同步到钉钉）
  * POST /api/reply
  */
-app.post('/api/reply', async (req, res) => {
+app.post('/api/reply', permissions.requireWebhook, async (req, res) => {
   try {
     const { content, sender = 'Bot', atTargets = null, replyTo = null } = req.body;
 
@@ -1288,6 +1293,17 @@ app.get('/health', async (req, res) => {
       storeDir: messageStore.storeDir,
       dbPath: messageStore.dbPath
     }
+  });
+});
+
+/**
+ * 获取配置状态（用于前端权限控制）
+ * GET /api/config/status
+ */
+app.get('/api/config/status', (req, res) => {
+  res.json({
+    success: true,
+    ...permissions.getConfigSummary()
   });
 });
 
