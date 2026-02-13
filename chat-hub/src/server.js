@@ -11,9 +11,14 @@ const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
 const sseManager = require('./sse-manager');
 const permissions = require('./permissions');
+const sessionManager = require('./session-manager');
+const messageRouter = require('./message-router');
+const messageSecurity = require('./message-security');
+const instanceAuth = require('./instance-auth');
 
-// 创建传输管理器
 const transportManager = new TransportManager(config);
+
+messageRouter.setTransportManager(transportManager);
 
 const app = express();
 
@@ -1615,23 +1620,25 @@ app.get('/api/online-users', (req, res) => {
 async function start() {
   const myBotName = config.bot?.name || '小琳';
   
-  // 注册文件路由
   app.use('/api/files', fileRoutes);
   
-  // 注册私聊路由
   const dmRoutes = require('./routes/dm');
   app.use('/api/chat/dm', dmRoutes);
   
-  // 注册管理后台路由
+  const sessionRoutes = require('./routes/session');
+  app.use('/api/sessions', sessionRoutes);
+  
   const adminRoutes = require('./routes/admin')(messageStore, messageStore.db);
   app.use('/api/admin', adminRoutes);
 
-  // 注册 Webhook 路由（接收 OpenClaw 钉钉消息）
   const webhookRoutes = require('./routes/webhook');
-  app.set('messageStore', messageStore); // 让 webhook 能访问 messageStore
+  app.set('messageStore', messageStore);
   app.use('/api/webhook', webhookRoutes);
 
-  // 连接传输层（支持自动降级）
+  sessionManager.init();
+  instanceAuth.init();
+  instanceAuth.startHeartbeat();
+
   await transportManager.connect();
   console.log(`[Server] 传输层已连接:`, transportManager.getStatus());
 
@@ -1793,7 +1800,73 @@ async function start() {
           users: onlineUsers,
         },
         messages: messageStore.getStats(),
+        instance: instanceAuth.getStatus(),
+        router: messageRouter.getStats(),
       });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get('/api/instances', (req, res) => {
+    try {
+      const instances = instanceAuth.getActiveInstances();
+      res.json({ success: true, count: instances.length, instances });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/instances/register', (req, res) => {
+    try {
+      const { name, endpoint, apiKey, metadata } = req.body;
+      const result = instanceAuth.registerInstance({
+        name,
+        endpoint,
+        apiKey,
+        metadata
+      });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/instances/unregister', (req, res) => {
+    try {
+      const { instanceId } = req.body;
+      instanceAuth.unregisterInstance(instanceId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/instances/heartbeat', (req, res) => {
+    try {
+      const { instanceId } = req.body;
+      instanceAuth.updateHeartbeat(instanceId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/instances/bind-user', (req, res) => {
+    try {
+      const { userId, instanceId, sessionId } = req.body;
+      instanceAuth.bindUserToInstance(userId, instanceId, sessionId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/api/instances/unbind-user', (req, res) => {
+    try {
+      const { userId, instanceId } = req.body;
+      instanceAuth.unbindUserFromInstance(userId, instanceId);
+      res.json({ success: true });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
     }

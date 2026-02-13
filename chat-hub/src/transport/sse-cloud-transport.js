@@ -1,6 +1,7 @@
 const Transport = require('./base')
 const { EventSource } = require('eventsource')
 const axios = require('axios')
+const { v4: uuidv4 } = require('uuid')
 
 /**
  * SSE 云端传输实现
@@ -8,6 +9,7 @@ const axios = require('axios')
  * 架构：
  * - SSE 连接（GET /sse/connect）：接收消息
  * - HTTP POST（POST /sse/send）：发送消息
+ * - 会话订阅：基于 conversationId 路由消息
  */
 class SSECloudTransport extends Transport {
   constructor(config) {
@@ -17,8 +19,11 @@ class SSECloudTransport extends Transport {
     this.heartbeatTimer = null
     this.reconnectAttempts = 0
     this.maxReconnectAttempts = config.reconnect?.maxRetries || 10
-    this.reconnectDelay = 1000 // 初始重连延迟 1 秒
-    this.heartbeatInterval = 30000 // 30 秒心跳
+    this.reconnectDelay = 1000
+    this.heartbeatInterval = 30000
+    this.instanceId = config.instanceId || uuidv4()
+    this.subscriptions = new Set()
+    this.userBindings = new Map()
   }
 
   async connect() {
@@ -196,26 +201,185 @@ class SSECloudTransport extends Transport {
     }
   }
 
+  async healthCheck() {
+    try {
+      if (!this.connected) return false
+      
+      return this.eventSource && this.eventSource.readyState === EventSource.OPEN
+    } catch (error) {
+      console.error('[SSECloudTransport] 健康检查失败:', error)
+      return false
+    }
+  }
+
+  async subscribeConversation(conversationId) {
+    if (!this.connected) {
+      throw new Error('SSE 未连接')
+    }
+
+    if (this.subscriptions.has(conversationId)) {
+      return true
+    }
+
+    try {
+      const subscribeUrl = `${this.config.endpoint}/sse/subscribe`
+      
+      const response = await axios.post(subscribeUrl, {
+        apiKey: this.config.apiKey,
+        instanceId: this.instanceId,
+        conversationId
+      }, {
+        timeout: 5000
+      })
+
+      if (response.data.success) {
+        this.subscriptions.add(conversationId)
+        console.log(`[SSECloudTransport] 已订阅会话: ${conversationId}`)
+        return true
+      } else {
+        throw new Error(response.data.error || '订阅失败')
+      }
+    } catch (error) {
+      console.error('[SSECloudTransport] 订阅会话失败:', error.message)
+      throw error
+    }
+  }
+
+  async unsubscribeConversation(conversationId) {
+    if (!this.subscriptions.has(conversationId)) {
+      return true
+    }
+
+    try {
+      const unsubscribeUrl = `${this.config.endpoint}/sse/unsubscribe`
+      
+      const response = await axios.post(unsubscribeUrl, {
+        apiKey: this.config.apiKey,
+        instanceId: this.instanceId,
+        conversationId
+      }, {
+        timeout: 5000
+      })
+
+      if (response.data.success) {
+        this.subscriptions.delete(conversationId)
+        console.log(`[SSECloudTransport] 已取消订阅会话: ${conversationId}`)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('[SSECloudTransport] 取消订阅失败:', error.message)
+      return false
+    }
+  }
+
+  async sendToConversation(message, conversationId) {
+    if (!this.connected) {
+      throw new Error('SSE 未连接')
+    }
+
+    try {
+      const sendUrl = `${this.config.endpoint}/sse/send`
+      
+      const response = await axios.post(sendUrl, {
+        apiKey: this.config.apiKey,
+        instanceId: this.instanceId,
+        conversationId,
+        message
+      }, {
+        timeout: 5000
+      })
+
+      if (response.data.success) {
+        console.log(`[SSECloudTransport] 消息已发送到会话: ${conversationId}`)
+        return true
+      } else {
+        throw new Error(response.data.error || '发送失败')
+      }
+    } catch (error) {
+      console.error('[SSECloudTransport] 发送消息到会话失败:', error.message)
+      throw error
+    }
+  }
+
+  bindUser(userId, sessionId = null) {
+    this.userBindings.set(userId, {
+      sessionId,
+      connectedAt: Date.now()
+    })
+    console.log(`[SSECloudTransport] 用户绑定: ${userId}`)
+  }
+
+  unbindUser(userId) {
+    this.userBindings.delete(userId)
+    console.log(`[SSECloudTransport] 用户解绑: ${userId}`)
+  }
+
+  getUserSession(userId) {
+    const binding = this.userBindings.get(userId)
+    return binding ? binding.sessionId : null
+  }
+
+  getConnectedUsers() {
+    return Array.from(this.userBindings.entries()).map(([userId, data]) => ({
+      userId,
+      sessionId: data.sessionId,
+      connectedAt: data.connectedAt
+    }))
+  }
+
+  async registerInstance(name, endpoint) {
+    try {
+      const registerUrl = `${this.config.endpoint}/sse/instance/register`
+      
+      const response = await axios.post(registerUrl, {
+        apiKey: this.config.apiKey,
+        instanceId: this.instanceId,
+        name,
+        endpoint
+      }, {
+        timeout: 5000
+      })
+
+      if (response.data.success) {
+        console.log(`[SSECloudTransport] 实例已注册: ${this.instanceId}`)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('[SSECloudTransport] 实例注册失败:', error.message)
+      return false
+    }
+  }
+
+  async unregisterInstance() {
+    try {
+      const unregisterUrl = `${this.config.endpoint}/sse/instance/unregister`
+      
+      await axios.post(unregisterUrl, {
+        apiKey: this.config.apiKey,
+        instanceId: this.instanceId
+      }, {
+        timeout: 5000
+      })
+
+      console.log(`[SSECloudTransport] 实例已注销: ${this.instanceId}`)
+    } catch (error) {
+      console.error('[SSECloudTransport] 实例注销失败:', error.message)
+    }
+  }
+
   getStatus() {
     const baseStatus = super.getStatus()
     return {
       ...baseStatus,
       mode: 'sse-cloud',
       endpoint: this.config.endpoint,
+      instanceId: this.instanceId,
+      subscriptions: Array.from(this.subscriptions),
+      connectedUsers: this.userBindings.size,
       reconnectAttempts: this.reconnectAttempts,
       maxReconnectAttempts: this.maxReconnectAttempts
-    }
-  }
-
-  async healthCheck() {
-    try {
-      if (!this.connected) return false
-      
-      // 简单检查连接状态
-      return this.eventSource && this.eventSource.readyState === EventSource.OPEN
-    } catch (error) {
-      console.error('[SSECloudTransport] 健康检查失败:', error)
-      return false
     }
   }
 }
