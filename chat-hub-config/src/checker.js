@@ -23,6 +23,9 @@ class ConfigChecker {
     await this.checkBotConfig();
     await this.checkServerConfig();
     await this.checkEnvFile();
+    await this.checkCorsConfig();
+    await this.checkRateLimitConfig();
+    await this.checkAuthConfig();
 
     return this.generateReport();
   }
@@ -301,6 +304,110 @@ class ConfigChecker {
     }
 
     this.passed.push('✓ .env 文件存在');
+  }
+
+  async checkCorsConfig() {
+    const config = this.loadConfig();
+
+    if (!config.cors) {
+      this.warnings.push({
+        type: 'warning',
+        category: 'cors',
+        message: '缺少 CORS 配置',
+        severity: 'low',
+        solution: '添加 cors 配置以优化跨域支持'
+      });
+      return;
+    }
+
+    if (!config.cors.origins) {
+      this.warnings.push({
+        type: 'warning',
+        category: 'cors',
+        message: 'CORS origins 未配置，默认允许所有来源',
+        severity: 'medium',
+        solution: '生产环境建议配置具体的 origins 白名单'
+      });
+    } else {
+      this.passed.push('✓ CORS origins 已配置');
+    }
+
+    if (config.cors.credentials) {
+      this.passed.push('✓ CORS credentials 支持已启用');
+    }
+
+    if (config.cors.maxAge) {
+      this.passed.push(`✓ CORS maxAge: ${config.cors.maxAge}秒`);
+    }
+  }
+
+  async checkRateLimitConfig() {
+    const config = this.loadConfig();
+
+    if (!config.rateLimit) {
+      this.warnings.push({
+        type: 'warning',
+        category: 'rate-limit',
+        message: '缺少速率限制配置',
+        severity: 'low',
+        solution: '添加 rateLimit 配置以防止 API 滥用'
+      });
+      return;
+    }
+
+    if (config.rateLimit.enabled === false) {
+      this.warnings.push({
+        type: 'warning',
+        category: 'rate-limit',
+        message: '速率限制已禁用，可能导致 API 滥用',
+        severity: 'medium',
+        solution: '生产环境建议启用速率限制'
+      });
+      return;
+    }
+
+    if (config.rateLimit.maxRequests) {
+      this.passed.push(`✓ 速率限制: ${config.rateLimit.maxRequests} 次/分钟`);
+    }
+
+    if (config.rateLimit.auth) {
+      this.passed.push('✓ 认证接口速率限制已配置');
+    }
+
+    if (config.rateLimit.message) {
+      this.passed.push('✓ 消息接口速率限制已配置');
+    }
+  }
+
+  async checkAuthConfig() {
+    const config = this.loadConfig();
+
+    if (!config.auth) {
+      this.warnings.push({
+        type: 'warning',
+        category: 'auth',
+        message: '缺少认证配置',
+        severity: 'low',
+        solution: '添加 auth 配置以增强安全性'
+      });
+      return;
+    }
+
+    if (config.auth.jwtSecret) {
+      this.passed.push('✓ JWT Secret 已配置');
+    } else {
+      this.warnings.push({
+        type: 'warning',
+        category: 'auth',
+        message: 'JWT Secret 未配置，使用默认值可能不安全',
+        severity: 'medium',
+        solution: '配置强随机的 JWT Secret'
+      });
+    }
+
+    if (config.auth.refreshTokenExpires) {
+      this.passed.push('✓ Refresh Token 过期时间已配置');
+    }
   }
 
   loadConfig() {

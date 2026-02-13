@@ -13,12 +13,12 @@ const os = require('os');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'maple-chatroom-secret-2026';
 const JWT_EXPIRES = '7d';
+const JWT_REFRESH_EXPIRES = '30d';
+const REFRESH_TOKEN_EXPIRES = 30 * 24 * 60 * 60 * 1000;
 
-// 数据库路径
 const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'users.db');
 const db = new Database(dbPath);
 
-// 初始化用户表
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -39,6 +39,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
   CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
   CREATE INDEX IF NOT EXISTS idx_users_type ON users(type);
+
+  CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    revoked INTEGER DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+  CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+
+  CREATE TABLE IF NOT EXISTS token_blacklist (
+    token TEXT PRIMARY KEY,
+    revoked_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_blacklist_expires ON token_blacklist(expires_at);
 `);
 
 // 确保有管理员账号
@@ -178,7 +199,6 @@ function login(username, password) {
     return { success: false, error: '密码错误' };
   }
   
-  // 检查用户状态
   if (user.status === UserStatus.PENDING) {
     return { success: false, error: '账号正在审核中，请耐心等待', code: 'PENDING' };
   }
@@ -195,11 +215,24 @@ function login(username, password) {
     return { success: false, error: '账号已被封禁', code: 'BANNED' };
   }
   
-  const token = jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
+  const accessToken = jwt.sign(
+    { userId: user.id, username: user.username, role: user.role, type: 'access' },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES }
   );
+
+  const refreshTokenValue = jwt.sign(
+    { userId: user.id, username: user.username, type: 'refresh' },
+    JWT_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES }
+  );
+
+  const refreshTokenId = uuidv4();
+  const now = Date.now();
+  db.prepare(`
+    INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(refreshTokenId, user.id, refreshTokenValue, now + REFRESH_TOKEN_EXPIRES, now);
   
   return {
     success: true,
@@ -212,9 +245,99 @@ function login(username, password) {
       type: user.type,
       status: user.status
     },
-    accessToken: token,
-    refreshToken: token  // 简化处理，实际应分开
+    accessToken,
+    refreshToken: refreshTokenValue,
+    expiresIn: JWT_EXPIRES
   };
+}
+
+function refreshToken(refreshTokenValue) {
+  if (!refreshTokenValue) {
+    return { success: false, error: '缺少 refresh token' };
+  }
+
+  const blacklisted = db.prepare('SELECT 1 FROM token_blacklist WHERE token = ?').get(refreshTokenValue);
+  if (blacklisted) {
+    return { success: false, error: 'Token 已失效' };
+  }
+
+  const storedToken = db.prepare(`
+    SELECT * FROM refresh_tokens 
+    WHERE token = ? AND revoked = 0 AND expires_at > ?
+  `).get(refreshTokenValue, Date.now());
+
+  if (!storedToken) {
+    return { success: false, error: '无效或已过期的 refresh token' };
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshTokenValue, JWT_SECRET);
+  } catch (error) {
+    return { success: false, error: 'Token 验证失败' };
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+  if (!user || user.status !== UserStatus.APPROVED) {
+    return { success: false, error: '用户状态异常' };
+  }
+
+  const newAccessToken = jwt.sign(
+    { userId: user.id, username: user.username, role: user.role, type: 'access' },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES }
+  );
+
+  const newRefreshTokenValue = jwt.sign(
+    { userId: user.id, username: user.username, type: 'refresh' },
+    JWT_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES }
+  );
+
+  const now = Date.now();
+  db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE id = ?').run(storedToken.id);
+
+  const newRefreshTokenId = uuidv4();
+  db.prepare(`
+    INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(newRefreshTokenId, user.id, newRefreshTokenValue, now + REFRESH_TOKEN_EXPIRES, now);
+
+  return {
+    success: true,
+    accessToken: newAccessToken,
+    refreshToken: newRefreshTokenValue,
+    expiresIn: JWT_EXPIRES
+  };
+}
+
+function logout(refreshTokenValue, accessToken) {
+  const now = Date.now();
+
+  if (refreshTokenValue) {
+    db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE token = ?').run(refreshTokenValue);
+  }
+
+  if (accessToken) {
+    try {
+      const decoded = jwt.decode(accessToken);
+      if (decoded && decoded.exp) {
+        db.prepare(`
+          INSERT OR IGNORE INTO token_blacklist (token, revoked_at, expires_at)
+          VALUES (?, ?, ?)
+        `).run(accessToken, now, decoded.exp * 1000);
+      }
+    } catch (e) {
+    }
+  }
+
+  return { success: true };
+}
+
+function cleanExpiredTokens() {
+  const now = Date.now();
+  db.prepare('DELETE FROM refresh_tokens WHERE expires_at < ? OR revoked = 1').run(now);
+  db.prepare('DELETE FROM token_blacklist WHERE expires_at < ?').run(now);
 }
 
 /**
@@ -222,13 +345,22 @@ function login(username, password) {
  */
 function verifyToken(token) {
   try {
+    const blacklisted = db.prepare('SELECT 1 FROM token_blacklist WHERE token = ?').get(token);
+    if (blacklisted) {
+      return { success: false, error: 'Token 已失效', code: 'TOKEN_REVOKED' };
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET);
+    
+    if (decoded.type === 'refresh') {
+      return { success: false, error: '请使用 access token', code: 'WRONG_TOKEN_TYPE' };
+    }
+
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
     if (!user) {
       return { success: false, error: '用户不存在' };
     }
     
-    // 检查用户状态
     if (user.status !== UserStatus.APPROVED) {
       return { success: false, error: '账号状态异常', code: user.status };
     }
@@ -246,7 +378,10 @@ function verifyToken(token) {
       }
     };
   } catch (error) {
-    return { success: false, error: 'Token 无效或已过期' };
+    if (error.name === 'TokenExpiredError') {
+      return { success: false, error: 'Token 已过期', code: 'TOKEN_EXPIRED' };
+    }
+    return { success: false, error: 'Token 无效或已过期', code: 'TOKEN_INVALID' };
   }
 }
 
@@ -448,7 +583,10 @@ function adminMiddleware(req, res, next) {
 module.exports = {
   register,
   login,
+  logout,
+  refreshToken,
   verifyToken,
+  cleanExpiredTokens,
   getUser,
   getUserById,
   getUserByUsername,

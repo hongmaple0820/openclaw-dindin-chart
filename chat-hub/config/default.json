@@ -41,6 +41,26 @@
     "messagePrefix": "[钉钉群消息]"
   },
   
+  "cors": {
+    "origins": ["*"],
+    "credentials": true,
+    "maxAge": 86400
+  },
+  
+  "rateLimit": {
+    "enabled": true,
+    "windowMs": 60000,
+    "maxRequests": 100,
+    "auth": {
+      "windowMs": 900000,
+      "maxRequests": 10
+    },
+    "message": {
+      "windowMs": 60000,
+      "maxRequests": 30
+    }
+  },
+  
   "features": {
     "storage": true,
     "analytics": true,

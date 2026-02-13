@@ -14,6 +14,7 @@ class ConfigWizard {
       { id: 'dingtalk', name: '钉钉配置', fn: this.stepDingtalk.bind(this) },
       { id: 'redis', name: 'Redis配置', fn: this.stepRedis.bind(this) },
       { id: 'bot', name: '机器人配置', fn: this.stepBot.bind(this) },
+      { id: 'security', name: '安全配置', fn: this.stepSecurity.bind(this) },
       { id: 'verify', name: '验证配置', fn: this.stepVerify.bind(this) },
       { id: 'save', name: '保存配置', fn: this.stepSave.bind(this) }
     ];
@@ -254,6 +255,51 @@ class ConfigWizard {
     console.log('  ✓ 机器人配置已更新');
   }
 
+  async stepSecurity() {
+    console.log('\n--- 安全配置 ---');
+
+    console.log('此步骤配置 CORS、速率限制和认证相关设置。');
+
+    const skipConfig = await this.question('\n是否现在配置安全设置? (Y/n，直接回车跳过): ');
+
+    if (skipConfig.toLowerCase() === 'n' || skipConfig.trim() === '') {
+      console.log('  ⏭️ 已跳过安全配置');
+      return;
+    }
+
+    // CORS 配置
+    console.log('\n--- CORS 配置 ---');
+    const corsEnabled = await this.question('是否启用 CORS 配置? (Y/n): ');
+    if (corsEnabled.toLowerCase() !== 'n') {
+      this.config.cors = this.config.cors || {};
+      this.config.cors.origins = ['*'];
+      this.config.cors.credentials = true;
+      this.config.cors.maxAge = 86400;
+      console.log('  ✓ CORS 配置已启用');
+    }
+
+    // 速率限制配置
+    console.log('\n--- 速率限制配置 ---');
+    const rateLimitEnabled = await this.question('是否启用 API 速率限制? (Y/n): ');
+    if (rateLimitEnabled.toLowerCase() !== 'n') {
+      this.config.rateLimit = this.config.rateLimit || {};
+      this.config.rateLimit.enabled = true;
+      this.config.rateLimit.windowMs = 60000;
+      this.config.rateLimit.maxRequests = 100;
+      console.log('  ✓ 速率限制已启用 (100次/分钟)');
+    }
+
+    // 认证配置
+    console.log('\n--- 认证配置 ---');
+    const authEnabled = await this.question('是否配置认证设置? (Y/n): ');
+    if (authEnabled.toLowerCase() !== 'n') {
+      this.config.auth = this.config.auth || {};
+      console.log('  ✓ 认证配置已更新');
+    }
+
+    console.log('  ✓ 安全配置已完成');
+  }
+
   async stepVerify() {
     console.log('\n--- 验证配置 ---');
 
@@ -269,7 +315,17 @@ class ConfigWizard {
         enabled: this.config.redis.enabled,
         host: this.config.redis.host,
         port: this.config.redis.port
-      } : '(未配置)'
+      } : '(未配置)',
+      cors: this.config.cors ? {
+        origins: this.config.cors.origins,
+        credentials: this.config.cors.credentials,
+        maxAge: this.config.cors.maxAge
+      } : '(未配置)',
+      rateLimit: this.config.rateLimit ? {
+        enabled: this.config.rateLimit.enabled,
+        maxRequests: this.config.rateLimit.maxRequests
+      } : '(未配置)',
+      auth: this.config.auth ? '(已配置)' : '(未配置)'
     }, null, 2));
 
     const confirm = await this.question('\n确认配置正确? (Y/n): ');

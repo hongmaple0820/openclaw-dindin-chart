@@ -327,6 +327,28 @@ openclaw skill chat-hub-config update --version 1.2.0
   },
   "server": {
     "port": 3000            // 服务端口
+  },
+  "cors": {
+    "origins": ["*"],       // 跨域来源白名单
+    "credentials": true,    // 是否支持 credentials
+    "maxAge": 86400         // 预检请求缓存时间（秒）
+  },
+  "rateLimit": {
+    "enabled": true,         // 是否启用速率限制
+    "windowMs": 60000,       // 时间窗口（毫秒）
+    "maxRequests": 100,      // 最大请求数
+    "auth": {
+      "windowMs": 900000,    // 认证接口时间窗口
+      "maxRequests": 10      // 认证接口最大请求数
+    },
+    "message": {
+      "windowMs": 60000,     // 消息接口时间窗口
+      "maxRequests": 30      // 消息接口最大请求数
+    }
+  },
+  "auth": {
+    "jwtSecret": "",        // JWT 密钥（可选）
+    "refreshTokenExpires": 2592000000 // Refresh Token 过期时间
   }
 }
 ```
@@ -563,5 +585,5 @@ if (config.dingtalk.enabled && (!config.dingtalk.webhookBase || !config.dingtalk
 
 ---
 
-**版本**: 1.0.0
-**最后更新**: 2026-02-13
+**版本**: 1.1.0
+**最后更新**: 2026-02-14

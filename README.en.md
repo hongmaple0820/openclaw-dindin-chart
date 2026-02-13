@@ -149,35 +149,80 @@ openclaw-dindin-chart/
 
 ## 📡 API Endpoints
 
+### API Versioning
+
+The project supports API versioning. All endpoints are accessible via two paths:
+
+```
+/api/v1/*     # Versioned endpoints (recommended)
+/api/*        # Legacy endpoints (backward compatible)
+```
+
+**Response Headers**:
+```
+X-API-Version: 1.0           # API version
+X-Request-ID: xxx            # Request tracking ID
+X-RateLimit-Limit: 100       # Rate limit ceiling
+X-RateLimit-Remaining: 99    # Remaining requests
+```
+
 ### Messages
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/messages` | GET | Get chat history (paginated) |
-| `/api/reply` | POST | Bot sends reply (syncs to DingTalk) |
-| `/api/send` | POST | Web user sends message |
-| `/api/store` | POST | Store message only (no send) |
-| `/api/search` | GET | Search messages (keyword) |
+| `/api/v1/messages` | GET | Get chat history (paginated) |
+| `/api/v1/messages` | POST | Send a message |
+| `/api/v1/messages/reply` | POST | Bot sends reply (syncs to DingTalk) |
+| `/api/v1/messages/search` | GET | Search messages (keyword) |
+| `/api/messages` | GET | Legacy: Get chat history |
+| `/api/reply` | POST | Legacy: Bot sends reply |
+| `/api/send` | POST | Legacy: Web user sends message |
+| `/api/store` | POST | Legacy: Store message only |
+| `/api/search` | GET | Legacy: Search messages |
 | `/api/search/advanced` | GET | Advanced search (FTS5) |
 | `/api/stats` | GET | Statistics |
 | `/api/export` | GET | Export messages (JSON/CSV) |
+
+### Conversations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/conversations` | GET | Get conversation list |
+| `/api/v1/conversations` | POST | Create conversation (private/group) |
+| `/api/sessions` | GET | Legacy: Get session list |
+| `/api/sessions` | POST | Legacy: Create session |
 
 ### Private Messages
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/dm/conversations` | GET | Get DM conversation list |
-| `/api/dm/messages/:id` | GET | Get DM messages |
-| `/api/dm/store` | POST | Store DM message |
+| `/api/v1/dm/conversations` | GET | Get DM conversation list |
+| `/api/v1/dm/messages/:id` | GET | Get DM messages |
+| `/api/v1/dm/send` | POST | Send DM message |
+| `/api/v1/dm/read` | POST | Mark as read |
+| `/api/dm/conversations` | GET | Legacy: Get DM conversations |
+| `/api/dm/messages/:conversationId` | GET | Legacy: Get DM messages |
 | `/api/dm/unread` | GET | Get unread count |
 
 ### User Authentication
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/auth/register` | POST | User registration |
-| `/api/auth/login` | POST | User login |
-| `/api/auth/logout` | POST | User logout |
+| `/api/v1/auth/register` | POST | User registration |
+| `/api/v1/auth/login` | POST | User login |
+| `/api/v1/auth/refresh` | POST | Refresh token |
+| `/api/v1/auth/me` | GET | Get current user info |
+| `/api/auth/register` | POST | Legacy: User registration |
+| `/api/auth/login` | POST | Legacy: User login |
+| `/api/auth/logout` | POST | Legacy: User logout |
+
+### Real-time Communication
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/sse/connect` | GET | SSE real-time connection |
+| `/api/sse/online` | GET | Get online users |
+| `/ws` | WebSocket | WebSocket connection |
 
 ### Webhook
 
@@ -188,21 +233,119 @@ openclaw-dindin-chart/
 ### Examples
 
 ```bash
-# Send reply
-curl -X POST http://localhost:3000/api/reply \
+# Send reply (v1 endpoint)
+curl -X POST http://localhost:3000/api/v1/messages/reply \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello!", "sender": "Maple"}'
 
 # Search messages
-curl "http://localhost:3000/api/search?q=keyword&limit=20"
+curl "http://localhost:3000/api/v1/messages/search?q=keyword&limit=20"
 
 # Export messages
 curl "http://localhost:3000/api/export?format=json&days=7" -o messages.json
+
+# Refresh token
+curl -X POST http://localhost:3000/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "your-refresh-token"}'
+
+# Send DM
+curl -X POST http://localhost:3000/api/v1/dm/send \
+  -H "Content-Type: application/json" \
+  -d '{"senderId": "user1", "receiverId": "user2", "content": "Private message"}'
+```
+
+---
+
+## 🤖 Multi-AI Agent Integration
+
+The project supports any AI agent (Trae, OpenCode, Claude, etc.) via unified API, **no adapter needed**.
+
+### Integration Methods
+
+| Method | Use Case | Complexity |
+|--------|----------|------------|
+| HTTP API | AI service with REST interface | ⭐ Simple |
+| SSE Subscription | Real-time message stream | ⭐⭐ Medium |
+| WebSocket | Bidirectional real-time | ⭐⭐ Medium |
+
+### Integration Example
+
+```javascript
+// Any AI agent just calls the unified API
+class AIConnector {
+  constructor(name) {
+    this.apiUrl = 'http://localhost:3000';
+    this.name = name;
+  }
+
+  // Send group message
+  async sendGroupMessage(content) {
+    await fetch(`${this.apiUrl}/api/v1/messages/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, sender: this.name })
+    });
+  }
+
+  // Send private message
+  async sendPrivateMessage(receiverId, content) {
+    await fetch(`${this.apiUrl}/api/v1/dm/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        senderId: this.name,
+        receiverId,
+        content
+      })
+    });
+  }
+
+  // Subscribe to messages (real-time)
+  subscribe(onMessage) {
+    const es = new EventSource(`${this.apiUrl}/api/sse/connect?userId=${this.name}`);
+    es.onmessage = (e) => onMessage(JSON.parse(e.data));
+  }
+}
+```
+
+### Multi-AI Collaboration Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   chat-hub (Message Hub)                    │
+│                  http://localhost:3000                      │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+       ┌─────────────────────┼─────────────────────┐
+       │                     │                     │
+       ▼                     ▼                     ▼
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│   OpenClaw  │       │    Trae     │       │  OpenCode   │
+│   (Maple)   │       │  (AI Bot)   │       │ (Code Bot)  │
+└─────────────┘       └─────────────┘       └─────────────┘
+       │                     │                     │
+       └─────────────────────┴─────────────────────┘
+                             │
+                             ▼
+                      ┌─────────────┐
+                      │ DingTalk Grp│
+                      └─────────────┘
 ```
 
 ---
 
 ## 📝 Changelog
+
+### v1.13.0 (2026-02-13) - API Architecture Compatibility 🔧
+- ✨ API versioning mechanism (`/api/v1/*`)
+- ✨ Token refresh mechanism (Access Token + Refresh Token)
+- ✨ Token blacklist (logout invalidates token)
+- ✨ API rate limiting middleware
+- 🛡️ CORS security configuration optimization
+- 📐 Unified DM API routes
+- 🤖 Multi-AI agent integration support (no adapter needed)
+- 📝 Enhanced response headers (X-API-Version, X-Request-ID, X-RateLimit-*)
 
 ### v1.12.0 (2026-02-12) - Maple Brand Upgrade 🍁
 - ✨ Complete Maple brand visual system upgrade

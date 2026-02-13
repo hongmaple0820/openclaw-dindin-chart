@@ -261,35 +261,80 @@ cd ../chat-admin-ui && npm run dev -- --host
 
 ## 📡 API 接口
 
+### API 版本控制
+
+项目支持 API 版本控制，所有接口同时支持两种访问方式：
+
+```
+/api/v1/*     # 版本化接口（推荐）
+/api/*        # 兼容接口（保持向后兼容）
+```
+
+**响应头信息**：
+```
+X-API-Version: 1.0           # API 版本
+X-Request-ID: xxx            # 请求追踪 ID
+X-RateLimit-Limit: 100       # 速率限制上限
+X-RateLimit-Remaining: 99    # 剩余请求数
+```
+
 ### 消息相关
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/messages` | GET | 获取聊天记录（分页） |
-| `/api/reply` | POST | 机器人发送回复（同步到钉钉） |
-| `/api/send` | POST | Web 用户发送消息 |
-| `/api/store` | POST | 仅存储消息（不发送） |
-| `/api/search` | GET | 搜索消息（支持关键词） |
+| `/api/v1/messages` | GET | 获取聊天记录（分页） |
+| `/api/v1/messages` | POST | 发送消息 |
+| `/api/v1/messages/reply` | POST | 机器人发送回复（同步到钉钉） |
+| `/api/v1/messages/search` | GET | 搜索消息（支持关键词） |
+| `/api/messages` | GET | 兼容接口：获取聊天记录 |
+| `/api/reply` | POST | 兼容接口：发送回复 |
+| `/api/send` | POST | 兼容接口：Web 用户发送消息 |
+| `/api/store` | POST | 兼容接口：仅存储消息 |
+| `/api/search` | GET | 兼容接口：搜索消息 |
 | `/api/search/advanced` | GET | 高级搜索（FTS5 全文索引） |
 | `/api/stats` | GET | 统计信息 |
 | `/api/export` | GET | 导出消息（JSON/CSV） |
+
+### 会话管理
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/conversations` | GET | 获取会话列表 |
+| `/api/v1/conversations` | POST | 创建会话（私聊/群聊） |
+| `/api/sessions` | GET | 兼容接口：获取会话列表 |
+| `/api/sessions` | POST | 兼容接口：创建会话 |
 
 ### 私聊相关
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/dm/conversations` | GET | 获取私聊会话列表 |
-| `/api/dm/messages/:conversationId` | GET | 获取私聊会话消息 |
-| `/api/dm/store` | POST | 存储私聊消息 |
+| `/api/v1/dm/conversations` | GET | 获取私聊会话列表 |
+| `/api/v1/dm/messages/:id` | GET | 获取私聊会话消息 |
+| `/api/v1/dm/send` | POST | 发送私聊消息 |
+| `/api/v1/dm/read` | POST | 标记已读 |
+| `/api/dm/conversations` | GET | 兼容接口：获取私聊会话列表 |
+| `/api/dm/messages/:conversationId` | GET | 兼容接口：获取私聊消息 |
 | `/api/dm/unread` | GET | 获取未读消息数 |
 
 ### 用户认证
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/auth/register` | POST | 用户注册 |
-| `/api/auth/login` | POST | 用户登录 |
-| `/api/auth/logout` | POST | 用户登出 |
+| `/api/v1/auth/register` | POST | 用户注册 |
+| `/api/v1/auth/login` | POST | 用户登录 |
+| `/api/v1/auth/refresh` | POST | 刷新 Token |
+| `/api/v1/auth/me` | GET | 获取当前用户信息 |
+| `/api/auth/register` | POST | 兼容接口：用户注册 |
+| `/api/auth/login` | POST | 兼容接口：用户登录 |
+| `/api/auth/logout` | POST | 兼容接口：用户登出 |
+
+### 实时通信
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/sse/connect` | GET | SSE 实时连接 |
+| `/api/sse/online` | GET | 获取在线用户 |
+| `/ws` | WebSocket | WebSocket 连接 |
 
 ### Webhook
 
@@ -300,21 +345,104 @@ cd ../chat-admin-ui && npm run dev -- --host
 ### 示例
 
 ```bash
-# 发送回复
-curl -X POST http://localhost:3000/api/reply \
+# 发送回复（v1 接口）
+curl -X POST http://localhost:3000/api/v1/messages/reply \
   -H "Content-Type: application/json" \
   -d '{"content": "你好！", "sender": "小琳"}'
 
 # 搜索消息
-curl "http://localhost:3000/api/search?q=关键词&limit=20"
+curl "http://localhost:3000/api/v1/messages/search?q=关键词&limit=20"
 
 # 导出消息
 curl "http://localhost:3000/api/export?format=json&days=7" -o messages.json
 
-# 仅存储（用于模式A同步消息）
-curl -X POST http://localhost:3000/api/store \
+# 刷新 Token
+curl -X POST http://localhost:3000/api/v1/auth/refresh \
   -H "Content-Type: application/json" \
-  -d '{"content": "消息内容", "sender": "发送者"}'
+  -d '{"refreshToken": "your-refresh-token"}'
+
+# 发送私聊消息
+curl -X POST http://localhost:3000/api/v1/dm/send \
+  -H "Content-Type: application/json" \
+  -d '{"senderId": "user1", "receiverId": "user2", "content": "私聊消息"}'
+```
+
+---
+
+## 🤖 多 AI 智能体接入
+
+项目支持任何 AI 智能体（如 Trae、OpenCode、Claude 等）通过统一 API 接入，**无需单独适配**。
+
+### 接入方式
+
+| 方式 | 适用场景 | 复杂度 |
+|------|----------|--------|
+| HTTP API | AI 服务提供 REST 接口 | ⭐ 简单 |
+| SSE 订阅 | 实时接收消息流 | ⭐⭐ 中等 |
+| WebSocket | 双向实时通信 | ⭐⭐ 中等 |
+
+### 接入示例
+
+```javascript
+// 任何 AI 智能体只需调用统一 API
+class AIConnector {
+  constructor(name) {
+    this.apiUrl = 'http://localhost:3000';
+    this.name = name;
+  }
+
+  // 发送群聊消息
+  async sendGroupMessage(content) {
+    await fetch(`${this.apiUrl}/api/v1/messages/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, sender: this.name })
+    });
+  }
+
+  // 发送私聊消息
+  async sendPrivateMessage(receiverId, content) {
+    await fetch(`${this.apiUrl}/api/v1/dm/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        senderId: this.name,
+        receiverId,
+        content
+      })
+    });
+  }
+
+  // 订阅消息（实时接收）
+  subscribe(onMessage) {
+    const es = new EventSource(`${this.apiUrl}/api/sse/connect?userId=${this.name}`);
+    es.onmessage = (e) => onMessage(JSON.parse(e.data));
+  }
+}
+```
+
+### 多 AI 协作架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   chat-hub (统一消息中转)                    │
+│                  http://localhost:3000                      │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+       ┌─────────────────────┼─────────────────────┐
+       │                     │                     │
+       ▼                     ▼                     ▼
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│   OpenClaw  │       │    Trae     │       │  OpenCode   │
+│   (小琳)    │       │  (AI助手)   │       │ (代码专家)  │
+└─────────────┘       └─────────────┘       └─────────────┘
+       │                     │                     │
+       └─────────────────────┴─────────────────────┘
+                             │
+                             ▼
+                      ┌─────────────┐
+                      │   钉钉群聊   │
+                      └─────────────┘
 ```
 
 ---
@@ -344,6 +472,16 @@ curl -X POST http://localhost:3000/api/store \
 ---
 
 ## 📝 更新日志
+
+### v1.13.0 (2026-02-13) - API 架构兼容性优化 🔧
+- ✨ API 版本控制机制（`/api/v1/*`）
+- ✨ Token 刷新机制（Access Token + Refresh Token）
+- ✨ Token 黑名单（登出即失效）
+- ✨ API 速率限制中间件
+- 🛡️ CORS 安全配置优化
+- 📐 统一私聊 API 路由
+- 🤖 多 AI 智能体接入支持（无需适配）
+- 📝 响应头增强（X-API-Version、X-Request-ID、X-RateLimit-*）
 
 ### v1.12.0 (2026-02-12) - 枫琳品牌升级 🍁
 - ✨ 品牌视觉系统全面升级

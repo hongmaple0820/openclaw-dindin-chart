@@ -15,6 +15,7 @@ const sessionManager = require('./session-manager');
 const messageRouter = require('./message-router');
 const messageSecurity = require('./message-security');
 const instanceAuth = require('./instance-auth');
+const { corsMiddleware, apiVersionMiddleware, requestIdMiddleware } = require('./middleware/cors');
 
 const transportManager = new TransportManager(config);
 
@@ -22,7 +23,6 @@ messageRouter.setTransportManager(transportManager);
 
 const app = express();
 
-// HTTP 压缩（gzip/brotli）
 app.use(compression({
   filter: (req, res) => {
     if (req.headers['x-no-compression']) {
@@ -30,34 +30,24 @@ app.use(compression({
     }
     return compression.filter(req, res);
   },
-  threshold: 1024 // 大于 1KB 才压缩
+  threshold: 1024
 }));
 
-// 静态文件服务 - 前端 SPA
 const webDistPath = path.resolve(__dirname, '../../chat-web/dist');
 const adminDistPath = path.resolve(__dirname, '../../chat-admin-ui/dist');
 console.log('[Server] 前端目录:', webDistPath);
 console.log('[Server] 管理后台:', adminDistPath);
 
-// 管理后台静态文件（/admin 路径）
 app.use('/admin', express.static(adminDistPath));
 app.get('/admin/*', (req, res) => {
   res.sendFile(path.join(adminDistPath, 'index.html'));
 });
 
-// 主前端静态文件
 app.use(express.static(webDistPath));
 
-// CORS 支持
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
+app.use(corsMiddleware());
+app.use(apiVersionMiddleware());
+app.use(requestIdMiddleware());
 
 app.use(express.json());
 
@@ -1634,6 +1624,12 @@ async function start() {
   const webhookRoutes = require('./routes/webhook');
   app.set('messageStore', messageStore);
   app.use('/api/webhook', webhookRoutes);
+
+  const apiV1Routes = require('./routes/api-v1');
+  app.use('/api/v1', apiV1Routes);
+
+  app.use('/api/v1/dm', dmRoutes);
+  app.use('/api/v1/sessions', sessionRoutes);
 
   sessionManager.init();
   instanceAuth.init();

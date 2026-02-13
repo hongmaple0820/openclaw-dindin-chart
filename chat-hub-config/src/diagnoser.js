@@ -82,6 +82,35 @@ class Diagnoser {
         this.addResult('feature', 'pass', '所有功能可用', 'info', null);
       }
     }
+
+    // 检查新的配置项
+    if (config.cors) {
+      this.addResult('config', 'pass', 'CORS 配置已启用', 'info', null);
+      if (config.cors.origins) {
+        this.addResult('config', 'info', `CORS Origins: ${config.cors.origins.join(', ')}`, 'info', null);
+      }
+    } else {
+      this.addResult('config', 'warning', 'CORS 配置未启用', 'low', '添加 CORS 配置以优化跨域支持');
+    }
+
+    if (config.rateLimit) {
+      if (config.rateLimit.enabled) {
+        this.addResult('config', 'pass', 'API 速率限制已启用', 'info', null);
+        if (config.rateLimit.maxRequests) {
+          this.addResult('config', 'info', `速率限制: ${config.rateLimit.maxRequests}次/分钟`, 'info', null);
+        }
+      } else {
+        this.addResult('config', 'warning', 'API 速率限制已禁用', 'medium', '生产环境建议启用速率限制');
+      }
+    } else {
+      this.addResult('config', 'warning', '速率限制配置未启用', 'low', '添加 rateLimit 配置以防止 API 滥用');
+    }
+
+    if (config.auth) {
+      this.addResult('config', 'pass', '认证配置已启用', 'info', null);
+    } else {
+      this.addResult('config', 'warning', '认证配置未启用', 'low', '添加 auth 配置以增强安全性');
+    }
   }
 
   async checkServiceStatus() {
