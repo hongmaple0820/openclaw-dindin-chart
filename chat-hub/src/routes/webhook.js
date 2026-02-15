@@ -5,6 +5,36 @@
 
 const express = require('express');
 const router = express.Router();
+const config = require('../config');
+
+// 获取用户映射
+function getUserMapping() {
+  const userMap = {};
+  if (config.userPhones) {
+    // 反向映射：从真实姓名到用户名
+    Object.entries(config.userPhones).forEach(([username, realName]) => {
+      userMap[realName] = username;
+    });
+  }
+  return userMap;
+}
+
+/**
+ * 转换发送者名称
+ * @param {string} sender - 原始发送者名称（可能包含真实姓名）
+ * @returns {string} 转换后的发送者名称（使用配置的用户名）
+ */
+function resolveSenderName(sender) {
+  const userMap = getUserMapping();
+  
+  // 如果在映射中找到，使用映射的用户名
+  if (userMap[sender]) {
+    return userMap[sender];
+  }
+  
+  // 否则保持原样
+  return sender;
+}
 
 /**
  * POST /api/webhook/dingtalk
@@ -30,6 +60,9 @@ router.post('/dingtalk', async (req, res) => {
       });
     }
 
+    // 转换发送者名称，保护隐私
+    const resolvedSender = resolveSenderName(sender);
+
     // 获取 message-store 实例
     const messageStore = req.app.get('messageStore');
     if (!messageStore) {
@@ -44,7 +77,7 @@ router.post('/dingtalk', async (req, res) => {
     const message = {
       id: messageId || `webhook-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'human',
-      sender,
+      sender: resolvedSender,
       content,
       timestamp: timestamp || Date.now(),
       source: 'dingtalk-webhook',
@@ -54,7 +87,7 @@ router.post('/dingtalk', async (req, res) => {
 
     await messageStore.addMessage(message);
 
-    console.log(`[webhook/dingtalk] Message stored: ${sender} -> ${content.substring(0, 50)}...`);
+    console.log(`[webhook/dingtalk] Message stored: ${resolvedSender} -> ${content.substring(0, 50)}...`);
 
     res.json({
       success: true,
