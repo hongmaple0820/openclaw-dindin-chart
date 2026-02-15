@@ -6,7 +6,7 @@ echo "  chat-hub 快速测试"
 echo "========================================="
 echo ""
 
-BASE_URL="http://localhost:3000"
+BASE_URL="http://localhost:8273"
 
 # 颜色定义
 GREEN='\033[0;32m'

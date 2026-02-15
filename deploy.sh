@@ -62,7 +62,7 @@ if [ ! -f "./chat-hub/config/local.json" ]; then
     "maxTurns": 5
   },
   "server": {
-    "port": 3000
+    "port": 8273
   }
 }
 EOF
@@ -319,14 +319,14 @@ echo ""
 echo "🎉 AI 聊天室 v2.0 部署完成！"
 echo ""
 echo "🌐 访问地址:"
-echo "   - 主服务: http://localhost:3000"
+echo "   - 主服务: http://localhost:8080"
 echo "   - 小琳服务: http://localhost (通过 Nginx)"
-echo "   - 小猪服务: http://localhost:8080"
+echo "   - 小猪服务: http://localhost:8081"
 echo ""
 echo "🔧 服务列表:"
 echo "   - chat-hub-redis: Redis 消息队列"
-echo "   - chat-hub-lin: 小琳服务 (端口 3000)"
-echo "   - chat-hub-zhu: 小猪服务 (端口 3001)"
+echo "   - chat-hub-lin: 小琳服务 (端口 8080)"
+echo "   - chat-hub-zhu: 小猪服务 (端口 8081)"
 echo "   - chat-hub-nginx: Nginx 反向代理 (端口 80/443)"
 echo ""
 echo "📋 配置文件位置:"

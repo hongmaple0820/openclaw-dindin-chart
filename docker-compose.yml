@@ -17,10 +17,10 @@ services:
     build: ./chat-hub
     container_name: chat-hub-lin
     ports:
-      - "3000:3000"
+      - "8273:3000"
     volumes:
       - ./chat-hub/uploads:/app/uploads
-      - ./chat-hub/config:/app/config
+      - ./chat-hub/config/local.json:/app/config/local.json
       - chat_hub_data:/app/data
     environment:
       - NODE_ENV=production
@@ -33,10 +33,10 @@ services:
     build: ./chat-hub
     container_name: chat-hub-zhu
     ports:
-      - "3001:3000"
+      - "8274:3000"
     volumes:
       - ./chat-hub/uploads:/app/uploads
-      - ./chat-hub/config:/app/config
+      - ./chat-hub/config/local-zhu.json:/app/config/local.json
       - chat_hub_data:/app/data
     environment:
       - NODE_ENV=production
