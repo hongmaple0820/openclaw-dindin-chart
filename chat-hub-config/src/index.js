@@ -4,6 +4,7 @@ const { runDiagnose } = require('./diagnoser');
 const { runBackup, runRestore } = require('./backup');
 const { runRepair } = require('./repair');
 const { runStart, runStop, runRestart, runStatus, runLogs } = require('./runner');
+const { runBotList, runBotAdd, runBotUpdate, runBotDelete, runBotTest } = require('./bot-manager');
 
 const COMMANDS = {
   check: {
@@ -60,6 +61,31 @@ const COMMANDS = {
     description: '查看服务日志',
     usage: 'openclaw skill chat-hub-config logs [--lines <n>]',
     fn: runLogs
+  },
+  bots: {
+    description: '列出所有 Bot',
+    usage: 'openclaw skill chat-hub-config bots [--list]',
+    fn: runBotList
+  },
+  'bot-add': {
+    description: '添加新 Bot',
+    usage: 'openclaw skill chat-hub-config bot-add <name> <webhookUrl> [--secret <secret>] [--default]',
+    fn: runBotAdd
+  },
+  'bot-update': {
+    description: '更新 Bot 配置',
+    usage: 'openclaw skill chat-hub-config bot-update <id> [--webhook <url>] [--secret <secret>]',
+    fn: runBotUpdate
+  },
+  'bot-delete': {
+    description: '删除 Bot',
+    usage: 'openclaw skill chat-hub-config bot-delete <id>',
+    fn: runBotDelete
+  },
+  'bot-test': {
+    description: '测试 Bot webhook',
+    usage: 'openclaw skill chat-hub-config bot-test <id>',
+    fn: runBotTest
   }
 };
 
@@ -105,6 +131,13 @@ function showHelp() {
     setup      启动交互式配置向导
     diagnose   运行系统诊断并生成报告
 
+  Bot 管理:
+    bots       列出所有 Bot
+    bot-add    添加新 Bot
+    bot-update 更新 Bot 配置
+    bot-delete 删除 Bot
+    bot-test   测试 Bot webhook
+
   备份恢复:
     backup     备份当前配置
     restore    从备份恢复配置
@@ -124,6 +157,11 @@ function showHelp() {
   # 首次配置
   openclaw skill chat-hub-config check
   openclaw skill chat-hub-config setup
+
+  # Bot 管理
+  openclaw skill chat-hub-config bots
+  openclaw skill chat-hub-config bot-add 小琳 https://oapi.dingtalk.com/robot/send?access_token=xxx --secret SECxxx --default
+  openclaw skill chat-hub-config bot-test <bot-id>
 
   # 问题排查
   openclaw skill chat-hub-config diagnose
