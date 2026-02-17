@@ -240,8 +240,10 @@ class ConfigWizard {
     console.log('\n--- 机器人配置 ---');
 
     const currentName = this.config.bot?.name || 'Bot';
+    const currentMultiBot = this.config.bot?.multiBot || false;
 
     console.log(`\n当前机器人名称: ${currentName}`);
+    console.log(`当前多 Bot 模式: ${currentMultiBot ? '已启用' : '未启用'}`);
 
     const name = await this.question('请输入机器人名称 (直接回车使用当前值): ');
     if (name.trim()) {
@@ -250,6 +252,14 @@ class ConfigWizard {
     } else if (!this.config.bot?.name) {
       this.config.bot = this.config.bot || {};
       this.config.bot.name = 'Bot';
+    }
+
+    const enableMultiBot = await this.question('\n是否启用多 Bot 模式? (y/N): ');
+    if (enableMultiBot.toLowerCase() === 'y') {
+      this.config.bot = this.config.bot || {};
+      this.config.bot.multiBot = true;
+      console.log('  ✓ 多 Bot 模式已启用');
+      console.log('  💡 提示: 可通过 API 管理多个 Bot: GET /api/v1/bots');
     }
 
     console.log('  ✓ 机器人配置已更新');

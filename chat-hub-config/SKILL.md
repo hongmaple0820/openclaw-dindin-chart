@@ -355,6 +355,81 @@ openclaw skill chat-hub-config update --version 1.2.0
 
 > **注意**: `dingtalk.webhookBase` 和 `dingtalk.secret` 为可选配置。不配置时系统仍可运行，但第三方集成功能将受限。
 
+## 多 Bot 独立配置
+
+### 概述
+
+系统支持多 Bot 独立 webhook 配置，每个 Bot 可以有自己独立的钉钉群和 webhook。
+
+### Bot 管理 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/bots` | 获取所有 Bot |
+| GET | `/api/v1/bots/:id` | 获取单个 Bot |
+| POST | `/api/v1/bots` | 创建 Bot |
+| PUT | `/api/v1/bots/:id` | 更新 Bot |
+| DELETE | `/api/v1/bots/:id` | 删除 Bot |
+| POST | `/api/v1/bots/:id/test` | 测试发送 |
+| POST | `/api/v1/bots/:id/send` | 发送消息 |
+| POST | `/api/v1/bots/route-test` | 测试路由 |
+
+### 创建 Bot
+
+```bash
+# 创建 Bot
+curl -X POST http://localhost:3000/api/v1/bots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "小琳",
+    "displayName": "小琳 AI",
+    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
+    "webhookSecret": "SECxxx",
+    "isDefault": true
+  }'
+```
+
+### Webhook 配置模式
+
+| 模式 | webhookSecret | webhookToken | 说明 |
+|------|---------------|--------------|------|
+| 加签名 | ✅ | ❌ | 使用 SEC 密钥签名 |
+| 仅Token | ❌ | ✅ | 仅使用 access_token |
+| URL内置 | ❌ | ❌ | Token 已在 URL 中 |
+
+### 智能路由
+
+系统自动根据消息内容路由到对应 Bot：
+
+```
+1. @目标匹配 → @小琳 → 小琳 Bot (conf: 1.0)
+2. 名字提及 → "问小琳" → 小琳 Bot (conf: 0.8)
+3. 上下文延续 → 追问 → 上一个 Bot (conf: 0.6)
+4. 默认 → 无匹配 → 默认 Bot (conf: 0.5)
+```
+
+### 测试路由
+
+```bash
+# 测试消息路由
+curl -X POST http://localhost:3000/api/v1/bots/route-test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "问一下小琳怎么看这个问题"
+  }'
+```
+
+### 配置示例
+
+```json
+{
+  "bot": {
+    "name": "Bot",
+    "multiBot": true
+  }
+}
+```
+
 ## 功能权限控制
 
 ### 概述
@@ -585,5 +660,5 @@ if (config.dingtalk.enabled && (!config.dingtalk.webhookBase || !config.dingtalk
 
 ---
 
-**版本**: 1.1.0
-**最后更新**: 2026-02-14
+**版本**: 1.2.0
+**最后更新**: 2026-02-17

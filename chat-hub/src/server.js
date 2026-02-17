@@ -15,6 +15,7 @@ const sessionManager = require('./session-manager');
 const messageRouter = require('./message-router');
 const messageSecurity = require('./message-security');
 const instanceAuth = require('./instance-auth');
+const botManager = require('./bot-manager');
 const { corsMiddleware, apiVersionMiddleware, requestIdMiddleware } = require('./middleware/cors');
 
 const transportManager = new TransportManager(config);
@@ -294,12 +295,18 @@ app.post('/api/send', async (req, res) => {
     // 发布到 Redis（通知其他机器人）
     await transportManager.send(message, config.channels.messages);
     
-    // 检查 webhook 是否配置，如果已配置则发送到钉钉
-    if (permissions.isWebhookConfigured()) {
+    // 智能路由：根据消息内容决定发送到哪个 Bot
+    const routeResult = botManager.resolveBot(message);
+    if (routeResult && routeResult.bot) {
+      console.log(`[Server] 智能路由: ${routeResult.reason} -> ${routeResult.bot.displayName}`);
+      const dingtalkContent = `${sender}：${content}`;
+      await botManager.send(routeResult.bot, dingtalkContent, sender, parsedAtTargets);
+    } else if (permissions.isWebhookConfigured()) {
+      // 回退到原有的全局 webhook
       const dingtalkContent = `${sender}：${content}`;
       await dingtalk.sendText(dingtalkContent);
     } else {
-      console.log('[Server] Webhook 未配置，跳过发送到钉钉');
+      console.log('[Server] 无匹配 Bot 且 webhook 未配置，跳过发送到钉钉');
     }
     
     console.log('[Server] Web 消息已发送:', sender, '->', content.substring(0, 50));

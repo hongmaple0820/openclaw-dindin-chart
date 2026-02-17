@@ -410,6 +410,29 @@ class ConfigChecker {
     }
   }
 
+  async checkBotConfig() {
+    const config = this.loadConfig();
+
+    if (!config.bot) {
+      this.warnings.push({
+        type: 'warning',
+        category: 'bot',
+        message: '缺少 bot 配置',
+        severity: 'low',
+        solution: '在 local.json 中添加 bot 配置'
+      });
+      return;
+    }
+
+    if (config.bot.name) {
+      this.passed.push(`✓ 机器人名称: ${config.bot.name}`);
+    }
+
+    if (config.bot.multiBot === true) {
+      this.passed.push('✓ 多 Bot 模式已启用');
+    }
+  }
+
   loadConfig() {
     try {
       const defaultPath = path.join(CONFIG_PATH, 'default.json');

@@ -7,6 +7,7 @@ const dmHandler = require('../dm-handler');
 const sessionManager = require('../session-manager');
 const messageRouter = require('../message-router');
 const sseManager = require('../sse-manager');
+const botManager = require('../bot-manager');
 const { v4: uuidv4 } = require('uuid');
 
 function parseAtMentions(content) {
@@ -304,6 +305,138 @@ router.get('/stats', (req, res) => {
     const stats = messageStore.getStats();
     res.json({ success: true, stats });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.get('/bots', (req, res) => {
+  try {
+    const bots = botManager.listBots();
+    res.json({ success: true, bots });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.get('/bots/:id', (req, res) => {
+  try {
+    const bot = botManager.getBot(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot 不存在', code: 'NOT_FOUND' });
+    }
+    res.json({ success: true, bot });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.post('/bots', async (req, res) => {
+  try {
+    const { username, displayName, webhookBase, webhookSecret, webhookToken, webhookEnabled, isDefault, replyEnabled } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'username 不能为空', code: 'INVALID_INPUT' });
+    }
+    
+    const bot = botManager.createBot({
+      username,
+      displayName,
+      webhookBase,
+      webhookSecret,
+      webhookToken,
+      webhookEnabled,
+      isDefault,
+      replyEnabled
+    });
+    
+    res.json({ success: true, bot });
+  } catch (error) {
+    if (error.message.includes('UNIQUE constraint')) {
+      return res.status(400).json({ success: false, error: '用户名已存在', code: 'DUPLICATE' });
+    }
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.put('/bots/:id', async (req, res) => {
+  try {
+    const bot = botManager.updateBot(req.params.id, req.body);
+    res.json({ success: true, bot });
+  } catch (error) {
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({ success: false, error: error.message, code: 'NOT_FOUND' });
+    }
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.delete('/bots/:id', (req, res) => {
+  try {
+    botManager.deleteBot(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({ success: false, error: error.message, code: 'NOT_FOUND' });
+    }
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.post('/bots/:id/test', async (req, res) => {
+  try {
+    const result = await botManager.testBot(req.params.id);
+    res.json({ success: true, result });
+  } catch (error) {
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({ success: false, error: error.message, code: 'NOT_FOUND' });
+    }
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.post('/bots/route-test', (req, res) => {
+  try {
+    const { content, context } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content 不能为空', code: 'INVALID_INPUT' });
+    }
+    
+    const result = botManager.resolveBot({ content }, context || {});
+    
+    if (!result) {
+      return res.json({ success: true, matched: false, message: '无匹配的 Bot' });
+    }
+    
+    res.json({
+      success: true,
+      matched: true,
+      bot: {
+        id: result.bot.id,
+        username: result.bot.username,
+        displayName: result.bot.displayName
+      },
+      reason: result.reason,
+      confidence: result.confidence
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
+  }
+});
+
+router.post('/bots/:id/send', async (req, res) => {
+  try {
+    const { content, sender, atTargets } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content 不能为空', code: 'INVALID_INPUT' });
+    }
+    
+    const result = await botManager.sendToBot(req.params.id, content, sender, atTargets);
+    res.json({ success: true, result });
+  } catch (error) {
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({ success: false, error: error.message, code: 'NOT_FOUND' });
+    }
     res.status(500).json({ success: false, error: error.message, code: 'INTERNAL_ERROR' });
   }
 });

@@ -62,6 +62,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_blacklist_expires ON token_blacklist(expires_at);
 `);
 
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN webhook_base TEXT`);
+  db.exec(`ALTER TABLE users ADD COLUMN webhook_secret TEXT`);
+  db.exec(`ALTER TABLE users ADD COLUMN webhook_token TEXT`);
+  db.exec(`ALTER TABLE users ADD COLUMN webhook_enabled INTEGER DEFAULT 1`);
+  db.exec(`ALTER TABLE users ADD COLUMN is_default INTEGER DEFAULT 0`);
+  db.exec(`ALTER TABLE users ADD COLUMN reply_enabled INTEGER DEFAULT 1`);
+  console.log('[Auth] users 表已扩展 webhook 字段');
+} catch (e) {
+  if (e.message.includes('duplicate column')) {
+    console.log('[Auth] users 表 webhook 字段已存在');
+  } else {
+    console.log('[Auth] 扩展字段:', e.message);
+  }
+}
+
 // 确保有管理员账号
 const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 if (!adminExists) {
