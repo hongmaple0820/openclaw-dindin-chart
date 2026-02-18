@@ -1,0 +1,22 @@
+{
+  "server": {
+    "port": 8273
+  },
+  "dingtalk": {
+    "enabled": true,
+    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN_HERE",
+    "secret": "YOUR_SECRET_HERE"
+  },
+  "bot": {
+    "name": "小熊"
+  },
+  "redis": {
+    "enabled": true,
+    "host": "47.96.248.176",
+    "port": 6379,
+    "password": "YOUR_REDIS_PASSWORD"
+  },
+  "userPhones": {
+    "朱志鸿": "maple"
+  }
+}
