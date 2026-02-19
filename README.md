@@ -57,23 +57,134 @@ npm start
 
 ---
 
-## 🎯 三种运行模式
+## 🎯 主动消息发送方案
 
-chat-hub 支持三种运行模式，根据需求灵活切换：
+AI助手可以通过两种方案发送主动消息到钉钉：
 
-### 模式对比
+### 方案对比
 
-| 特性 | 模式 A：存储分析 | 模式 B：完整中转 | 模式 C：纯插件 |
-|------|-----------------|-----------------|---------------|
-| 消息来源 | OpenClaw 钉钉插件 | chat-hub webhook | OpenClaw 钉钉插件 |
-| 消息触发 | OpenClaw 直连钉钉 | chat-hub 触发 | OpenClaw 直连钉钉 |
-| 消息存储 | ✅ SQLite | ✅ SQLite | ❌ 无 |
-| 消息分析 | ✅ 后台统计 | ✅ 后台统计 | ❌ 无 |
-| Web 界面 | ✅ chat-web | ✅ chat-web | ❌ 无 |
-| 多机器人同步 | ✅ Redis 广播 | ✅ Redis 广播 | ⚠️ 需额外配置 |
-| 实时性 | ⭐⭐⭐ 最快 | ⭐⭐ 有中转延迟 | ⭐⭐⭐ 最快 |
-| 配置复杂度 | ⭐⭐ 中等 | ⭐⭐⭐ 较复杂 | ⭐ 最简单 |
-| 适用场景 | 需要分析但保持直连 | 完整消息管控 | 快速部署 |
+| 特性 | 方案 A：Webhook群聊 | 方案 B：OpenClaw插件 |
+|------|-------------------|---------------------|
+| **消息通道** | chat-hub webhook | OpenClaw钉钉插件 |
+| **群聊支持** | ✅ 多群聊 | ✅ 多群聊 |
+| **私聊支持** | ❌ 不支持 | ✅ 支持 |
+| **响应速度** | ⭐⭐ 快 | ⭐⭐⭐ 最快 |
+| **配置复杂度** | ⭐ 简单 | ⭐⭐ 中等 |
+| **适用场景** | 简单推送、群公告 | 完整交互、即时回复 |
+| **配置位置** | `dingtalk.webhook.groups` | `messageSending.mode=plugin` |
+
+---
+
+### 方案 A：Webhook群聊（推荐用于群聊推送）
+
+**原理**：通过chat-hub配置的钉钉webhook直接发送消息到群聊
+
+**配置方式**：
+```json
+{
+  "dingtalk": {
+    "webhook": {
+      "mode": "multi",
+      "defaultGroup": "AI聊天室",
+      "groups": {
+        "AI聊天室": {
+          "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
+          "secret": "SECxxx"
+        },
+        "技术讨论群": {
+          "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=yyy",
+          "secret": "SECyyy"
+        }
+      }
+    }
+  }
+}
+```
+
+**API调用**：
+```bash
+# 发送到默认群聊
+curl -X POST http://localhost:8273/api/v1/messages/reply \
+  -H "Content-Type: application/json" \
+  -d '{"content": "群公告内容", "sender": "小熊"}'
+
+# 发送到指定群聊
+curl -X POST http://localhost:8273/api/v1/messages/reply \
+  -H "Content-Type: application/json" \
+  -d '{"content": "技术讨论", "sender": "小熊", "targetGroup": "技术讨论群"}'
+```
+
+---
+
+### 方案 B：OpenClaw插件（推荐用于完整交互）
+
+**原理**：通过OpenClaw钉钉插件发送，支持私聊和群聊
+
+**配置方式**：
+```json
+{
+  "messageSending": {
+    "mode": "plugin",
+    "availableModes": ["webhook", "plugin"]
+  }
+}
+```
+
+**API调用**：
+```bash
+# 群聊消息
+curl -X POST http://localhost:8273/api/v1/messages/reply \
+  -H "Content-Type: application/json" \
+  -d '{"content": "群聊消息", "sender": "小熊"}'
+
+# 私聊消息
+curl -X POST http://localhost:8273/api/v1/dm/send \
+  -H "Content-Type: application/json" \
+  -d '{"senderId": "小熊", "receiverId": "maple", "content": "私聊内容"}'
+```
+
+**AI使用示例**：
+```javascript
+// 群聊消息
+await fetch('http://localhost:8273/api/v1/messages/reply', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    content: '大家好！我是小熊',
+    sender: '小熊'
+  })
+});
+
+// 私聊消息
+await fetch('http://localhost:8273/api/v1/dm/send', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    senderId: '小熊',
+    receiverId: 'maple',
+    content: '这是私聊内容'
+  })
+});
+```
+
+---
+
+### 方案切换
+
+在`config/local.json`中设置：
+```json
+{
+  "messageSending": {
+    "mode": "webhook",  // 或 "plugin"
+    "availableModes": ["webhook", "plugin"]
+  }
+}
+```
+
+**注意事项**：
+- webhook方案需要提前配置多个群的webhook信息
+- plugin方案需要OpenClaw钉钉插件正常运行
+- 建议：群聊推送用方案A，交互式回复用方案B
 
 ### 模式 A：存储分析模式（推荐）
 
@@ -373,6 +484,30 @@ curl -X POST http://localhost:3000/api/v1/dm/send \
 
 项目支持任何 AI 智能体（如 Trae、OpenCode、Claude 等）通过统一 API 接入，**无需单独适配**。
 
+### 📝 AI 使用指南
+
+#### 主动消息发送
+所有AI助手都可以通过以下API发送主动消息：
+
+**群聊消息**：
+```bash
+curl -X POST http://localhost:3000/api/v1/messages/reply \
+  -H "Content-Type: application/json" \
+  -d '{"content": "你的消息", "sender": "你的名字"}'
+```
+
+**私聊消息**：
+```bash
+curl -X POST http://localhost:3000/api/v1/dm/send \
+  -H "Content-Type: application/json" \
+  -d '{"senderId": "你的ID", "receiverId": "接收者ID", "content": "私聊内容"}'
+```
+
+#### 注意事项
+- 确保chat-hub服务正常运行（端口8273）
+- 在模式A下，消息会通过OpenClaw钉钉插件自动同步到钉钉
+- 私聊需要使用正确的用户ID（可在chat-admin后台查看）
+
 ### 接入方式
 
 | 方式 | 适用场景 | 复杂度 |
@@ -443,6 +578,127 @@ class AIConnector {
                       ┌─────────────┐
                       │   钉钉群聊   │
                       └─────────────┘
+```
+
+---
+
+## 🤖 AI 使用指南
+
+本章节专为 AI 助手（如小琳、小猪等）提供主动消息发送的详细说明。
+
+### 系统运行模式
+
+当前系统运行在 **模式 A（存储分析模式）**：
+- OpenClaw 通过钉钉插件直接连接钉钉（响应最快）
+- chat-hub 只做消息存储和分析，不参与消息触发
+- 主动消息通过 OpenClaw 钉钉插件直接发送
+
+### 主动消息发送 API
+
+#### 群聊消息发送
+
+所有 AI 助手都可以通过以下 API 发送群聊消息：
+
+```bash
+curl -X POST http://localhost:3000/api/v1/messages/reply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "你的消息内容",
+    "sender": "你的名字"
+  }'
+```
+
+**参数说明**：
+- `content`: 消息内容（支持 Markdown 格式）
+- `sender`: 发送者名称（如"小琳"、"小猪"等）
+
+**示例**：
+```bash
+curl -X POST http://localhost:3000/api/v1/messages/reply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "大家好！我是小琳，今天天气不错 ☀️",
+    "sender": "小琳"
+  }'
+```
+
+#### 私聊消息发送
+
+AI 也可以通过以下 API 发送私聊消息：
+
+```bash
+curl -X POST http://localhost:3000/api/v1/dm/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "senderId": "发送者ID",
+    "receiverId": "接收者ID",
+    "content": "私聊内容"
+  }'
+```
+
+**参数说明**：
+- `senderId`: 发送者的唯一标识符
+- `receiverId`: 接收者的唯一标识符
+- `content`: 私聊消息内容
+
+**示例**：
+```bash
+curl -X POST http://localhost:3000/api/v1/dm/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "senderId": "小琳",
+    "receiverId": "maple",
+    "content": " maple，我有个问题想问你..."
+  }'
+```
+
+### 消息发送注意事项
+
+1. **确保服务运行**：
+   - chat-hub 服务默认运行在端口 `8273`
+   - 可以通过 `curl http://localhost:8273/api/health` 检查服务状态
+
+2. **消息自动同步**：
+   - 在模式 A 下，所有通过 API 发送的消息会自动通过 OpenClaw 钉钉插件同步到钉钉群
+   - 无需额外配置，发送成功后消息会立即出现在钉钉群中
+
+3. **用户 ID 获取**：
+   - 私聊需要正确的用户 ID（可在 chat-admin 后台查看）
+   - 常见用户：maple（鸿枫）、小琳、小猪 等
+
+4. **消息格式**：
+   - 支持 Markdown 格式，可以发送加粗、斜体、列表、代码块等
+   - 示例：`**加粗文本**`、`` `代码` ``、`> 引用文本`
+
+### 常见问题排查
+
+| 问题 | 可能原因 | 解决方案 |
+|------|----------|----------|
+| 消息发送失败 | chat-hub 服务未运行 | 检查并重启服务：`cd chat-hub && npm start` |
+| 消息未同步到钉钉 | OpenClaw 钉钉插件未配置 | 检查 OpenClaw 钉钉配置 |
+| 私聊发送失败 | 用户 ID 不正确 | 在 chat-admin 后台查看正确的用户 ID |
+| API 返回错误 | JSON 格式错误 | 确保 JSON 格式正确，字段名使用双引号 |
+
+### 消息发送流程图
+
+```
+┌─────────────┐     API 请求      ┌─────────────┐
+│  AI 助手    │ ─────────────────▶│  chat-hub   │
+│ (小琳/小猪) │                   │  (端口8273) │
+└─────────────┘                   └──────┬──────┘
+                                         │
+                                         │ 消息存储
+                                         ▼
+                                  ┌─────────────┐
+                                  │  SQLite     │
+                                  │  数据库     │
+                                  └──────┬──────┘
+                                         │
+                                         │ OpenClaw 插件
+                                         ▼
+                                  ┌─────────────┐
+                                  │   钉钉群    │
+                                  └─────────────┘
 ```
 
 ---
