@@ -50,7 +50,29 @@ async function main() {
   console.log(`  - 数据分析: ${config.features?.analytics !== false ? '✓' : '✗'}`);
   console.log(`  - Redis 同步: ${config.features?.redis !== false && config.redis?.enabled !== false ? '✓' : '✗'}`);
   console.log(`  - OpenClaw 触发: ${triggerEnabled ? (smartMode ? '✓ 智能模式' : '✓ 基础模式') : '✗'}`);
-  console.log(`  - 钉钉 Webhook: ${config.dingtalk?.enabled !== false && config.dingtalk?.webhookBase ? '✓' : '✗'}`);
+  
+  // 显示钉钉 webhook 信息
+  const webhookInfo = [];
+  if (config.dingtalk?.enabled !== false && config.dingtalk?.webhooks) {
+    const webhooks = Object.keys(config.dingtalk.webhooks);
+    if (webhooks.length > 0) {
+      webhookInfo.push(`✓ 多 Webhook (${webhooks.length}个)`);
+      webhookInfo.push(`  默认: ${config.dingtalk.defaultWebhook || 'primary'}`);
+      if (webhooks.length <= 3) {
+        webhookInfo.push(`  列表: ${webhooks.join(', ')}`);
+      }
+    } else {
+      webhookInfo.push('✗ 无配置');
+    }
+  } else {
+    webhookInfo.push('✗ 已禁用');
+  }
+  
+  console.log(`  - 钉钉 Webhook: ${webhookInfo[0]}`);
+  for (let i = 1; i < webhookInfo.length; i++) {
+    console.log(`                   ${webhookInfo[i]}`);
+  }
+  
   console.log(`  - 使用统计: ${analytics.enabled ? '✓' : '✗'}`);
   console.log('========================================\n');
 
@@ -101,7 +123,6 @@ async function main() {
         await trigger.start();
         console.log('[Trigger] OpenClaw 触发器已启动');
       }
-      console.log('[Trigger] OpenClaw 触发器已启动');
     } else {
       console.log('[Trigger] OpenClaw 触发器未启用（模式 A：存储分析）');
     }

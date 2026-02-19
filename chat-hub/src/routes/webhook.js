@@ -46,12 +46,13 @@ function resolveSenderName(sender) {
  *   "content": "消息内容",
  *   "conversationId": "会话ID（可选）",
  *   "messageId": "消息ID（可选）",
- *   "timestamp": 1234567890（可选）
+ *   "timestamp": 1234567890（可选）,
+ *   "webhook": "webhook名称（可选，默认使用默认webhook）"
  * }
  */
 router.post('/dingtalk', async (req, res) => {
   try {
-    const { sender, content, conversationId, messageId, timestamp } = req.body;
+    const { sender, content, conversationId, messageId, timestamp, webhook } = req.body;
 
     if (!sender || !content) {
       return res.status(400).json({
@@ -81,25 +82,100 @@ router.post('/dingtalk', async (req, res) => {
       content,
       timestamp: timestamp || Date.now(),
       source: 'dingtalk-webhook',
+      webhook: webhook || config.dingtalk.defaultWebhook || 'primary',
       atTargets: null,
       replyTo: null
     };
 
     await messageStore.addMessage(message);
 
-    console.log(`[webhook/dingtalk] Message stored: ${resolvedSender} -> ${content.substring(0, 50)}...`);
+    console.log(`[webhook/dingtalk] Message stored: ${resolvedSender} -> ${content.substring(0, 50)}... (webhook: ${message.webhook})`);
 
     res.json({
       success: true,
       message: {
         id: message.id,
         sender: message.sender,
+        webhook: message.webhook,
         timestamp: message.timestamp
       }
     });
 
   } catch (error) {
     console.error('[webhook/dingtalk] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/webhook/dingtalk/:webhookName
+ * 接收指定 webhook 的钉钉消息
+ */
+router.post('/dingtalk/:webhookName', async (req, res) => {
+  try {
+    const webhookName = req.params.webhookName;
+    const { sender, content, conversationId, messageId, timestamp } = req.body;
+
+    if (!sender || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: sender, content'
+      });
+    }
+
+    // 验证 webhook 是否存在
+    if (!config.dingtalk.webhooks || !config.dingtalk.webhooks[webhookName]) {
+      return res.status(404).json({
+        success: false,
+        error: `Webhook not found: ${webhookName}`
+      });
+    }
+
+    // 转换发送者名称，保护隐私
+    const resolvedSender = resolveSenderName(sender);
+
+    // 获取 message-store 实例
+    const messageStore = req.app.get('messageStore');
+    if (!messageStore) {
+      console.error('[webhook/dingtalk] message-store not available');
+      return res.status(500).json({
+        success: false,
+        error: 'Message store not initialized'
+      });
+    }
+
+    // 存储消息
+    const message = {
+      id: messageId || `webhook-${webhookName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: 'human',
+      sender: resolvedSender,
+      content,
+      timestamp: timestamp || Date.now(),
+      source: 'dingtalk-webhook',
+      webhook: webhookName,
+      atTargets: null,
+      replyTo: null
+    };
+
+    await messageStore.addMessage(message);
+
+    console.log(`[webhook/dingtalk/${webhookName}] Message stored: ${resolvedSender} -> ${content.substring(0, 50)}...`);
+
+    res.json({
+      success: true,
+      message: {
+        id: message.id,
+        sender: message.sender,
+        webhook: message.webhook,
+        timestamp: message.timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error(`[webhook/dingtalk/${req.params.webhookName}] Error:`, error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -116,7 +192,26 @@ router.get('/dingtalk/health', (req, res) => {
     success: true,
     service: 'dingtalk-webhook',
     status: 'ok',
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    availableWebhooks: Object.keys(config.dingtalk.webhooks || {})
+  });
+});
+
+/**
+ * GET /api/webhook/dingtalk/config
+ * 获取 webhook 配置信息（不包含敏感信息）
+ */
+router.get('/dingtalk/config', (req, res) => {
+  const webhookNames = Object.keys(config.dingtalk.webhooks || {});
+  const webhookInfo = webhookNames.map(name => ({
+    name,
+    default: name === (config.dingtalk.defaultWebhook || 'primary')
+  }));
+  
+  res.json({
+    success: true,
+    defaultWebhook: config.dingtalk.defaultWebhook || 'primary',
+    webhooks: webhookInfo
   });
 });
 

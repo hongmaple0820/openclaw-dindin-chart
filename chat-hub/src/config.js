@@ -47,8 +47,17 @@ function loadConfig() {
     console.log(`{
   "bot": { "name": "你的机器人名" },
   "dingtalk": {
-    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=你的token",
-    "secret": "你的密钥"
+    "webhooks": {
+      "primary": {
+        "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=你的token",
+        "secret": "你的密钥"
+      },
+      "secondary": {
+        "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=另一个token",
+        "secret": "另一个密钥"
+      }
+    },
+    "defaultWebhook": "primary"
   }
 }`);
   }
@@ -80,6 +89,34 @@ if (config.redis && !config.transport) {
 // 如果 transport.redis 存在但没有 enabled 字段，默认启用
 if (config.transport?.redis && config.transport.redis.enabled === undefined) {
   config.transport.redis.enabled = true;
+}
+
+// ========== 钉钉 webhook 配置迁移 ==========
+// 如果存在旧的 dingtalk 配置（单个 webhook），自动迁移到新的多 webhook 格式
+if (config.dingtalk && 
+    (config.dingtalk.webhookBase || config.dingtalk.secret) && 
+    !config.dingtalk.webhooks) {
+  console.log('[Config] 检测到旧版钉钉 webhook 配置，自动迁移到多 webhook 格式');
+  config.dingtalk.webhooks = {
+    primary: {
+      webhookBase: config.dingtalk.webhookBase || '',
+      secret: config.dingtalk.secret || ''
+    }
+  };
+  config.dingtalk.defaultWebhook = 'primary';
+  
+  // 清理旧的配置字段
+  delete config.dingtalk.webhookBase;
+  delete config.dingtalk.secret;
+}
+
+// 如果 webhooks 存在但没有 defaultWebhook，设置默认值
+if (config.dingtalk?.webhooks && !config.dingtalk.defaultWebhook) {
+  const webhookNames = Object.keys(config.dingtalk.webhooks);
+  if (webhookNames.length > 0) {
+    config.dingtalk.defaultWebhook = webhookNames[0];
+    console.log(`[Config] 自动设置默认 webhook: ${config.dingtalk.defaultWebhook}`);
+  }
 }
 
 module.exports = config;

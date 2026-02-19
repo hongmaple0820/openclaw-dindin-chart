@@ -1,22 +1,28 @@
 {
-  "server": {
-    "port": 8273
+  "bot": {
+    "name": "小琳"
   },
   "dingtalk": {
     "enabled": true,
-    "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN_HERE",
-    "secret": "YOUR_SECRET_HERE"
-  },
-  "bot": {
-    "name": "小熊"
-  },
-  "redis": {
-    "enabled": true,
-    "host": "47.96.248.176",
-    "port": 6379,
-    "password": "YOUR_REDIS_PASSWORD"
+    "defaultWebhook": "xiaolin",
+    "webhooks": {
+      "xiaolin": {
+        "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=your-xiaolin-token",
+        "secret": "your-xiaolin-secret"
+      },
+      "xiaozhu": {
+        "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=your-xiaozhu-token",
+        "secret": "your-xiaozhu-secret"
+      },
+      "maple": {
+        "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=your-maple-token",
+        "secret": "your-maple-secret"
+      }
+    }
   },
   "userPhones": {
-    "朱志鸿": "maple"
+    "maple": "鸿枫",
+    "lin": "小琳",
+    "zhu": "小猪"
   }
 }

@@ -30,8 +30,13 @@
   
   "dingtalk": {
     "enabled": true,
-    "webhookBase": "",
-    "secret": ""
+    "defaultWebhook": "primary",
+    "webhooks": {
+      "primary": {
+        "webhookBase": "",
+        "secret": ""
+      }
+    }
   },
   
   "trigger": {

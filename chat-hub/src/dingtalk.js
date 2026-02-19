@@ -20,12 +20,8 @@ let sendQueue = Promise.resolve();
 const MIN_SEND_INTERVAL = 1000; // 最小发送间隔 1 秒
 let lastSendTime = 0;
 
-// 频率限制
-const RATE_LIMIT = {
-  maxPerMinute: 20, // 每分钟最多 20 条
-  window: 60000, // 1 分钟
-  records: [], // 发送记录
-};
+// 频率限制（按 webhook 分组）
+const RATE_LIMIT = new Map();
 
 // 重试配置
 const RETRY_CONFIG = {
@@ -33,6 +29,22 @@ const RETRY_CONFIG = {
   retryDelay: 1000, // 1s
   retryDelayMultiplier: 2, // 指数退避
 };
+
+/**
+ * 获取指定 webhook 的配置
+ */
+function getWebhookConfig(webhookName = null) {
+  const name = webhookName || config.dingtalk.defaultWebhook || 'primary';
+  
+  if (!config.dingtalk.webhooks || !config.dingtalk.webhooks[name]) {
+    throw new Error(`钉钉 webhook 配置不存在: ${name}`);
+  }
+  
+  return {
+    name,
+    ...config.dingtalk.webhooks[name]
+  };
+}
 
 /**
  * 生成钉钉签名
@@ -45,25 +57,36 @@ function generateSign(secret, timestamp) {
 }
 
 /**
- * 检查频率限制
+ * 检查频率限制（按 webhook 分组）
  */
-function checkRateLimit() {
+function checkRateLimit(webhookName) {
   const now = Date.now();
+  const key = webhookName || 'default';
+  
+  if (!RATE_LIMIT.has(key)) {
+    RATE_LIMIT.set(key, {
+      maxPerMinute: 20, // 每分钟最多 20 条
+      window: 60000, // 1 分钟
+      records: [], // 发送记录
+    });
+  }
+  
+  const limit = RATE_LIMIT.get(key);
   
   // 清理过期记录
-  RATE_LIMIT.records = RATE_LIMIT.records.filter(
-    time => now - time < RATE_LIMIT.window
+  limit.records = limit.records.filter(
+    time => now - time < limit.window
   );
   
   // 检查是否超限
-  if (RATE_LIMIT.records.length >= RATE_LIMIT.maxPerMinute) {
-    const oldestRecord = RATE_LIMIT.records[0];
-    const waitTime = RATE_LIMIT.window - (now - oldestRecord);
-    throw new Error(`频率限制：已达到每分钟 ${RATE_LIMIT.maxPerMinute} 条上限，请等待 ${Math.ceil(waitTime / 1000)}s`);
+  if (limit.records.length >= limit.maxPerMinute) {
+    const oldestRecord = limit.records[0];
+    const waitTime = limit.window - (now - oldestRecord);
+    throw new Error(`频率限制：已达到每分钟 ${limit.maxPerMinute} 条上限，请等待 ${Math.ceil(waitTime / 1000)}s`);
   }
   
   // 记录本次发送
-  RATE_LIMIT.records.push(now);
+  limit.records.push(now);
 }
 
 /**
@@ -101,23 +124,7 @@ async function requestWithRetry(url, data, retries = 0) {
  */
 async function queuedSend(sendFn) {
   sendQueue = sendQueue.then(async () => {
-    // 检查频率限制
-    try {
-      checkRateLimit();
-    } catch (error) {
-      console.error('[钉钉]', error.message);
-      throw error;
-    }
-    
-    // 限速
-    const now = Date.now();
-    const elapsed = now - lastSendTime;
-    if (elapsed < MIN_SEND_INTERVAL) {
-      await sleep(MIN_SEND_INTERVAL - elapsed);
-    }
-    
     await sendFn();
-    lastSendTime = Date.now();
   }).catch(err => {
     console.error('[钉钉] 队列发送失败:', err.message);
   });
@@ -168,12 +175,29 @@ function parseAtTargets(atTargets) {
  * @param {string} content - 消息内容
  * @param {string} sender - 发送者名称
  * @param {string|string[]} atTargets - @ 目标: 'all' | 'lin' | 'maple' | ['lin', 'maple']
+ * @param {string} webhookName - webhook 名称（可选，默认使用 defaultWebhook）
  */
-async function sendText(content, sender = 'System', atTargets = null) {
+async function sendText(content, sender = 'System', atTargets = null, webhookName = null) {
   return queuedSend(async () => {
+    const webhookConfig = getWebhookConfig(webhookName);
     const timestamp = Date.now();
-    const sign = generateSign(config.dingtalk.secret, timestamp);
-    const url = `${config.dingtalk.webhookBase}&timestamp=${timestamp}&sign=${sign}`;
+    const sign = generateSign(webhookConfig.secret, timestamp);
+    const url = `${webhookConfig.webhookBase}&timestamp=${timestamp}&sign=${sign}`;
+
+    // 检查频率限制
+    try {
+      checkRateLimit(webhookConfig.name);
+    } catch (error) {
+      console.error('[钉钉]', error.message);
+      throw error;
+    }
+    
+    // 限速
+    const now = Date.now();
+    const elapsed = now - lastSendTime;
+    if (elapsed < MIN_SEND_INTERVAL) {
+      await sleep(MIN_SEND_INTERVAL - elapsed);
+    }
 
     // 解析 @ 目标
     const { atMobiles, isAtAll, atText } = parseAtTargets(atTargets);
@@ -195,20 +219,21 @@ async function sendText(content, sender = 'System', atTargets = null) {
       }
     };
 
-    console.log('[钉钉] 发送文本:', content.substring(0, 50));
+    console.log(`[钉钉-${webhookConfig.name}] 发送文本:`, content.substring(0, 50));
 
     try {
       const response = await requestWithRetry(url, data);
-      console.log('[钉钉] 发送成功:', sender, '->', content.substring(0, 50));
+      console.log(`[钉钉-${webhookConfig.name}] 发送成功:`, sender, '->', content.substring(0, 50));
       if (atMobiles.length > 0) {
-        console.log('[钉钉] @用户:', atMobiles.join(', '));
+        console.log(`[钉钉-${webhookConfig.name}] @用户:`, atMobiles.join(', '));
       }
       if (isAtAll) {
-        console.log('[钉钉] @所有人');
+        console.log(`[钉钉-${webhookConfig.name}] @所有人`);
       }
+      lastSendTime = Date.now();
       return response.data;
     } catch (error) {
-      console.error('[钉钉] 发送失败:', error.message);
+      console.error(`[钉钉-${webhookConfig.name}] 发送失败:`, error.message);
       throw error;
     }
   });
@@ -220,12 +245,29 @@ async function sendText(content, sender = 'System', atTargets = null) {
  * @param {string} text - Markdown 内容
  * @param {string} sender - 发送者名称
  * @param {string|string[]} atTargets - @ 目标
+ * @param {string} webhookName - webhook 名称（可选）
  */
-async function sendMarkdown(title, text, sender = 'System', atTargets = null) {
+async function sendMarkdown(title, text, sender = 'System', atTargets = null, webhookName = null) {
   return queuedSend(async () => {
+    const webhookConfig = getWebhookConfig(webhookName);
     const timestamp = Date.now();
-    const sign = generateSign(config.dingtalk.secret, timestamp);
-    const url = `${config.dingtalk.webhookBase}&timestamp=${timestamp}&sign=${sign}`;
+    const sign = generateSign(webhookConfig.secret, timestamp);
+    const url = `${webhookConfig.webhookBase}&timestamp=${timestamp}&sign=${sign}`;
+
+    // 检查频率限制
+    try {
+      checkRateLimit(webhookConfig.name);
+    } catch (error) {
+      console.error('[钉钉]', error.message);
+      throw error;
+    }
+    
+    // 限速
+    const now = Date.now();
+    const elapsed = now - lastSendTime;
+    if (elapsed < MIN_SEND_INTERVAL) {
+      await sleep(MIN_SEND_INTERVAL - elapsed);
+    }
 
     // 解析 @ 目标
     const { atMobiles, isAtAll, atText } = parseAtTargets(atTargets);
@@ -243,16 +285,36 @@ async function sendMarkdown(title, text, sender = 'System', atTargets = null) {
     };
 
     try {
-      const res = await axios.post(url, body, { timeout: 10000 });
-      if (res.data.errcode !== 0) {
-        console.error('[钉钉] Markdown 发送失败:', res.data);
-      }
+      const res = await requestWithRetry(url, body);
+      console.log(`[钉钉-${webhookConfig.name}] Markdown 发送成功:`, title);
+      lastSendTime = Date.now();
       return res.data;
     } catch (error) {
-      console.error('[钉钉] 请求失败:', error.message);
+      console.error(`[钉钉-${webhookConfig.name}] Markdown 发送失败:`, error.message);
       throw error;
     }
   });
+}
+
+/**
+ * 获取所有可用的 webhook 名称
+ */
+function getAvailableWebhooks() {
+  if (!config.dingtalk.webhooks) {
+    return [];
+  }
+  return Object.keys(config.dingtalk.webhooks);
+}
+
+/**
+ * 切换默认 webhook
+ */
+function setDefaultWebhook(webhookName) {
+  if (!config.dingtalk.webhooks || !config.dingtalk.webhooks[webhookName]) {
+    throw new Error(`Webhook 不存在: ${webhookName}`);
+  }
+  config.dingtalk.defaultWebhook = webhookName;
+  console.log(`[钉钉] 默认 webhook 已切换为: ${webhookName}`);
 }
 
 module.exports = { 
@@ -260,5 +322,8 @@ module.exports = {
   sendMarkdown, 
   generateSign,
   parseAtTargets,
-  getUserPhoneMap
+  getUserPhoneMap,
+  getAvailableWebhooks,
+  setDefaultWebhook,
+  getWebhookConfig
 };
