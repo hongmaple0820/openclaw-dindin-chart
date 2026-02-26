@@ -168,6 +168,63 @@ class RedisClient {
     return this.resilientClient.getStatus();
   }
 
+  /**
+   * 代理方法：GET
+   */
+  async get(key) {
+    return this.resilientClient.get(key);
+  }
+
+  /**
+   * 代理方法：SET
+   */
+  async set(key, value, ttl) {
+    return this.resilientClient.set(key, value, ttl);
+  }
+
+  /**
+   * 代理方法：SETEX
+   */
+  async setex(key, ttl, value) {
+    return this.resilientClient.set(key, value, ttl);
+  }
+
+  /**
+   * 代理方法：DEL
+   */
+  async del(...keys) {
+    if (this.resilientClient.client && !this.resilientClient.isDegraded) {
+      return this.resilientClient.client.del(...keys);
+    }
+    // 降级模式：从本地缓存删除
+    keys.forEach(key => this.resilientClient.cache.delete(key));
+    return keys.length;
+  }
+
+  /**
+   * 代理方法：KEYS
+   */
+  async keys(pattern) {
+    if (this.resilientClient.client && !this.resilientClient.isDegraded) {
+      return this.resilientClient.client.keys(pattern);
+    }
+    // 降级模式：从本地缓存匹配
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    return Array.from(this.resilientClient.cache.keys()).filter(k => regex.test(k));
+  }
+
+  /**
+   * 代理方法：FLUSHDB
+   */
+  async flushdb() {
+    if (this.resilientClient.client && !this.resilientClient.isDegraded) {
+      return this.resilientClient.client.flushdb();
+    }
+    // 降级模式：清空本地缓存
+    this.resilientClient.cache.clear();
+    return 'OK';
+  }
+
   async close() {
     logger.info('关闭 Redis 连接...');
     await this.resilientClient.disconnect();

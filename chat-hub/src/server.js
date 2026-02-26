@@ -22,6 +22,42 @@ const transportManager = new TransportManager(config);
 
 messageRouter.setTransportManager(transportManager);
 
+// ==================== 配置持久化 ====================
+
+/**
+ * 持久化配置到 local.json
+ * 只保存需要持久化的字段（groups, users, messageSending）
+ */
+function persistConfig() {
+  try {
+    const configPath = path.join(__dirname, '../config/local.json');
+    
+    // 读取现有配置
+    let existingConfig = {};
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      existingConfig = JSON.parse(content);
+    }
+    
+    // 更新需要持久化的字段
+    const updatedConfig = {
+      ...existingConfig,
+      groups: config.groups || existingConfig.groups || {},
+      users: config.users || existingConfig.users || {},
+      messageSending: config.messageSending || existingConfig.messageSending
+    };
+    
+    // 写入配置文件（格式化 JSON）
+    fs.writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), 'utf-8');
+    console.log('[Server] 配置已持久化到 local.json');
+    
+    return true;
+  } catch (error) {
+    console.error('[Server] 持久化配置失败:', error.message);
+    return false;
+  }
+}
+
 const app = express();
 
 app.use(compression({
@@ -1607,6 +1643,269 @@ app.get('/api/online-users', (req, res) => {
     res.json({ success: true, users: onlineUsers });
   } catch (error) {
     console.error('[Server] 获取在线用户失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==================== 钉钉双模式发送 API ====================
+
+/**
+ * 发送群聊消息到钉钉
+ * POST /api/dingtalk/group
+ * Body: { groupName, content, sender?, atTargets?, mode? }
+ */
+app.post('/api/dingtalk/group', async (req, res) => {
+  try {
+    const { groupName, content, sender, atTargets, mode } = req.body;
+
+    if (!groupName || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'groupName and content are required'
+      });
+    }
+
+    const result = await dingtalk.sendToGroup(groupName, content, {
+      sender: sender || config.bot?.name || 'Bot',
+      atTargets,
+      mode
+    });
+
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('[Server] 发送群聊消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 发送私聊消息到钉钉（仅插件模式）
+ * POST /api/dingtalk/user
+ * Body: { userId, content, sender?, mode? }
+ */
+app.post('/api/dingtalk/user', async (req, res) => {
+  try {
+    const { userId, content, sender, mode } = req.body;
+
+    if (!userId || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId and content are required'
+      });
+    }
+
+    const result = await dingtalk.sendToUser(userId, content, {
+      sender: sender || config.bot?.name || 'Bot',
+      mode
+    });
+
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('[Server] 发送私聊消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 获取钉钉发送配置状态
+ * GET /api/dingtalk/config
+ */
+app.get('/api/dingtalk/config', (req, res) => {
+  try {
+    const mode = dingtalk.getSendingMode();
+    const groups = config.groups || {};
+    const users = config.users || {};
+    
+    res.json({
+      success: true,
+      mode,
+      availableModes: config.messageSending?.availableModes || ['webhook'],
+      groups: Object.keys(groups).map(name => ({
+        name,
+        displayName: groups[name].name || name,
+        openConversationId: groups[name].openConversationId,
+        hasWebhook: !!groups[name].webhook,
+        registeredAt: groups[name].registeredAt
+      })),
+      users: Object.keys(users).map(id => ({
+        id,
+        displayName: users[id].displayName || id,
+        dingtalkUserId: users[id].dingtalkUserId,
+        hasPhone: !!users[id].phone,
+        registeredAt: users[id].registeredAt
+      })),
+      stats: {
+        totalGroups: Object.keys(groups).length,
+        totalUsers: Object.keys(users).length,
+        groupsWithOpenId: Object.values(groups).filter(g => g.openConversationId).length,
+        usersWithDingtalkId: Object.values(users).filter(u => u.dingtalkUserId).length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 删除群聊映射
+ * DELETE /api/dingtalk/groups/:name
+ */
+app.delete('/api/dingtalk/groups/:name', (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    if (!config.groups?.[name]) {
+      return res.status(404).json({ success: false, error: '群聊映射不存在' });
+    }
+    
+    delete config.groups[name];
+    persistConfig();
+    
+    console.log(`[Server] 删除群聊映射: ${name}`);
+    res.json({ success: true, message: `群聊 ${name} 已删除` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 删除用户映射
+ * DELETE /api/dingtalk/users/:name
+ */
+app.delete('/api/dingtalk/users/:name', (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    if (!config.users?.[name]) {
+      return res.status(404).json({ success: false, error: '用户映射不存在' });
+    }
+    
+    delete config.users[name];
+    persistConfig();
+    
+    console.log(`[Server] 删除用户映射: ${name}`);
+    res.json({ success: true, message: `用户 ${name} 已删除` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 更新群聊 ID 映射（OpenClaw 收到消息时自动调用）
+ * POST /api/dingtalk/groups/register
+ * Body: { name, openConversationId, groupName?, accountId? }
+ */
+app.post('/api/dingtalk/groups/register', (req, res) => {
+  try {
+    const { name, openConversationId, groupName, accountId } = req.body;
+
+    if (!name || !openConversationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'name and openConversationId are required'
+      });
+    }
+
+    // 初始化 groups 配置
+    if (!config.groups) config.groups = {};
+    
+    // 更新或创建群聊配置
+    const existing = config.groups[name] || {};
+    config.groups[name] = {
+      ...existing,
+      name: groupName || name,
+      openConversationId,
+      accountId: accountId || existing.accountId || 'default',
+      webhook: existing.webhook,
+      registeredAt: Date.now()
+    };
+
+    // 持久化到配置文件
+    persistConfig();
+
+    console.log(`[Server] 注册群聊映射: ${name} -> ${openConversationId}`);
+    res.json({ 
+      success: true, 
+      group: config.groups[name],
+      message: `群聊 ${name} 已注册，ID: ${openConversationId}`
+    });
+  } catch (error) {
+    console.error('[Server] 注册群聊映射失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 更新用户 ID 映射（OpenClaw 收到消息时自动调用）
+ * POST /api/dingtalk/users/register
+ * Body: { name, dingtalkUserId, displayName?, phone?, accountId? }
+ */
+app.post('/api/dingtalk/users/register', (req, res) => {
+  try {
+    const { name, dingtalkUserId, displayName, phone, accountId } = req.body;
+
+    if (!name || !dingtalkUserId) {
+      return res.status(400).json({
+        success: false,
+        error: 'name and dingtalkUserId are required'
+      });
+    }
+
+    // 初始化 users 配置
+    if (!config.users) config.users = {};
+    
+    // 更新或创建用户配置
+    const existing = config.users[name] || {};
+    config.users[name] = {
+      ...existing,
+      name,
+      displayName: displayName || existing.displayName || name,
+      dingtalkUserId,
+      phone: phone || existing.phone,
+      accountId: accountId || existing.accountId || 'default',
+      registeredAt: Date.now()
+    };
+
+    // 持久化到配置文件
+    persistConfig();
+
+    console.log(`[Server] 注册用户映射: ${name} -> ${dingtalkUserId}`);
+    res.json({ 
+      success: true, 
+      user: config.users[name],
+      message: `用户 ${name} 已注册，ID: ${dingtalkUserId}`
+    });
+  } catch (error) {
+    console.error('[Server] 注册用户映射失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * 切换发送模式
+ * POST /api/dingtalk/mode
+ * Body: { mode }
+ */
+app.post('/api/dingtalk/mode', (req, res) => {
+  try {
+    const { mode } = req.body;
+    
+    if (!['webhook', 'plugin'].includes(mode)) {
+      return res.status(400).json({
+        success: false,
+        error: 'mode must be "webhook" or "plugin"'
+      });
+    }
+    
+    config.messageSending = config.messageSending || {};
+    config.messageSending.mode = mode;
+    
+    // 持久化
+    persistConfig();
+    
+    console.log(`[Server] 钉钉发送模式已切换为: ${mode}`);
+    res.json({ success: true, mode });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });

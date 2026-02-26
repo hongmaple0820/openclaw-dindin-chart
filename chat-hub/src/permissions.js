@@ -28,9 +28,18 @@ const FEATURE_MESSAGES = {
 };
 
 function isWebhookConfigured() {
-  return config.dingtalk?.enabled !== false &&
-         config.dingtalk?.webhookBase &&
-         config.dingtalk?.secret;
+  if (config.dingtalk?.enabled === false) {
+    return false;
+  }
+  
+  // 新配置格式：支持多 webhook
+  if (config.dingtalk?.webhook?.groups) {
+    const groups = Object.values(config.dingtalk.webhook.groups);
+    return groups.some(g => g?.webhookBase && g?.secret);
+  }
+  
+  // 旧配置格式
+  return !!(config.dingtalk?.webhookBase && config.dingtalk?.secret);
 }
 
 function isFeatureEnabled(feature) {
@@ -101,12 +110,21 @@ function requireWebhook(req, res, next) {
 }
 
 function getConfigSummary() {
+  // 检查是否有新格式的 webhook 配置
+  const hasNewFormat = !!(config.dingtalk?.webhook?.groups);
+  const webhookGroups = hasNewFormat ? Object.values(config.dingtalk.webhook.groups) : [];
+  const hasGroupWebhook = webhookGroups.length > 0 && webhookGroups[0]?.webhookBase;
+  
   return {
     webhook: {
       configured: isWebhookConfigured(),
       enabled: config.dingtalk?.enabled !== false,
-      hasWebhook: !!config.dingtalk?.webhookBase,
-      hasSecret: !!config.dingtalk?.secret
+      hasWebhook: hasNewFormat ? hasGroupWebhook : !!config.dingtalk?.webhookBase,
+      hasSecret: hasNewFormat 
+        ? webhookGroups.some(g => g?.secret)
+        : !!config.dingtalk?.secret,
+      mode: hasNewFormat ? 'multi' : (config.dingtalk?.webhookBase ? 'single' : 'none'),
+      groupCount: webhookGroups.length
     },
     features: {
       dingtalkIntegration: isFeatureEnabled(FEATURES.DINGTALK_INTEGRATION),

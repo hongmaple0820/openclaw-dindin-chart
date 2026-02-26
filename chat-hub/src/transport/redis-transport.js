@@ -97,9 +97,21 @@ class RedisTransport extends Transport {
     try {
       if (!this.redisClient) return false
       
-      // 尝试 ping
-      await this.redisClient.resilientClient.ping()
-      return true
+      // 获取状态
+      const status = this.redisClient.getStatus()
+      
+      // 如果已连接且未降级，则健康
+      if (status.connected && !status.degraded) {
+        return true
+      }
+      
+      // 如果正在重连，返回 false 但不记录错误
+      if (status.connecting) {
+        return false
+      }
+      
+      // 降级模式下返回 false
+      return false
     } catch (error) {
       console.error('[RedisTransport] 健康检查失败:', error)
       return false
