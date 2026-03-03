@@ -9,6 +9,7 @@ const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
 const fileRoutes = require('./routes/files');
+const characterRoutes = require('./api/character-routes');
 const sseManager = require('./sse-manager');
 const permissions = require('./permissions');
 const sessionManager = require('./session-manager');
@@ -1933,6 +1934,7 @@ async function start() {
 
   const apiV1Routes = require('./routes/api-v1');
   app.use('/api/v1', apiV1Routes);
+  app.use('/api/character', characterRoutes);
 
   app.use('/api/v1/dm', dmRoutes);
   app.use('/api/v1/sessions', sessionRoutes);

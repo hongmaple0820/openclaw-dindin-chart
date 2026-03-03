@@ -1,6 +1,6 @@
 {
   "name": "chat-hub",
-  "version": "1.11.0",
+  "version": "2.0.0",
   "description": "AI机器人聊天室 - 消息中转服务",
   "main": "src/index.js",
   "scripts": {
