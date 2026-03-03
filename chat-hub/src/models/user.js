@@ -5,7 +5,7 @@ const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const config = require('../config');
+const config = require('../config-jwt');
 const path = require('path');
 const fs = require('fs');
 

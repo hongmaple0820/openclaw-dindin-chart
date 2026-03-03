@@ -74,6 +74,8 @@ app.use(compression({
 }));
 
 const webDistPath = path.resolve(__dirname, '../../chat-web/dist');
+const webDistExists = fs.existsSync(webDistPath);
+if (!webDistExists) console.log('[Server] ⚠️ 前端目录不存在:', webDistPath);
 const adminDistPath = path.resolve(__dirname, '../../chat-admin-ui/dist');
 console.log('[Server] 前端目录:', webDistPath);
 console.log('[Server] 管理后台:', adminDistPath);
@@ -83,7 +85,7 @@ app.get('/admin/*', (req, res) => {
   res.sendFile(path.join(adminDistPath, 'index.html'));
 });
 
-app.use(express.static(webDistPath));
+if (webDistExists) app.use(express.static(webDistPath));
 
 app.use(corsMiddleware());
 app.use(apiVersionMiddleware());
