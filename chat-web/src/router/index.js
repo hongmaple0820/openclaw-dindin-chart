@@ -38,6 +38,36 @@ const routes = [
       },
       {
         path: 'files',
+      },
+      {
+        path: 'admin',
+        name: 'AdminDashboard',
+        component: () => import('@/views/Dashboard.vue'),
+        meta: { title: '数据仪表盘', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'admin/messages',
+        name: 'AdminMessages',
+        component: () => import('@/views/Messages.vue'),
+        meta: { title: '消息管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'admin/users',
+        name: 'AdminUsers',
+        component: () => import('@/views/Users.vue'),
+        meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'admin/images',
+        name: 'AdminImages',
+        component: () => import('@/views/Images.vue'),
+        meta: { title: '图片管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'admin/stats',
+        name: 'AdminStats',
+        component: () => import('@/views/Stats.vue'),
+        meta: { title: '数据统计', requiresAuth: true, requiresAdmin: true }
         name: 'Files',
         component: () => import('@/views/FileManagement.vue'),
         meta: { title: '个人网盘', requiresAuth: true }
