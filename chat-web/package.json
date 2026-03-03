@@ -1,16 +1,21 @@
 {
   "name": "chat-web",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "description": "枫琳 - 人机共生智能协作平台",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "@vueuse/core": "^14.2.0",
     "axios": "^1.13.4",
     "dompurify": "^3.3.1",
@@ -21,6 +26,7 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.10.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "vite": "^7.2.4"
   }

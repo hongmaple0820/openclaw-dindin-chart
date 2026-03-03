@@ -1,0 +1,19 @@
+[package]
+name = "chat-web"
+version = "2.0.0"
+description = "枫琳聊天室 - 人机共生智能协作平台"
+authors = ["maple"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
