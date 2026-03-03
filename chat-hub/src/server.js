@@ -1932,6 +1932,14 @@ async function start() {
   const adminRoutes = require('./routes/admin')(messageStore, messageStore.db);
   app.use('/api/admin', adminRoutes);
 
+  // 超级管理员路由
+  const superAdminRoutes = require('./routes/super-admin');
+  // 设置 app.locals 以便路由访问
+  app.locals.messageStore = messageStore;
+  app.locals.sessionManager = sessionManager;
+  app.use('/api/super-admin', superAdminRoutes);
+  app.use('/api/admin', adminRoutes);
+
   const webhookRoutes = require('./routes/webhook');
   app.set('messageStore', messageStore);
   app.use('/api/webhook', webhookRoutes);
