@@ -585,5 +585,3 @@ function formatDate(timestamp) {
     height: 50%;
     padding: 16px;
   }
-}
-</style>

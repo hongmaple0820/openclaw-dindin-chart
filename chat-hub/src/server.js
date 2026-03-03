@@ -1950,6 +1950,10 @@ async function start() {
   app.use('/api/notifications', notificationRoutes);
   app.use('/api', notificationRoutes); // 置顶 API 挂在 /api 下
 
+  // 项目群系统路由
+  const projectRoutes = require('./routes/projects');
+  app.use('/api/projects', projectRoutes);
+
   sessionManager.init();
   instanceAuth.init();
   instanceAuth.startHeartbeat();

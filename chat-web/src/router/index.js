@@ -96,6 +96,37 @@ const routes = [
         name: 'GroupSettings',
         component: () => import('@/views/GroupSettings.vue'),
         meta: { title: '群设置', requiresAuth: true }
+      },
+      // 项目群相关路由
+      {
+        path: 'projects',
+        name: 'Projects',
+        component: () => import('@/views/Projects.vue'),
+        meta: { title: '项目群', requiresAuth: true }
+      },
+      {
+        path: 'projects/create',
+        name: 'CreateProject',
+        component: () => import('@/views/CreateProject.vue'),
+        meta: { title: '创建项目', requiresAuth: true }
+      },
+      {
+        path: 'projects/:id',
+        name: 'ProjectDetail',
+        component: () => import('@/views/ProjectDetail.vue'),
+        meta: { title: '项目详情', requiresAuth: true }
+      },
+      {
+        path: 'projects/:id/tasks',
+        name: 'ProjectTasks',
+        component: () => import('@/views/ProjectTasks.vue'),
+        meta: { title: '任务看板', requiresAuth: true }
+      },
+      {
+        path: 'projects/:id/skills',
+        name: 'ProjectSkills',
+        component: () => import('@/views/ProjectSkills.vue'),
+        meta: { title: '技能管理', requiresAuth: true }
       }
     ]
   },

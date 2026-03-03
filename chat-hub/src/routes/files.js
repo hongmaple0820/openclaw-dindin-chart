@@ -3,7 +3,7 @@
  */
 
 const express = require('express');
-const FileStorage = require('../api/file-storage');
+const { FileStorage } = require('../api/file-storage');
 const router = express.Router();
 
 // 初始化文件存储
