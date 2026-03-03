@@ -1954,11 +1954,19 @@ async function start() {
   const projectRoutes = require('./routes/projects');
   app.use('/api/projects', projectRoutes);
 
-  // 邮箱通道路由
+// 邮箱通道路由
   const emailRoutes = require('./routes/email');
+
+  // 企业微信通道路由
+  const wecomRoutes = require('./routes/wecom');
+  app.use('/api/wecom', wecomRoutes);
   app.use('/api/email', emailRoutes);
 
-  sessionManager.init();
+  // 权限系统路由
+  const permissionRoutes = require('./routes/permissions');
+  app.use('/api', permissionRoutes);
+
+  sessionManager.init()
   instanceAuth.init();
   instanceAuth.startHeartbeat();
 

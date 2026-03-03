@@ -1,0 +1,83 @@
+name: feishu-channel
+version: 1.0.0
+category: channel
+description: 飞书通道插件，支持发送和接收飞书消息
+
+capabilities:
+  - send_message
+  - receive_message
+  - send_image
+  - receive_image
+  - send_card
+  - send_file
+
+config:
+  app_id:
+    type: string
+    required: true
+    description: 飞书应用ID
+  app_secret:
+    type: password
+    required: true
+    description: 飞书应用Secret
+  encrypt_key:
+    type: string
+    description: 加密Key（可选，用于消息加密）
+  verification_token:
+    type: string
+    description: 验证Token（可选，用于消息验证）
+  webhook_url:
+    type: string
+    description: 自定义 Webhook URL（可选）
+
+usage:
+  scope: [private, group]
+  scenarios:
+    - 发送飞书消息
+    - 接收飞书消息
+    - 发送消息卡片
+    - 群聊消息同步
+    - 私聊消息同步
+
+api:
+  base_path: /api/feishu
+  endpoints:
+    - path: /init
+      method: POST
+      description: 初始化飞书插件
+      admin: true
+    - path: /send
+      method: POST
+      description: 发送消息
+      params:
+        receive_id: 接收者ID（用户ID或群ID）
+        msg_type: 消息类型（text/post/image/card）
+        content: 消息内容
+        receive_id_type: 接收者类型（open_id/user_id/union_id/chat_id）
+    - path: /webhook
+      method: POST
+      description: 接收飞书事件回调
+    - path: /test
+      method: GET
+      description: 测试连接
+      admin: true
+    - path: /card
+      method: POST
+      description: 发送消息卡片
+    - path: /status
+      method: GET
+      description: 获取插件状态
+
+examples:
+  - name: 初始化并发送消息
+    code: |
+      # 初始化
+      curl -X POST http://localhost:3000/api/feishu/init \
+        -H "Content-Type: application/json" \
+        -H "X-Admin-Key: admin123" \
+        -d '{"app_id": "cli_xxx", "app_secret": "xxx"}'
+      
+      # 发送文本消息
+      curl -X POST http://localhost:3000/api/feishu/send \
+        -H "Content-Type: application/json" \
+        -d '{"receive_id": "ou_xxx", "msg_type": "text", "content": "Hello!"}'

@@ -1,0 +1,120 @@
+name: wecom-channel
+version: 1.0.0
+category: channel
+description: 企业微信通道插件，支持发送和接收企业微信消息
+
+capabilities:
+  - send_message
+  - receive_message
+  - send_image
+  - receive_image
+  - send_file
+
+config:
+  corp_id:
+    type: string
+    required: true
+    description: 企业ID
+  agent_id:
+    type: string
+    required: true
+    description: 应用AgentId
+  secret:
+    type: password
+    required: true
+    description: 应用Secret
+  token:
+    type: string
+    description: 回调Token（可选，用于消息加密）
+  encoding_aes_key:
+    type: string
+    description: 回调加密Key（可选，43位字符）
+
+usage:
+  scope: [private, group]
+  scenarios:
+    - 发送企业微信消息
+    - 接收企业微信消息
+    - 群聊消息同步
+    - 企业通知推送
+    - 审批提醒
+
+api:
+  base_path: /api/wecom
+  endpoints:
+    - path: /init
+      method: POST
+      description: 初始化企业微信插件
+      admin: true
+    - path: /send
+      method: POST
+      description: 发送消息
+      params:
+        to_user: 接收用户ID（touser）
+        to_party: 接收部门ID（toparty）
+        to_tag: 接收标签ID（totag）
+        msgtype: 消息类型（text/image/file等）
+        content: 消息内容
+    - path: /send-text
+      method: POST
+      description: 发送文本消息
+    - path: /send-image
+      method: POST
+      description: 发送图片消息
+    - path: /send-file
+      method: POST
+      description: 发送文件消息
+    - path: /webhook
+      method: POST
+      description: 接收消息回调
+    - path: /test
+      method: GET
+      description: 测试连接
+      admin: true
+    - path: /token
+      method: GET
+      description: 获取access_token（调试用）
+      admin: true
+    - path: /status
+      method: GET
+      description: 获取插件状态
+
+examples:
+  - name: 初始化并发送消息
+    code: |
+      # 初始化
+      curl -X POST http://localhost:3000/api/wecom/init \
+        -H "Content-Type: application/json" \
+        -H "X-Admin-Key: admin123" \
+        -d '{
+          "corp_id": "your_corp_id",
+          "agent_id": "1000001",
+          "secret": "your_secret"
+        }'
+      
+      # 发送文本消息
+      curl -X POST http://localhost:3000/api/wecom/send-text \
+        -H "Content-Type: application/json" \
+        -H "X-User-Id: user1" \
+        -d '{
+          "to_user": "zhangsan",
+          "content": "这是一条测试消息"
+        }'
+
+notes: |
+  ## 企业微信 API 说明
+  
+  ### 获取 access_token
+  - URL: https://qyapi.weixin.qq.com/cgi-bin/gettoken
+  - 参数: corpid, corpsecret
+  - 有效期: 2小时（7200秒）
+  - 建议: 缓存 token，过期前自动刷新
+  
+  ### 发送应用消息
+  - URL: https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=ACCESS_TOKEN
+  - 支持消息类型: text, image, voice, video, file, textcard, news, mpnews, markdown
+  
+  ### 消息加解密
+  - 使用 AES-256-CBC 加密
+  - 需要 Token 和 EncodingAESKey
+  - 回调消息需要解密验证
