@@ -1,0 +1,31 @@
+name: dingtalk-channel
+version: 1.0.0
+category: channel
+description: 钉钉通道插件，支持群聊消息推送和接收
+
+capabilities:
+  - send_message
+  - receive_message
+  - send_markdown
+  - send_link
+  - send_action_card
+
+config:
+  webhooks:
+    type: object
+    required: true
+    description: Webhook 配置列表
+  userPhones:
+    type: object
+    description: 用户手机号映射（用于 @ 提醒）
+  replyMode:
+    type: string
+    default: text
+    description: 回复模式 (text/markdown)
+
+usage:
+  scope: [group]
+  scenarios:
+    - 发送群消息
+    - 发送 Markdown 消息
+    - @ 提醒群成员
