@@ -1,0 +1,41 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
+      "path": "pages/chat/index",
+      "style": {
+        "navigationBarTitleText": "协作空间",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/character/index",
+      "style": {
+        "navigationBarTitleText": "角色管理"
+      }
+    },
+    {
+      "path": "pages/character/detail",
+      "style": {
+        "navigationBarTitleText": "角色详情"
+      }
+    },
+    {
+      "path": "pages/character/create",
+      "style": {
+        "navigationBarTitleText": "创建角色"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "chat-mobile",
+    "navigationBarBackgroundColor": "#667eea",
+    "backgroundColor": "#f5f5f5"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "chat-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:mp-weixin": "uni dev:mp-weixin",
+    "build:mp-weixin": "uni build:mp-weixin",
+    "dev:h5": "uni dev:h5",
+    "build:h5": "uni build:h5"
+  },
+  "dependencies": {
+    "@dcloudio/uni-components": "^3.0.0-alpha-3000020210521001",
+    "axios": "^1.6.8",
+    "dompurify": "^3.0.9",
+    "marked": "^12.0.1",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.8",
+    "@dcloudio/uni-automator": "3.0.0-4010520240507001",
+    "@dcloudio/uni-cli-shared": "3.0.0-4010520240507001",
+    "@dcloudio/uni-stacktracey": "3.0.0-4010520240507001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-4010520240507001",
+    "sass": "^1.72.0",
+    "typescript": "^5.4.2",
+    "vite": "^5.2.0"
+  }
+}

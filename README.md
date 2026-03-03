@@ -275,7 +275,15 @@ openclaw-dindin-chart/
 │   │   ├── default.json   # 默认配置
 │   │   └── local.json     # 本地配置（git忽略）
 │   └── README.md
-├── chat-web/              # 前端：聊天界面
+├── chat-web/              # 前端：Web 聊天界面
+├── chat-mobile/           # 前端：移动端聊天应用（uni-app）
+│   ├── src/
+│   │   ├── pages/         # 页面组件
+│   │   ├── components/    # 通用组件
+│   │   ├── stores/        # Pinia 状态管理
+│   │   └── utils/         # 工具函数
+│   ├── public/            # 静态资源
+│   └── vite.config.ts     # Vite 配置
 ├── chat-admin-api/        # 后台：管理 API
 ├── chat-admin-ui/         # 后台：管理界面
 └── docs/
