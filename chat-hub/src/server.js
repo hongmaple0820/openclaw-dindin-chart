@@ -25,6 +25,25 @@ const transportManager = new TransportManager(config);
 
 messageRouter.setTransportManager(transportManager);
 
+// 主动触发器 - 早安/晚安/随机消息
+const ProactiveTrigger = require('./character/proactive-trigger');
+const proactiveTrigger = new ProactiveTrigger({
+  enabled: true,
+  timeTriggers: {
+    morning: {
+      enabled: true,
+      timeRange: ['07:00', '09:00'],
+      messages: ['早安~ 昨晚睡得好吗？', '早上好呀！新的一天开始了~', '早安！记得吃早餐哦~']
+    },
+    evening: {
+      enabled: true,
+      timeRange: ['22:00', '23:00'],
+      messages: ['晚安~ 今天辛苦了', '早点休息哦，熬夜对身体不好~', '晚安！好梦~']
+    }
+  },
+  randomTrigger: { enabled: false }
+});
+
 // ==================== 配置持久化 ====================
 
 /**
@@ -1972,11 +1991,37 @@ async function start() {
 
   // 权限系统路由
   const permissionRoutes = require('./routes/permissions');
+  // 媒体生成路由
+  const mediaRoutes = require('./routes/media');
+  app.use('/api/media', mediaRoutes);
+
   app.use('/api', permissionRoutes);
 
   sessionManager.init()
   instanceAuth.init();
   instanceAuth.startHeartbeat();
+
+  // ==================== 主动触发器启动 ====================
+  const { initProactiveTrigger } = require('./proactive-init');
+  
+  initProactiveTrigger({
+    messageSender: async (message, options) => {
+      console.log('[ProactiveTrigger] 发送主动消息:', message);
+      await dingtalk.sendText(message, myBotName, null);
+      const proactiveMessage = {
+        id: uuidv4(),
+        type: 'bot',
+        sender: myBotName,
+        content: message,
+        timestamp: Date.now(),
+        source: 'proactive',
+        triggerType: options?.triggerType
+      };
+      messageStore.addMessage(proactiveMessage);
+      await transportManager.send(proactiveMessage, config.channels.messages);
+    },
+    redisClient: transportManager.redisClient
+  });
 
   await transportManager.connect();
   console.log(`[Server] 传输层已连接:`, transportManager.getStatus());

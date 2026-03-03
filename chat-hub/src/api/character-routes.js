@@ -1,6 +1,6 @@
 /**
  * 角色系统 API 路由
- * 包含角色管理、关系管理、记忆管理、主动触发等 API
+ * 包含角色管理、关系管理、记忆管理、主动触发、情绪检测等 API
  */
 
 const express = require('express');
@@ -8,10 +8,12 @@ const router = express.Router();
 const CharacterManager = require('../character/character-manager');
 const RelationshipManager = require('../character/relationship-manager');
 const MemoryManager = require('../character/memory-manager');
+const EmotionDetector = require('../character/emotion-detector');
 
 // 实例化管理器
 const relationshipManager = new RelationshipManager();
 const memoryManager = new MemoryManager();
+const emotionDetector = new EmotionDetector({ threshold: 1, verbose: false });
 
 // ==================== 参数验证工具 ====================
 
@@ -518,6 +520,157 @@ router.get('/memories/:characterId/stats', (req, res) => {
     res.json({ success: true, stats });
   } catch (error) {
     handleError(res, error, '获取记忆统计');
+  }
+});
+
+// ==================== 情绪检测 API ====================
+
+/**
+ * 分析文本情绪
+ * POST /api/emotion/analyze
+ * Body: { text }
+ */
+router.post('/emotion/analyze', (req, res) => {
+  try {
+    const { text } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ success: false, error: 'text 是必需参数' });
+    }
+    
+    const result = emotionDetector.analyze(text);
+    
+    console.log(`[Character API] 情绪分析: "${text.substring(0, 30)}..." -> ${result.emotionName} (${result.score})`);
+    
+    res.json({ success: true, result });
+  } catch (error) {
+    handleError(res, error, '情绪分析');
+  }
+});
+
+/**
+ * 批量情绪分析
+ * POST /api/emotion/analyze-batch
+ * Body: { texts: string[] }
+ */
+router.post('/emotion/analyze-batch', (req, res) => {
+  try {
+    const { texts } = req.body;
+    
+    if (!texts || !Array.isArray(texts)) {
+      return res.status(400).json({ success: false, error: 'texts 数组是必需参数' });
+    }
+    
+    const results = emotionDetector.analyzeBatch(texts);
+    
+    console.log(`[Character API] 批量情绪分析: ${texts.length} 条文本`);
+    
+    res.json({ 
+      success: true, 
+      count: results.length,
+      results 
+    });
+  } catch (error) {
+    handleError(res, error, '批量情绪分析');
+  }
+});
+
+/**
+ * 获取情绪分析统计
+ * GET /api/emotion/stats
+ */
+router.get('/emotion/stats', (req, res) => {
+  try {
+    const stats = emotionDetector.getStats();
+    
+    res.json({ success: true, stats });
+  } catch (error) {
+    handleError(res, error, '获取情绪统计');
+  }
+});
+
+/**
+ * 重置情绪分析统计
+ * POST /api/emotion/stats/reset
+ */
+router.post('/emotion/stats/reset', (req, res) => {
+  try {
+    emotionDetector.resetStats();
+    
+    console.log('[Character API] 情绪统计已重置');
+    
+    res.json({ success: true, message: '情绪统计已重置' });
+  } catch (error) {
+    handleError(res, error, '重置情绪统计');
+  }
+});
+
+/**
+ * 获取情绪关键词词典
+ * GET /api/emotion/keywords
+ * Query: emotion (可选，指定情绪类型)
+ */
+router.get('/emotion/keywords', (req, res) => {
+  try {
+    const { emotion } = req.query;
+    const keywords = emotionDetector.getKeywords(emotion || null);
+    
+    res.json({ 
+      success: true, 
+      emotions: Object.keys(keywords),
+      keywords 
+    });
+  } catch (error) {
+    handleError(res, error, '获取情绪关键词');
+  }
+});
+
+/**
+ * 添加自定义情绪关键词
+ * POST /api/emotion/keywords
+ * Body: { emotion, keyword, weight? }
+ */
+router.post('/emotion/keywords', (req, res) => {
+  try {
+    const { emotion, keyword, weight = 1 } = req.body;
+    
+    if (!emotion || !keyword) {
+      return res.status(400).json({ success: false, error: 'emotion 和 keyword 是必需参数' });
+    }
+    
+    emotionDetector.addKeyword(emotion, keyword, weight);
+    
+    console.log(`[Character API] 添加情绪关键词: ${emotion} -> ${keyword} (${weight})`);
+    
+    res.json({ success: true, message: '关键词已添加' });
+  } catch (error) {
+    handleError(res, error, '添加情绪关键词');
+  }
+});
+
+/**
+ * 删除情绪关键词
+ * DELETE /api/emotion/keywords
+ * Body: { emotion, keyword }
+ */
+router.delete('/emotion/keywords', (req, res) => {
+  try {
+    const { emotion, keyword } = req.body;
+    
+    if (!emotion || !keyword) {
+      return res.status(400).json({ success: false, error: 'emotion 和 keyword 是必需参数' });
+    }
+    
+    const removed = emotionDetector.removeKeyword(emotion, keyword);
+    
+    if (removed) {
+      console.log(`[Character API] 删除情绪关键词: ${emotion} -> ${keyword}`);
+      res.json({ success: true, message: '关键词已删除' });
+    } else {
+      res.status(404).json({ success: false, error: '关键词不存在' });
+    }
+  } catch (error) {
+    handleError(res, error, '删除情绪关键词');
   }
 });
 
