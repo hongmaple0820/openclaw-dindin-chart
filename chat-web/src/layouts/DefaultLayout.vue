@@ -33,6 +33,24 @@
           <el-menu-item index="/">首页</el-menu-item>
           <el-menu-item index="/chat" v-if="userStore.isLoggedIn">协作空间</el-menu-item>
           <el-menu-item index="/dm" v-if="userStore.isLoggedIn">枫语私语</el-menu-item>
+          <el-menu-item index="/groups" v-if="userStore.isLoggedIn">
+            群聊
+            <el-badge 
+              v-if="groupUnreadCount > 0" 
+              :value="groupUnreadCount" 
+              :max="99"
+              class="nav-badge"
+            />
+          </el-menu-item>
+          <el-menu-item index="/friends" v-if="userStore.isLoggedIn">
+            好友
+            <el-badge 
+              v-if="pendingFriendRequests > 0" 
+              :value="pendingFriendRequests" 
+              :max="99"
+              class="nav-badge"
+            />
+          </el-menu-item>
           <el-menu-item index="/files" v-if="userStore.isLoggedIn">个人网盘</el-menu-item>
         </el-menu>
       </div>
@@ -48,6 +66,24 @@
           <el-menu-item index="/">首页</el-menu-item>
           <el-menu-item index="/chat" v-if="userStore.isLoggedIn">协作空间</el-menu-item>
           <el-menu-item index="/dm" v-if="userStore.isLoggedIn">枫语私语</el-menu-item>
+          <el-menu-item index="/groups" v-if="userStore.isLoggedIn">
+            群聊
+            <el-badge 
+              v-if="groupUnreadCount > 0" 
+              :value="groupUnreadCount" 
+              :max="99"
+              class="nav-badge"
+            />
+          </el-menu-item>
+          <el-menu-item index="/friends" v-if="userStore.isLoggedIn">
+            好友
+            <el-badge 
+              v-if="pendingFriendRequests > 0" 
+              :value="pendingFriendRequests" 
+              :max="99"
+              class="nav-badge"
+            />
+          </el-menu-item>
           <el-menu-item index="/files" v-if="userStore.isLoggedIn">个人网盘</el-menu-item>
         </el-menu>
       </div>
@@ -67,6 +103,14 @@
                 <el-dropdown-item @click="router.push('/profile')">
                   <el-icon><User /></el-icon>
                   个人中心
+                </el-dropdown-item>
+                <el-dropdown-item @click="router.push('/friends')">
+                  <el-icon><UserFilled /></el-icon>
+                  我的好友
+                </el-dropdown-item>
+                <el-dropdown-item @click="router.push('/groups')">
+                  <el-icon><ChatLineRound /></el-icon>
+                  我的群聊
                 </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">
                   <el-icon><SwitchButton /></el-icon>
@@ -100,15 +144,33 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
+import { useFriendStore } from '@/stores/friends';
+import { useGroupStore } from '@/stores/groups';
 import { ElMessage } from 'element-plus';
 
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const friendStore = useFriendStore();
+const groupStore = useGroupStore();
 const showMobileMenu = ref(false);
+
+// 好友申请数量
+const pendingFriendRequests = computed(() => friendStore.pendingRequestCount);
+
+// 群聊未读数
+const groupUnreadCount = computed(() => groupStore.totalUnread);
+
+// 初始化时获取好友申请数量和群聊列表
+onMounted(async () => {
+  if (userStore.isLoggedIn) {
+    await friendStore.fetchRequests();
+    await groupStore.fetchGroups();
+  }
+});
 
 const handleLogout = async () => {
   await userStore.logout();
@@ -211,6 +273,7 @@ const handleLogout = async () => {
   transition: all 0.3s ease;
   border-radius: 8px;
   margin: 0 4px;
+  position: relative;
 }
 
 .desktop-menu :deep(.el-menu-item:hover) {
@@ -223,6 +286,17 @@ const handleLogout = async () => {
   background: rgba(196, 30, 58, 0.1);
   font-weight: 600;
   border-bottom: 3px solid #C41E3A;
+}
+
+.nav-badge {
+  margin-left: 4px;
+}
+
+.nav-badge :deep(.el-badge__content) {
+  font-size: 10px;
+  height: 16px;
+  line-height: 16px;
+  padding: 0 5px;
 }
 
 /* 移动端菜单 */

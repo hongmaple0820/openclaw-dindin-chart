@@ -31,6 +31,12 @@ const routes = [
         meta: { title: '枫语私语', requiresAuth: true }
       },
       {
+        path: 'friends',
+        name: 'Friends',
+        component: () => import('@/views/Friends.vue'),
+        meta: { title: '好友', requiresAuth: true }
+      },
+      {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),
@@ -38,6 +44,9 @@ const routes = [
       },
       {
         path: 'files',
+        name: 'Files',
+        component: () => import('@/views/FileManagement.vue'),
+        meta: { title: '个人网盘', requiresAuth: true }
       },
       {
         path: 'admin',
@@ -68,9 +77,25 @@ const routes = [
         name: 'AdminStats',
         component: () => import('@/views/Stats.vue'),
         meta: { title: '数据统计', requiresAuth: true, requiresAdmin: true }
-        name: 'Files',
-        component: () => import('@/views/FileManagement.vue'),
-        meta: { title: '个人网盘', requiresAuth: true }
+      },
+      // 群聊相关路由
+      {
+        path: 'groups',
+        name: 'Groups',
+        component: () => import('@/views/Groups.vue'),
+        meta: { title: '群聊', requiresAuth: true }
+      },
+      {
+        path: 'groups/create',
+        name: 'CreateGroup',
+        component: () => import('@/views/CreateGroup.vue'),
+        meta: { title: '创建群聊', requiresAuth: true }
+      },
+      {
+        path: 'groups/:id/settings',
+        name: 'GroupSettings',
+        component: () => import('@/views/GroupSettings.vue'),
+        meta: { title: '群设置', requiresAuth: true }
       }
     ]
   },

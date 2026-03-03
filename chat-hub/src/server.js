@@ -1945,6 +1945,11 @@ async function start() {
   app.use('/api/v1/dm', dmRoutes);
   app.use('/api/v1/sessions', sessionRoutes);
 
+  // 通知系统路由
+  const notificationRoutes = require('./routes/notifications');
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api', notificationRoutes); // 置顶 API 挂在 /api 下
+
   sessionManager.init();
   instanceAuth.init();
   instanceAuth.startHeartbeat();
