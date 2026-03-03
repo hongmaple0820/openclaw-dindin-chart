@@ -1,0 +1,115 @@
+name: email-channel
+version: 1.0.0
+category: channel
+description: 邮箱通道插件，支持发送和接收邮件
+
+capabilities:
+  - send_email
+  - receive_email
+  - attachments
+  - html_email
+
+config:
+  smtp_host:
+    type: string
+    required: true
+    description: SMTP 服务器地址
+  smtp_port:
+    type: number
+    default: 587
+    description: SMTP 端口（587 为 TLS，465 为 SSL）
+  smtp_user:
+    type: string
+    required: true
+    description: SMTP 用户名（邮箱地址）
+  smtp_password:
+    type: password
+    required: true
+    description: SMTP 密码或授权码
+  smtp_secure:
+    type: boolean
+    default: false
+    description: 是否使用 SSL（465 端口自动启用）
+  imap_host:
+    type: string
+    description: IMAP 服务器地址（接收邮件）
+  imap_port:
+    type: number
+    default: 993
+    description: IMAP 端口
+  from:
+    type: string
+    description: 发件人地址（默认使用 smtp_user）
+
+usage:
+  scope: [private, group]
+  scenarios:
+    - 通知推送
+    - 报告发送
+    - 任务提醒
+    - 验证码发送
+    - 告警通知
+
+api:
+  base_path: /api/email
+  endpoints:
+    - path: /init
+      method: POST
+      description: 初始化邮箱插件
+      admin: true
+    - path: /send
+      method: POST
+      description: 发送邮件
+      params:
+        to: 收件人地址
+        subject: 邮件主题
+        text: 纯文本内容
+        html: HTML 内容（可选）
+        attachments: 附件列表（可选）
+    - path: /send-text
+      method: POST
+      description: 发送简单文本邮件
+    - path: /send-html
+      method: POST
+      description: 发送 HTML 邮件
+    - path: /test
+      method: GET
+      description: 测试 SMTP 连接
+      admin: true
+    - path: /status
+      method: GET
+      description: 获取插件状态
+    - path: /unread
+      method: GET
+      description: 获取未读邮件数量（需 IMAP）
+    - path: /recent
+      method: GET
+      description: 获取最近邮件（需 IMAP）
+    - path: /close
+      method: POST
+      description: 关闭连接
+      admin: true
+
+examples:
+  - name: 初始化并发送邮件
+    code: |
+      # 初始化
+      curl -X POST http://localhost:3000/api/email/init \
+        -H "Content-Type: application/json" \
+        -H "X-Admin-Key: admin123" \
+        -d '{
+          "smtp_host": "smtp.qq.com",
+          "smtp_port": 587,
+          "smtp_user": "your@qq.com",
+          "smtp_password": "your-auth-code"
+        }'
+      
+      # 发送邮件
+      curl -X POST http://localhost:3000/api/email/send \
+        -H "Content-Type: application/json" \
+        -H "X-User-Id: user1" \
+        -d '{
+          "to": "recipient@example.com",
+          "subject": "测试邮件",
+          "text": "这是一封测试邮件"
+        }'

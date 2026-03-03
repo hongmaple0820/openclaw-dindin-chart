@@ -1954,6 +1954,10 @@ async function start() {
   const projectRoutes = require('./routes/projects');
   app.use('/api/projects', projectRoutes);
 
+  // 邮箱通道路由
+  const emailRoutes = require('./routes/email');
+  app.use('/api/email', emailRoutes);
+
   sessionManager.init();
   instanceAuth.init();
   instanceAuth.startHeartbeat();

@@ -389,10 +389,3 @@ watch(() => props.projectId, loadData, { immediate: true });
   margin-top: 20px;
 }
 </style>
-
-.detail-actions {
-  margin-top: 24px;
-  display: flex;
-  gap: 8px;
-}
-</style>
