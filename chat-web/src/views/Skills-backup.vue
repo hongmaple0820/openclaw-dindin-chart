@@ -11,24 +11,23 @@
         <!-- 顶部搜索栏 -->
         <div class="sidebar-header">
           <h3>技能管理</h3>
-          <el-button type="primary" :icon="Plus" circle @click="showAddDialog = true" />
         </div>
         
         <!-- Tab 切换 -->
         <el-tabs v-model="skillStore.currentTab" @tab-change="handleTabChange">
           <el-tab-pane label="内置技能" name="built-in">
             <template #label>
-              <span>内置 <el-badge :value="skillStore.builtInSkills.length" type="primary" /></span>
+              <span>内置技能 <el-badge :value="skillStore.builtInSkills.length" /></span>
             </template>
           </el-tab-pane>
           <el-tab-pane label="我的技能" name="my">
             <template #label>
-              <span>我的 <el-badge :value="skillStore.mySkills.length" type="primary" /></span>
+              <span>我的技能 <el-badge :value="skillStore.mySkills.length" /></span>
             </template>
           </el-tab-pane>
           <el-tab-pane label="技能市场" name="market">
             <template #label>
-              <span>市场</span>
+              <span>技能市场</span>
             </template>
           </el-tab-pane>
         </el-tabs>
@@ -74,7 +73,7 @@
               v-for="skill in currentSkills"
               :key="skill.id"
               :skill="skill"
-              :is-active="urrentSkill?.id === skill.id"
+              :is-active="skillStore.currentSkill?.id === skill.id"
               @click="selectSkill(skill)"
               @toggle="handleToggleSkill"
               @install="handleInstallSkill"
@@ -93,10 +92,10 @@
             <div class="detail-info">
               <div class="detail-name">
                 {{ skillStore.currentSkill.name }}
-                <el-tag v-if="skillStore.currentSkill.installed" type="success" size="small">
+                <el-tag v-if="skillStore.currentSkill.installed" type="success">
                   已安装
                 </el-tag>
-                <el-tag v-if="!skillStore.currentSkill.enabled && skillStore.currentSkill.installed" type="warning" size="small">
+                <el-tag v-if="!skillStore.currentSkill.enabled && skillStore.currentSkill.installed" type="warning">
                   已禁用
                 </el-tag>
               </div>
@@ -108,11 +107,11 @@
           
           <el-divider />
           
-          <el-tabs v-model="activeDetailTab" class="detail-tabs">
+          <el-tabs v-model="activeDetailTab">
             <el-tab-pane label="基本信息" name="info">
               <el-descriptions :column="1" border>
                 <el-descriptions-item label="技能 ID">
-                  <code class="inline-code">{{ skillStore.currentSkill.id }}</code>
+                  {{ skillStore.currentSkill.id }}
                 </el-descriptions-item>
                 <el-descriptions-item label="版本">
                   v{{ skillStore.currentSkill.version || '1.0.0' }}
@@ -121,15 +120,10 @@
                   {{ skillStore.currentSkill.category || '未分类' }}
                 </el-descriptions-item>
                 <el-descriptions-item label="类型">
-                  <el-tag size="small" :type="getTypeTagType(skillStore.currentSkill.type)">
-                    {{ getTypeLabel(skillStore.currentSkill.type) }}
-                  </el-tag>
+                  {{ skillStore.currentSkill.type === 'built-in' ? '内置' : skillStore.currentSkill.type === 'market' ? '市场' : '自定义' }}
                 </el-descriptions-item>
                 <el-descriptions-item v-if="skillStore.currentSkill.author" label="作者">
                   {{ skillStore.currentSkill.author }}
-                </el-descriptions-item>
-                <el-descriptions-item v-if="skillStore.currSkill.downloads" label="下载量">
-                  {{ formatNumber(skillStore.currentSkill.downloads) }}
                 </el-descriptions-item>
                 <el-descriptions-item v-if="skillStore.currentSkill.installedAt" label="安装时间">
                   {{ formatDate(skillStore.currentSkill.installedAt) }}
@@ -147,59 +141,53 @@
               />
             </el-tab-pane>
             
-            <el-tab-pane label="使用示例" name="examples" v-if="skillStore.currentSkill.examples?.length">
+            <el-tab-pane label="使用示例" name="examples" v-if="skillStore.currentSkill.examples">
               <div class="examples-section">
                 <div v-for="(example, index) in skillStore.currentSkill.examples" :key="index" class="example-item">
                   <div class="example-title">{{ example.title }}</div>
                   <div class="example-desc">{{ example.description }}</div>
-                  <div class="example-command-wrapper">
-                    <code class="example-command-text">{{ example.command }}</code>
-                    <el-button
-                      text
-                      :icon="CopyDocument"
-                      @click="copyCommand(example.command)"
-                      size="small"
-                    >
-                      复制
-                    </el-button>
-                  </div>
+                  <el-input
+                    :model-value="example.command"
+                    readonly
+                    class="example-command"
+                  >
+                    <template #append>
+                      <el-bucon="CopyDocument" @click="copyCommand(example.command)">
+                        复制
+                      </el-button>
+                    </template>
+                  </el-input>
                 </div>
               </div>
             </el-tab-pane>
           </el-tabs>
-           <div class="detail-actions">
+          
+          <div class="detail-actions">
             <el-button
               v-if="!skillStore.currentSkill.installed"
               type="primary"
               :icon="Download"
               @click="handleInstallSkill(skillStore.currentSkill.id)"
-              :loading="installing"
+              :loadining"
             >
               安装技能
             </el-button>
-            <template v-else>
-              <el-button
-                type="primary"
-                :icon="skillStore.currentSkill.enabled ? SwitchButton : VideoPlay"
-                @click="handleToggleSkill(skillStore.ckill.id, !skillStore.currentSkill.enabled)"
-              >
-                {{ skillStore.currentSkill.enabled ? '禁用' : '启用' }}
-              </el-button>
-              <el-button
-                type="danger"
-                :icon="Delete"
-                @click="handleUninstallSkill"
-                :loading="uninstalling"
-              >
-                卸载
-              </el-button>
-              <el-button
-                :icon="Setting"
-                @click="activeDetailTab = 'config'"
-              >
-                配置
-              </el-button>
-            </template>
+            <el-button
+              v-else
+              type="danger"
+              :icon="Delete"
+              @click="handleUninstallSkill"
+              :loading="uninstalling"
+            >
+              卸载技能
+            </el-button>
+            <el-button
+              v-if="skillStore.currentSkill.installed"
+              :icon="Setting"
+              @click="activeDetailTab = 'config'"
+            >
+              配置
+            </el-button>
           </div>
         </template>
         
@@ -208,44 +196,19 @@
         </div>
       </div>
     </div>
-    
-    <!-- 添加技能对话框 -->
-    <el-dialog v-model="showAddDialog" title="添加自定义技能" width="500px">
-      <el-form :model="addForm" label-width="80px">
-        <el-form-item label="技能名称" required>
-          <el-input v-model="addForm.name" placeholder="输入技能名称" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="addForm.description" type="textarea" :rows="2" placeholder="技能描述" />
-        </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="addForm.category" placeholder="技能分类" />
-        </el-form-item>
-        <el-form-item label="图标">
-          <el-input v-model="addForm.icon" placeholder="emoji 图标" maxlength="4" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleAddSkill" :loading="adding">添加</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } f'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
-  Search, Loading, Download, Delete, Setting, CopyDocument,
-  Plus, SwitchButton, VideoPlay
+  Search, Loading, Download, Delete, Setting, CopyDocument
 } from '@element-plus/icons-vue';
 import { useSkillStore } from '@/stores/skills';
 import SkillCard from '@/components/SkillCard.vue';
 import SkillConfig from '@/components/SkillConfig.vue';
 
-const router = useRouter();
 const skillStore = useSkillStore();
 
 // 状态
@@ -253,15 +216,6 @@ const activeDetailTab = ref('info');
 const installing = ref(false);
 const uninstalling = ref(false);
 const configLoading = ref(false);
-const s = ref(false);
-const adding = ref(false);
-
-const addForm = ref({
-  name: '',
-  description: '',
-  category: '',
-  icon: '🔧'
-});
 
 // 计算属性
 const currentSkills = computed(() => {
@@ -316,8 +270,9 @@ async function handleToggleSkill(skillId, enabled) {
     ElMessage.error(res.error || '操作失败');
   }
 }
-技能
-async function handleInstallSkill(s{
+
+// 安装技能
+async function handleInstallSkill(skillId) {
   installing.value = true;
   try {
     const res = await skillStore.installSkill(skillId);
@@ -345,7 +300,6 @@ async function handleUninstallSkill() {
     const res = await skillStore.uninstallSkill(skillStore.currentSkill.id);
     if (res.success) {
       ElMessage.success('技能已卸载');
-      skillStore.clearSelection();
       await skillStore.fetchSkills();
     } else {
       ElMessage.error(res.error || '卸载失败');
@@ -368,7 +322,7 @@ async function handleSaveConfig(config) {
       ElMessage.error(res.error || '保存失败');
     }
   } finally {
-    configLolue = false;
+    configLoading.value = false;
   }
 }
 
@@ -377,35 +331,10 @@ function handleResetConfig() {
   ElMessage.info('配置已重置');
 }
 
-// 添加自定义技能
-async function handleAddSkill() {
-  if (!addForm.value.name.trim()) {
-    ElMessage.warning('请输入技能名称');
-    return;
-  }
-  
-  adding.value = true;
-  try {
-    const res = await skillStore.addCustomSkill(addForm.value);
-    if (res.success) {
-      ElMessage.success('技能已添加');
-      showAddDialog.value = false;
-      addForm.value = { name: '', description: '', category: '', icon: '🔧' };
-      await skillStore.fetchSkills();
-    } else {
-      ElMessage.error(res.error || '添加失败');
-    }
-  } finally {
-    adding.value = false;
-  }
-}
-
 // 复制命令
 function copyCommand(command) {
   navigator.clipboard.writeText(command).then(() => {
     ElMessage.success('已复制到剪贴板');
-  }).catch(() => {
-    ElMessage.error('复制失败');
   });
 }
 
@@ -413,36 +342,6 @@ function copyCommand(command) {
 function formatDate(timestamp) {
   if (!timestamp) return '-';
   return new Date(timestamp).toLocaleString('zh-CN');
-}
-
-// 格式化数字
-function formatNumber(num) {
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + 'w';
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k';
-  }
-  return num;
-}
-
-// 获取类型标签
-function getTypeTagType(type) {
-  const types = {
-    'built-in': 'info',
-    'market': 'success',
-    'custom': 'warning'
-  };
-  return types[type] || 'info';
-}
-
-// 获取类型标签文本
-function getTypeLabel(type) {
-  const labels = {
-    'built-in': '内置',
-    'market': '市场',
-    'custom': '自定义'
-  };
-  return labels[type] || type;
 }
 </script>
 
@@ -474,9 +373,6 @@ function getTypeLabel(type) {
   padding: 16px 20px;
   border-bottom: 1px solid #f0f0f0;
   background: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .sidebar-header h3 {
@@ -493,14 +389,6 @@ function getTypeLabel(type) {
 
 :deep(.el-tabs__header) {
   margin: 0;
-}
-
-:deep(.el-tabs__item) {
-  font-size: 13px;
-}
-
-:deep(.el-badge__content) {
-  font-size: 10px;
 }
 
 .search-wrapper {
@@ -557,7 +445,6 @@ function getTypeLabel(type) {
 
 .detail-info {
   flex: 1;
-  min-width: 0;
 }
 
 .detail-name {
@@ -567,7 +454,6 @@ function getTypeLabel(type) {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .detail-desc {
@@ -576,29 +462,10 @@ function getTypeLabel(type) {
   color: var(--fenlin-text-secondary, #5D6D7E);
 }
 
-.detail-tabs {
-  flex: 1;
-}
-
-:deep(.el-descriptions__label) {
-  width: 80px;
-  font-weight: 500;
-}
-
-.inline-code {
-  padding: 2px 8px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-}
-
 .detail-actions {
   display: flex;
   gap: 12px;
   margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
 }
 
 .detail-actions .el-button--primary {
@@ -609,53 +476,31 @@ function getTypeLabel(type) {
 .empty-detail {
   flex: 1;
   display: flex;
-  align-items: justify-content: center;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 使用示例 */
 .examples-section {
   padding: 16px 0;
 }
 
 .example-item {
   margin-bottom: 24px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
-}
-
-.example-item:last-child {
-  margin-bottom: 0;
 }
 
 .example-title {
   font-weight: 600;
   margin-bottom: 4px;
-  color: var(--fenlin-text-primary, #2C3E50);
 }
 
 .example-desc {
   font-size: 13px;
   color: var(--fenlin-text-secondary, #5D6D7E);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
-.example-command-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background: #fff;
-  bordedius: 6px;
-  border: 1px solid #e4e7ed;
-}
-
-.example-command-text {
-  flex: 1;
+.example-command {
   font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--fenlin-text-primary, #2C3E50);
-  word-break: break-all;
 }
 
 /* 移动端适配 */
@@ -670,35 +515,13 @@ function getTypeLabel(type) {
   
   .skills-sidebar {
     width: 100%;
-    height: auto;
-    max-height: 50vh;
+    height: 50%;
     border-right: none;
     border-bottom: 1px solid #f0f0f0;
   }
   
   .skill-detail {
-    height: auto;
-    min-height: 50vh;
-    padding: 16px;
-  }
-  
- e {
-    font-size: 20px;
-  }
-  
-  .skill-icon-large {
-    width: 60px;
-    height: 60px;
-    font-size: 30px;
-  }
-  
-  .detail-actions {
-    flex-wrap: wrap;
-  }
-  
-  .detail-actions .el-button {
-    flex: 1;
-    min-width: 100px;
+    height: 50%;
   }
 }
 </style>
