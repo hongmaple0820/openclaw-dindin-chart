@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  chat-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mapleclaw/chat-hub:latest
+    container_name: chat-hub
+    restart: unless-stopped
+    ports:
+      - "8273:8273"
+    environment:
+      - NODE_ENV=production
+      - PORT=8273
+      - DATA_DIR=/data
+      # 云端配置（可选）
+      # - CLOUD_ENDPOINT=https://your-cloud-endpoint.com
+      # - CLOUD_TOKEN=your_token
+    volumes:
+      - chat-hub-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8273/api/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mapleclaw-network
+
+  # 可选：RelayService 独立部署
+  # relay-service:
+  #   image: mapleclaw/chat-hub:latest
+  #   container_name: relay-service
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8274:8274"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - RELAY_PORT=8274
+  #   command: ["node", "src/relay/standalone.js"]
+
+volumes:
+  chat-hub-data:
+    driver: local
+
+networks:
+  mapleclaw-network:
+    driver: bridge
