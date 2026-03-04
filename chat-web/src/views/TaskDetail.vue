@@ -265,7 +265,8 @@ const priorityMap = {
   low: { label: '低优先级', type: 'info' }
 };
 
-const tas= computed(() => taskStore.currentTst currentUserId = computed(() => userStore.user?.id);
+const task = computed(() => taskStore.currentTask);
+const currentUserId = computed(() => userStore.user?.id);
 
 const isOverdue = computed(() => {
   if (!task.value?.dueDate) return false;
@@ -286,7 +287,8 @@ async function loadTask() {
       currentStatus.value = task.value.status;
       contextText.value = task.value.context || '';
     }
-  } f    loading.value = false;
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -360,7 +362,7 @@ async function handleDeleteComment(commentId) {
 
 // 移除执行者
 async function handleRemoveAssignee(userId) {
-  const success = await taskStore.removeAps.taskId, userId);
+  const success = await taskStore.removeAssignee(props.taskId, userId);
   if (success) {
     ElMessage.success('执行者已移除');
     emit('updated');
@@ -381,7 +383,8 @@ async function handleAddAssignees() {
   if (success) {
     ElMessage.success('执行者已添加');
     showAssigneeDialog.value = false;
-    selectedAssignees.value = []emit('updated');
+    selectedAssignees.value = [];
+    emit('updated');
   }
 }
 

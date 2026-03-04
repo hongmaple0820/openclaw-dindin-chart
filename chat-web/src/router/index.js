@@ -127,6 +127,103 @@ const routes = [
         name: 'ProjectSkills',
         component: () => import('@/views/ProjectSkills.vue'),
         meta: { title: '技能管理', requiresAuth: true }
+      },
+      // 技能相关路由
+      {
+        path: 'skills',
+        name: 'Skills',
+        component: () => import('@/views/Skills.vue'),
+        meta: { title: '技能库', requiresAuth: true }
+      },
+      {
+        path: 'skills/:id',
+        name: 'SkillDetail',
+        component: () => import('@/views/SkillDetail.vue'),
+        meta: { title: '技能详情', requiresAuth: true }
+      },
+      // Agent 相关路由
+      {
+        path: 'agents',
+        name: 'Agents',
+        component: () => import('@/views/Agents.vue'),
+        meta: { title: '智能体', requiresAuth: true }
+      },
+      {
+        path: 'agents/:id',
+        name: 'AgentDetail',
+        component: () => import('@/views/AgentDetail.vue'),
+        meta: { title: '智能体详情', requiresAuth: true }
+      },
+      // 任务相关路由
+      {
+        path: 'tasks',
+        name: 'Tasks',
+        component: () => import('@/views/Tasks.vue'),
+        meta: { title: '任务', requiresAuth: true }
+      },
+      {
+        path: 'tasks/:id',
+        name: 'TaskDetail',
+        component: () => import('@/views/TaskDetail.vue'),
+        meta: { title: '任务详情', requiresAuth: true }
+      },
+      // 调度器路由
+      {
+        path: 'scheduler',
+        name: 'Scheduler',
+        component: () => import('@/views/Scheduler.vue'),
+        meta: { title: '调度器', requiresAuth: true }
+      },
+      // 沙箱相关路由
+      {
+        path: 'sandboxes',
+        name: 'Sandboxes',
+        component: () => import('@/views/Sandboxes.vue'),
+        meta: { title: '沙箱', requiresAuth: true }
+      },
+      {
+        path: 'sandboxes/:id',
+        name: 'SandboxDetail',
+        component: () => import('@/views/SandboxDetail.vue'),
+        meta: { title: '沙箱详情', requiresAuth: true }
+      },
+      // 工作空间相关路由
+      {
+        path: 'workspaces',
+        name: 'Workspaces',
+        component: () => import('@/views/Workspaces.vue'),
+        meta: { title: '工作空间', requiresAuth: true }
+      },
+      {
+        path: 'workspaces/:id',
+        name: 'WorkspaceFiles',
+        component: () => import('@/views/WorkspaceFiles.vue'),
+        meta: { title: '工作空间文件', requiresAuth: true }
+      },
+      // 设置相关路由
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/views/Settings.vue'),
+        meta: { title: '设置', requiresAuth: true }
+      },
+      {
+        path: 'settings/theme',
+        name: 'ThemeSettings',
+        component: () => import('@/views/ThemeSettings.vue'),
+        meta: { title: '主题设置', requiresAuth: true }
+      },
+      {
+        path: 'settings/shortcuts',
+        name: 'ShortcutSettings',
+        component: () => import('@/views/ShortcutSettings.vue'),
+        meta: { title: '快捷键设置', requiresAuth: true }
+      },
+      {
+        path: 'settings/notifications',
+        name: 'NotificationSettings',
+        component: () => import('@/views/NotificationSettings.vue'),
+        meta: { title: '通知设置', requiresAuth: true }
       }
     ]
   },

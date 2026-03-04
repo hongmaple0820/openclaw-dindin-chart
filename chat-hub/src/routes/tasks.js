@@ -145,13 +145,13 @@ function createTask(req, res) {
     const id = uuidv4();
     const now = Date.now();
     
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO tasks (
         id, name, description, status, priority, is_pinned,
         creator_id, creator_type, workspace_id, workspace_path,
         context, tags, created_at, due_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    \`).run(
+    `).run(
       id, name, description || null, 'pending', priority, 0,
       userId, creator_type, workspace_id || null, workspace_path || null,
       context ? JSON.stringify(context) : null,
@@ -212,7 +212,7 @@ function updateTask(req, res) {
     }
     
     params.push(id);
-    db.prepare(\`UPDATE tasks SET \${updates.join(', ')} WHERE id = ?\`).run(...params);
+    db.prepare(`UPDATE tasks SET \${updates.join(', ')} WHERE id = ?`).run(...params);
     
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     task.context = task.context ? JSON.parse(task.context) : null;
@@ -270,7 +270,7 @@ function startTask(req, res) {
     }
     
     if (existing.status !== 'pending') {
-      return res.status(400).json({ success: false, message: \`任务状态为 \${existing.status}，无法启动\` });
+      return res.status(400).json({ success: false, message: `任务状态为 \${existing.status}，无法启动` });
     }
     
     const now = Date.now();
@@ -278,10 +278,10 @@ function startTask(req, res) {
     
     // 记录日志
     const logId = uuidv4();
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO task_logs (id, task_id, level, message, created_at)
       VALUES (?, ?, ?, ?, ?)
-    \`).run(logId, id, 'info', '任务已启动', now);
+    `).run(logId, id, 'info', '任务已启动', now);
     
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     task.context = task.context ? JSON.parse(task.context) : null;
@@ -311,11 +311,11 @@ function completeTask(req, res) {
     const now = Date.now();
     const durationMs = existing.started_at ? now - existing.started_at : null;
     
-    db.prepare(\`
+    db.prepare(`
       UPDATE tasks 
       SET status = ?, completed_at = ?, duration_ms = ?, result = ?, result_summary = ?
       WHERE id = ?
-    \`).run(
+    `).run(
       'completed', 
       now, 
       durationMs, 
@@ -326,10 +326,10 @@ function completeTask(req, res) {
     
     // 记录日志
     const logId = uuidv4();
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO task_logs (id, task_id, level, message, created_at)
       VALUES (?, ?, ?, ?, ?)
-    \`).run(logId, id, 'info', '任务已完成', now);
+    `).run(logId, id, 'info', '任务已完成', now);
     
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     task.context = task.context ? JSON.parse(task.context) : null;
@@ -360,18 +360,18 @@ function failTask(req, res) {
     const now = Date.now();
     const newRetryCount = (existing.retry_count || 0) + 1;
     
-    db.prepare(\`
+    db.prepare(`
       UPDATE tasks 
       SET status = ?, retry_count = ?, result_summary = ?
       WHERE id = ?
-    \`).run('failed', newRetryCount, error_message || null, id);
+    `).run('failed', newRetryCount, error_message || null, id);
     
     // 记录日志
     const logId = uuidv4();
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO task_logs (id, task_id, level, message, metadata, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    \`).run(logId, id, 'error', error_message || '任务失败', error_details ? JSON.stringify(error_details) : null, now);
+    `).run(logId, id, 'error', error_message || '任务失败', error_details ? JSON.stringify(error_details) : null, now);
     
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     task.context = task.context ? JSON.parse(task.context) : null;
@@ -426,11 +426,11 @@ function getAssignees(req, res) {
   try {
     const { id } = req.params;
     
-    const assignees = db.prepare(\`
+    const assignees = db.prepare(`
       SELECT * FROM task_assignees 
       WHERE task_id = ? 
       ORDER BY created_at ASC
-    \`).all(id);
+    `).all(id);
     
     res.json({ success: true, count: assignees.length, assignees });
   } catch (error) {
@@ -467,10 +467,10 @@ function addAssignee(req, res) {
     const assigneeId = uuidv4();
     const now = Date.now();
     
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO task_assignees (id, task_id, user_id, user_type, user_name, role, status, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    \`).run(assigneeId, id, user_id, user_type, user_name || null, role, 'pending', now);
+    `).run(assigneeId, id, user_id, user_type, user_name || null, role, 'pending', now);
     
     const assignee = db.prepare('SELECT * FROM task_assignees WHERE id = ?').get(assigneeId);
     
@@ -567,7 +567,7 @@ function addContextItem(req, res) {
     if (!validTypes.includes(type)) {
       return res.status(400).json({ 
         success: false, 
-        message: \`type 必须是: \${validTypes.join(', ')}\` 
+        message: `type 必须是: \${validTypes.join(', ')}` 
       });
     }
     
@@ -580,11 +580,11 @@ function addContextItem(req, res) {
     const itemId = uuidv4();
     const now = Date.now();
     
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO task_context_items (
         id, task_id, type, title, content, file_path, url, metadata, importance, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    \`).run(
+    `).run(
       itemId, id, type, title || null, 
       content ? JSON.stringify(content) : null,
       file_path || null, url || null,
@@ -618,12 +618,12 @@ function getComments(req, res) {
     const { id } = req.params;
     const { limit = 50, offset = 0 } = req.query;
     
-    const comments = db.prepare(\`
+    const comments = db.prepare(`
       SELECT * FROM task_comments 
       WHERE task_id = ? 
       ORDER BY created_at ASC 
       LIMIT ? OFFSET ?
-    \`).all(id, parseInt(limit), parseInt(offset));
+    `).all(id, parseInt(limit), parseInt(offset));
     
     res.json({ success: true, count: comments.length, comments });
   } catch (error) {
@@ -663,10 +663,10 @@ function addComment(req, res) {
     const commentId = uuidv4();
     const now = Date.now();
     
-    db.prepare(\`
+    db.prepare(`
       INSERT INTO task_comments (id, task_id, user_id, user_name, content, parent_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    \`).run(commentId, id, userId, user_name || null, content, parent_id || null, now);
+    `).run(commentId, id, userId, user_name || null, content, parent_id || null, now);
     
     const comment = db.prepare('SELECT * FROM task_comments WHERE id = ?').get(commentId);
     

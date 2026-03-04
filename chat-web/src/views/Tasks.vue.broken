@@ -12,7 +12,9 @@
         <div class="sidebar-header">
           <h3>任务</h3>
           <el-button type="primary" :icon="Plus" circle @click="showCreateTask = true" />
-        </div>
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
         
         <!-- 搜索栏 -->
         <div class="search-bar">
@@ -23,7 +25,9 @@
             clearable
             size="small"
           />
-        </div>
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
         
         <!-- 状态 Tab -->
         <div class="status-tabs">
@@ -35,8 +39,12 @@
           >
             <span class="tab-label">{{ tab.label }}</span>
             <el-badge :value="getCountByStatus(tab.value)" :max="99" type="primary" />
-          </div>
-        </div>
+          
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
         
         <!-- 置顶任务区域 -->
         <div v-if="taskStore.pinnedTasks.length > 0" class="pinned-section">
@@ -45,7 +53,9 @@
             <span>置顶任务</span>
             <el-badge :value="taskStore.pinnedTasks.length" type="warning" />
             <el-icon :class="['toggle-icon', { rotated: !showPinned }]"><ArrowDown /></el-icon>
-          </div>
+          
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
           <transition name="collapse">
             <div v-show="showPinned" class="pinned-list">
               <TaskCard
@@ -55,9 +65,13 @@
                 :class="{ active: currentTaskId === task.id }"
                 @click="selectTask(task)"
               />
-            </div>
+            
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
           </transition>
-        </div>
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
         
         <!-- 任务列表 -->
         <div class="tasks-list" v-loading="taskStore.loading">
@@ -78,8 +92,12 @@
           >
             <el-button type="primary" @click="showCreateTask = true">创建任务</el-button>
           </el-empty>
-        </div>
-      </div>
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
+      
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
       
       <!-- 右侧：看板视图/详情 -->
       <div class="tasks-main">
@@ -95,7 +113,9 @@
               看板
             </el-radio-button>
           </el-radio-group>
-        </div>
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
         
         <!-- 列表视图 -->
         <div v-if="viewMode === 'list'" class="list-view">
@@ -108,8 +128,12 @@
           />
           <div v-else class="empty-state">
             <el-empty description="选择一个任务查看详情" :image-size="120" />
-          </div>
-        </div>
+          
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
         
         <!-- 看板视图 -->
         <div v-else class="board-view">
@@ -120,9 +144,15 @@
             @task-click="selectTask"
             @move-task="handleMoveTask"
           />
-        </div>
-      </div>
-    </div>
+        
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
+      
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
+    
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
     
     <!-- 创建任务弹窗 -->
     <el-dialog
@@ -173,7 +203,9 @@
                   {{ friend.nickname?.[0] }}
                 </el-avatar>
                 <span>{{ friend.remark || friend.nickname }}</span>
-              </div>
+              
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
             </el-option>
           </el-select>
         </el-form-item>
@@ -195,7 +227,9 @@
         </el-button>
       </template>
     </el-dialog>
-  </div>
+  
+        <!-- 看板视图 -->
+        <div v-else class="board-view">
 </template>
 
 <script setup>

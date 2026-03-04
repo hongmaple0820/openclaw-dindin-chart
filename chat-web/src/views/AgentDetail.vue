@@ -279,7 +279,7 @@ async function loadAgent() {
     } else {
       ElMessage.error('加载失败');
     }
-  }atch (error) {
+  } catch (error) {
     console.error('加载 Agent 失败:', error);
     ElMessage.error('加载失败');
   } finally {
@@ -303,8 +303,8 @@ async function handleUpdate(formData) {
       ElMessage.error(res.error || '保存失败');
     }
   } catch (error) {
-   sole.error('保存失败:', error);
-    ElMessage.error');
+    console.error('保存失败:', error);
+    ElMessage.error('保存失败');
   } finally {
     submitting.value = false;
   }
@@ -393,7 +393,8 @@ function formatDate(timestamp) {
   return new Date(timestamp).toLocaleString('zh-CN');
 }
 
-function getToolNa  const names = {
+function getToolName(tool) {
+  const names = {
     web_search: '网络搜索',
     code_interpreter: '代码解释器',
     image_gen: '图片生成',
