@@ -34,3 +34,26 @@ Thumbs.db
 # 构建产物
 dist/
 build/
+# 测试覆盖率
+coverage/
+*.lcov
+
+# 临时文件
+*.tmp
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 旧目录（已删除）
+chat-hub-config/
+.agents/
+.kiro/
+.sisyphus/
+.trae/
+tests/
