@@ -1,0 +1,176 @@
+{
+  "version": "1.0.0",
+  "default_skills": [
+    {
+      "id": "weather",
+      "name": "天气查询",
+      "display_name": "Weather",
+      "description": "查询城市天气信息",
+      "version": "1.0.0",
+      "author": "system",
+      "category": "utility",
+      "tags": ["weather", "utility", "information"],
+      "enabled": true,
+      "is_public": true,
+      "command": "#天气",
+      "handler": "weather",
+      "params": {
+        "city": {
+          "type": "string",
+          "required": true,
+          "description": "城市名称"
+        }
+      },
+      "example": "#天气 北京"
+    },
+    {
+      "id": "calculator",
+      "name": "计算器",
+      "display_name": "Calculator",
+      "description": "数学表达式计算",
+      "version": "1.0.0",
+      "author": "system",
+      "category": "utility",
+      "tags": ["math", "calculator", "utility"],
+      "enabled": true,
+      "is_public": true,
+      "command": "#计算",
+      "handler": "calculator",
+      "params": {
+        "expression": {
+          "type": "string",
+          "required": true,
+          "description": "数学表达式"
+        }
+      },
+      "example": "#计算 2+3*4"
+    },
+    {
+      "id": "translator",
+      "name": "翻译",
+      "display_name": "Translator",
+      "description": "多语言翻译",
+      "version": "1.0.0",
+      "author": "system",
+      "category": "communication",
+      "tags": ["translate", "language", "communication"],
+      "enabled": true,
+      "is_public": true,
+      "command": "#翻译",
+      "handler": "translator",
+      "params": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "description": "要翻译的文本"
+        },
+        "to": {
+          "type": "string",
+          "required": false,
+          "default": "zh",
+          "description": "目标语言"
+        }
+      },
+      "example": "#翻译 Hello World"
+    },
+    {
+      "id": "search",
+      "name": "搜索",
+      "display_name": "Search",
+      "description": "网络搜索",
+      "version": "1.0.0",
+      "author": "system",
+      "category": "information",
+      "tags": ["search", "web", "information"],
+      "enabled": true,
+      "is_public": true,
+      "command": "#搜索",
+      "handler": "search",
+      "params": {
+        "query": {
+          "type": "string",
+          "required": true,
+          "description": "搜索关键词"
+        }
+      },
+      "example": "#搜索 OpenClaw"
+    },
+    {
+      "id": "reminder",
+      "name": "提醒",
+      "display_name": "Reminder",
+      "description": "设置提醒",
+      "version": "1.0.0",
+      "author": "system",
+      "category": "productivity",
+      "tags": ["reminder", "schedule", "productivity"],
+      "enabled": true,
+      "is_public": true,
+      "command": "#提醒",
+      "handler": "reminder",
+      "params": {
+        "time": {
+          "type": "string",
+          "required": true,
+          "description": "提醒时间"
+        },
+        "message": {
+          "type": "string",
+          "required": true,
+          "description": "提醒内容"
+        }
+      },
+      "example": "#提醒 10:30 开会"
+    }
+  ],
+  "default_mcp_servers": [
+    {
+      "id": "filesystem",
+      "name": "文件系统",
+      "description": "文件和目录操作",
+      "version": "1.0.0",
+      "author": "system",
+      "type": "stdio",
+      "command": "mcp-filesystem",
+      "tools": [
+        "read_file",
+        "write_file",
+        "list_directory",
+        "create_directory",
+        "delete_file",
+        "move_file"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "web-search",
+      "name": "网页搜索",
+      "description": "网络搜索和信息检索",
+      "version": "1.0.0",
+      "author": "system",
+      "type": "http",
+      "endpoint": "https://api.search.example.com/mcp",
+      "tools": [
+        "search",
+        "fetch",
+        "extract"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "code-executor",
+      "name": "代码执行",
+      "description": "安全执行代码片段",
+      "version": "1.0.0",
+      "author": "system",
+      "type": "stdio",
+      "command": "mcp-code-executor",
+      "tools": [
+        "execute_python",
+        "execute_javascript",
+        "execute_shell"
+      ],
+      "enabled": true
+    }
+  ]
+}
