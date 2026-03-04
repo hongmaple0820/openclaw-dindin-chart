@@ -2032,6 +2032,37 @@ async function start() {
     console.log('[Server] WorkspaceManager 初始化失败:', e.message);
   }
 
+  // ==================== RelayService (IM 服务端) ====================
+  let relayService = null;
+  try {
+    const { RelayService } = require('./relay');
+    relayService = new RelayService(v2DbRaw, {
+      relayPort: process.env.RELAY_PORT || 8274,
+      ...config
+    });
+    await relayService.init();
+    await relayService.start();
+    console.log('[Server] RelayService 初始化完成，端口 8274');
+    
+    // 替代 Redis Pub/Sub（可选）
+    // transportManager.setRelayService(relayService);
+  } catch (e) {
+    console.log('[Server] RelayService 初始化失败:', e.message);
+  }
+
+  // ==================== Observability (可观测性) ====================
+  let observability = null;
+  try {
+    const { Observability } = require('./observability');
+    observability = new Observability(v2DbRaw, config);
+    console.log('[Server] Observability 初始化完成');
+    
+    // 使用日志中间件
+    app.use(observability.middleware());
+  } catch (e) {
+    console.log('[Server] Observability 初始化失败:', e.message);
+  }
+
   // V2 新增路由
   const skillsModule = require('./routes/skills');
   const agentsV2Module = require('./routes/agents-v2');
@@ -2062,6 +2093,39 @@ async function start() {
   app.use('/api/sandbox', sandboxRoutes);
   app.use('/api/workspace', workspaceRoutes);
   app.use('/api/relay', relayRoutes);
+
+  // Observability 路由
+  const observabilityRoutes = require('./routes/observability');
+  if (observability && observabilityRoutes.setObservability) {
+    observabilityRoutes.setObservability(observability);
+  }
+  app.use('/api/observability', observabilityRoutes);
+
+  // OpenAI 协议兼容路由
+  app.post('/v1/chat/completions', async (req, res) => {
+    const agentId = req.headers['x-agent-id'];
+    if (!agentId) {
+      return res.status(400).json({ error: 'X-Agent-ID header required' });
+    }
+    // 转发到 Agent API
+    req.url = `/api/agents/${agentId}/chat`;
+    return app._router.handle(req, res, () => {});
+  });
+
+  app.get('/v1/models', async (req, res) => {
+    const agentId = req.headers['x-agent-id'];
+    if (!agentId) {
+      return res.json({
+        object: 'list',
+        data: [
+          { id: 'gpt-4', object: 'model', owned_by: 'openai' },
+          { id: 'gpt-3.5-turbo', object: 'model', owned_by: 'openai' }
+        ]
+      });
+    }
+    req.url = `/api/agents/${agentId}/models`;
+    return app._router.handle(req, res, () => {});
+  });
 
 // 邮箱通道路由
   const emailRoutes = require('./routes/email');
