@@ -2,7 +2,7 @@
 #
 # Chat-Hub 一键安装脚本
 # 
-# 用法: curl -fsSL https://get.hiclaw.io/chat-hub | bash
+# 用法: curl -fsSL https://get.mapleclaw.io/chat-hub | bash
 #
 
 set -e
@@ -70,7 +70,7 @@ check_dependencies() {
 install_chat_hub() {
     log_step "安装 Chat-Hub..."
     
-    INSTALL_DIR="${HOME}/.hiclaw/chat-hub"
+    INSTALL_DIR="${HOME}/.mapleclaw/chat-hub"
     
     # 创建目录
     mkdir -p "$INSTALL_DIR"
@@ -91,7 +91,7 @@ install_chat_hub() {
     npm install
     
     # 创建数据目录
-    mkdir -p "${HOME}/.hiclaw/data"
+    mkdir -p "${HOME}/.mapleclaw/data"
     
     log_info "安装完成: $INSTALL_DIR"
 }
@@ -100,7 +100,7 @@ install_chat_hub() {
 configure_chat_hub() {
     log_step "配置 Chat-Hub..."
     
-    CONFIG_FILE="${HOME}/.hiclaw/config.yaml"
+    CONFIG_FILE="${HOME}/.mapleclaw/config.yaml"
     
     if [ -f "$CONFIG_FILE" ]; then
         log_info "配置文件已存在: $CONFIG_FILE"
@@ -117,8 +117,8 @@ configure_chat_hub() {
     case $mode_choice in
         2)
             read -p "请输入云端 Token: " cloud_token
-            read -p "云端端点 (默认: https://cloud.hiclaw.io): " cloud_endpoint
-            cloud_endpoint=${cloud_endpoint:-"https://cloud.hiclaw.io"}
+            read -p "云端端点 (默认: https://cloud.mapleclaw.io): " cloud_endpoint
+            cloud_endpoint=${cloud_endpoint:-"https://cloud.mapleclaw.io"}
             
             cat > "$CONFIG_FILE" << EOF
 # Chat-Hub 配置文件
@@ -137,7 +137,7 @@ server:
   port: 8273
   
 database:
-  path: ~/.hiclaw/data/chat-hub.db
+  path: ~/.mapleclaw/data/chat-hub.db
 EOF
             log_info "配置文件已创建: $CONFIG_FILE"
             ;;
@@ -151,7 +151,7 @@ server:
   port: 8273
   
 database:
-  path: ~/.hiclaw/data/chat-hub.db
+  path: ~/.mapleclaw/data/chat-hub.db
 EOF
             log_info "配置文件已创建: $CONFIG_FILE"
             ;;
@@ -162,7 +162,7 @@ EOF
 start_chat_hub() {
     log_step "启动 Chat-Hub..."
     
-    cd "${HOME}/.hiclaw/chat-hub/chat-hub"
+    cd "${HOME}/.mapleclaw/chat-hub/chat-hub"
     
     # 使用 pm2 管理
     if command -v pm2 &> /dev/null; then
@@ -194,18 +194,18 @@ docker_deploy() {
     if [[ "$use_docker" =~ ^[Yy]$ ]]; then
         log_info "使用 Docker 部署..."
         
-        cd "${HOME}/.hiclaw/chat-hub/chat-hub"
+        cd "${HOME}/.mapleclaw/chat-hub/chat-hub"
         
         # 构建镜像
-        docker build -t hiclaw/chat-hub:latest .
+        docker build -t mapleclaw/chat-hub:latest .
         
         # 启动容器
         docker run -d \
             --name chat-hub \
             -p 8273:8273 \
-            -v ~/.hiclaw/data:/data \
-            -v ~/.hiclaw/config.yaml:/app/config.yaml \
-            hiclaw/chat-hub:latest
+            -v ~/.mapleclaw/data:/data \
+            -v ~/.mapleclaw/config.yaml:/app/config.yaml \
+            mapleclaw/chat-hub:latest
         
         log_info "Docker 容器已启动"
         exit 0
@@ -233,7 +233,7 @@ main() {
     echo "  1. 访问 http://localhost:8273"
     echo "  2. 查看日志: pm2 logs chat-hub"
     echo "  3. 停止服务: pm2 stop chat-hub"
-    echo "  4. 配置文件: ~/.hiclaw/config.yaml"
+    echo "  4. 配置文件: ~/.mapleclaw/config.yaml"
     echo ""
 }
 
