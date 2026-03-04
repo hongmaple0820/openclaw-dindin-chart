@@ -93,19 +93,11 @@ app.use(compression({
   threshold: 1024
 }));
 
-const webDistPath = path.resolve(__dirname, '../../chat-web/dist');
-const webDistExists = fs.existsSync(webDistPath);
-if (!webDistExists) console.log('[Server] ⚠️ 前端目录不存在:', webDistPath);
-const adminDistPath = path.resolve(__dirname, '../../chat-admin-ui/dist');
-console.log('[Server] 前端目录:', webDistPath);
-console.log('[Server] 管理后台:', adminDistPath);
-
-app.use('/admin', express.static(adminDistPath));
-app.get('/admin/*', (req, res) => {
-  res.sendFile(path.join(adminDistPath, 'index.html'));
-});
-
-if (webDistExists) app.use(express.static(webDistPath));
+// ==================== 前后端分离 ====================
+// 前端独立部署，后端只提供 API 服务
+// 前端地址: http://localhost:5173 (开发) 或独立域名 (生产)
+// 后端地址: http://localhost:8273/api/*
+console.log('[Server] 前后端分离模式: 后端仅提供 API 服务');
 
 app.use(corsMiddleware());
 app.use(apiVersionMiddleware());
@@ -2438,15 +2430,7 @@ async function start() {
     }
   });
 
-  // SPA fallback - 所有未匹配的路由返回 index.html
-  app.get('*', (req, res, next) => {
-    // 跳过 API 和 webhook 路由
-    if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) {
-      return next();
-    }
-    res.sendFile(path.join(webDistPath, 'index.html'));
-  });
-
+  // API 路由监听
   const port = config.server?.port || 3000;
   
   // 使用 http.createServer 以支持 WebSocket
@@ -2459,9 +2443,9 @@ async function start() {
   
   server.listen(port, () => {
     const stats = messageStore.getStats();
-    console.log(`[Server] 消息中转服务已启动: http://localhost:${port}`);
+    console.log(`[Server] API 服务已启动: http://localhost:${port}`);
     console.log('[Server] WebSocket: ws://localhost:' + port + '/ws');
-    console.log('[Server] 前端页面:', webDistPath);
+    console.log('[Server] 前端地址: http://localhost:5173 (开发环境)');
     console.log('[Server] 存储目录:', messageStore.storeDir);
     console.log('[Server] 数据库:', messageStore.dbPath);
     console.log('[Server] 已加载消息:', stats.total, '条');

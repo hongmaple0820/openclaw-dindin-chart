@@ -21,7 +21,8 @@ const DEFAULT_EXPOSE_HEADERS = [
 
 function corsMiddleware(options = {}) {
   const {
-    origins = config.cors?.origins || ['*'],
+    // 前后端分离：允许前端开发服务器地址
+    origins = config.cors?.origins || ['http://localhost:5173', 'http://127.0.0.1:5173', '*'],
     methods = DEFAULT_ALLOWED_METHODS,
     allowedHeaders = DEFAULT_ALLOWED_HEADERS,
     exposeHeaders = DEFAULT_EXPOSE_HEADERS,
