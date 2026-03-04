@@ -2101,6 +2101,42 @@ async function start() {
   }
   app.use('/api/observability', observabilityRoutes);
 
+  // ==================== Monitoring (监控告警) ====================
+  let monitoringService = null;
+  try {
+    const { MonitoringService } = require('./monitoring');
+    monitoringService = new MonitoringService({
+      serviceName: 'chat-hub',
+      serviceVersion: '2.0.0',
+      metricsPrefix: 'chat_hub_',
+      health: {
+        memoryThresholdMB: 500,
+        memoryWarningPercent: 80
+      },
+      alerts: {
+        evaluationInterval: 60000
+      }
+    });
+    
+    // 设置依赖
+    monitoringService.setDependencies({
+      transportManager,
+      db: v2DbRaw,
+      messageStore
+    });
+    
+    console.log('[Server] MonitoringService 初始化完成');
+  } catch (e) {
+    console.log('[Server] MonitoringService 初始化失败:', e.message);
+  }
+
+  // Monitoring 路由
+  const monitoringRoutes = require('./routes/monitoring');
+  if (monitoringService && monitoringRoutes.setMonitoring) {
+    monitoringRoutes.setMonitoring(monitoringService);
+  }
+  app.use('/api/monitoring', monitoringRoutes.router);
+
   // OpenAI 协议兼容路由
   app.post('/v1/chat/completions', async (req, res) => {
     const agentId = req.headers['x-agent-id'];
