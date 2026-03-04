@@ -1981,6 +1981,10 @@ async function start() {
   const projectRoutes = require('./routes/projects');
   app.use('/api/projects', projectRoutes);
 
+  // 定时任务系统路由
+  const schedulerRoutes = require('./routes/scheduler');
+  app.use('/api/scheduler', schedulerRoutes);
+
 // 邮箱通道路由
   const emailRoutes = require('./routes/email');
 
