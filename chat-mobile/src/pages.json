@@ -30,6 +30,60 @@
       "style": {
         "navigationBarTitleText": "创建角色"
       }
+    },
+    {
+      "path": "pages/skills/index",
+      "style": {
+        "navigationBarTitleText": "技能管理"
+      }
+    },
+    {
+      "path": "pages/skills/detail",
+      "style": {
+        "navigationBarTitleText": "技能详情"
+      }
+    },
+    {
+      "path": "pages/agents/index",
+      "style": {
+        "navigationBarTitleText": "智能体"
+      }
+    },
+    {
+      "path": "pages/agents/detail",
+      "style": {
+        "navigationBarTitleText": "智能体详情"
+      }
+    },
+    {
+      "path": "pages/agents/chat",
+      "style": {
+        "navigationBarTitleText": "智能体对话"
+      }
+    },
+    {
+      "path": "pages/tasks/index",
+      "style": {
+        "navigationBarTitleText": "任务管理"
+      }
+    },
+    {
+      "path": "pages/tasks/detail",
+      "style": {
+        "navigationBarTitleText": "任务详情"
+      }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置"
+      }
+    },
+    {
+      "path": "pages/relationship-test/index",
+      "style": {
+        "navigationBarTitleText": "关系测试"
+      }
     }
   ],
   "globalStyle": {
@@ -37,5 +91,43 @@
     "navigationBarTitleText": "chat-mobile",
     "navigationBarBackgroundColor": "#667eea",
     "backgroundColor": "#f5f5f5"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#667eea",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/chat/index",
+        "text": "聊天",
+        "iconPath": "static/tabbar/chat.png",
+        "selectedIconPath": "static/tabbar/chat-active.png"
+      },
+      {
+        "pagePath": "pages/agents/index",
+        "text": "智能体",
+        "iconPath": "static/tabbar/agent.png",
+        "selectedIconPath": "static/tabbar/agent-active.png"
+      },
+      {
+        "pagePath": "pages/tasks/index",
+        "text": "任务",
+        "iconPath": "static/tabbar/task.png",
+        "selectedIconPath": "static/tabbar/task-active.png"
+      },
+      {
+        "pagePath": "pages/skills/index",
+        "text": "技能",
+        "iconPath": "static/tabbar/skill.png",
+        "selectedIconPath": "static/tabbar/skill-active.png"
+      },
+      {
+        "pagePath": "pages/settings/index",
+        "text": "设置",
+        "iconPath": "static/tabbar/setting.png",
+        "selectedIconPath": "static/tabbar/setting-active.png"
+      }
+    ]
   }
 }

@@ -3,8 +3,8 @@
  * 封装 uni.request，包含请求和响应拦截器
  */
 
-// 基础配置
-const BASE_URL = 'http://localhost:3000/api'
+// 基础配置 - 连接 V2 API
+const BASE_URL = 'http://localhost:8273/api'
 
 // 请求拦截器
 const requestInterceptor = (config: UniApp.RequestOptions) => {
