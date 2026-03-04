@@ -72,7 +72,7 @@
                 size="small"
                 @click="handleRemoveAssignee(assignee.id)"
               />
-    </div>
+            </div>
             
             <el-button
               class="add-assignee-btn"
@@ -151,7 +151,7 @@
         
         <!-- 评论 -->
         <div class="info-section">
-      <label>
+          <label>
             <el-icon><ChatDotRound /></el-icon>
             评论 ({{ task.comments?.length || 0 }})
           </label>
@@ -163,7 +163,7 @@
               <div class="comment-content">
                 <div class="comment-header">
                   <span class="author">{{ comment.user?.nickname }}</span>
-                  <span class="time">{{ formatDateTime(ctedAt) }}</span>
+                  <span class="time">{{ formatDateTime(comment.createdAt) }}</span>
                 </div>
                 <p>{{ comment.content }}</p>
               </div>
@@ -308,7 +308,10 @@ async function handleStatusChange(status) {
     ElMessage.success('状态已更新');
     emit('updated');
   } else {
-    currentStatus.value = task.value.statusn
+    currentStatus.value = task.value.status;
+  }
+}
+
 // 更新上下文
 async function handleUpdateContext() {
   if (contextText.value === task.value.context) return;
@@ -391,7 +394,6 @@ async function handleAddAssignees() {
 // 更多操作
 async function handleCommand(command) {
   if (command === 'edit') {
-    // TODO: 打开编辑对话框
     ElMessage.info('编辑功能开发中');
   } else if (command === 'delete') {
     try {
@@ -449,7 +451,7 @@ onMounted(() => {
 
 .detail-header {
   display: flex;
-  justify-content: etween;
+  justify-content: space-between;
   align-items: center;
   padding: 16px;
   border-bottom: 1px solid #f0f0f0;
@@ -584,7 +586,10 @@ onMounted(() => {
 
 .log-content {
   font-size: 14px;
-  color: #606266.comment-item {
+  color: #606266;
+}
+
+.comment-item {
   display: flex;
   gap: 12px;
   padding: 12px 0;
@@ -638,7 +643,7 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .detail-content {
-    padding: 16px;
+    padding: 12px;
   }
   
   .title-section h2 {

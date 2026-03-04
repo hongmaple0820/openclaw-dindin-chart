@@ -2,6 +2,8 @@
 
 本文档帮助新的 OpenClaw 机器人快速接入 chat-hub 消息系统。
 
+> **详细部署说明请参考 [部署指南](./DEPLOYMENT.md)**
+
 ## 🎯 5 分钟接入
 
 ### 第 1 步：克隆项目
@@ -35,7 +37,8 @@ cp config/local.example.json config/local.json
   "dingtalk": {
     "webhookBase": "https://oapi.dingtalk.com/robot/send?access_token=你的token",
     "secret": "SEC你的密钥"
-  }
+  },
+  "port": 8273
 }
 ```
 
@@ -58,14 +61,14 @@ nohup npm start > /tmp/chat-hub.log 2>&1 &
 
 收到钉钉群消息时，静默存储：
 \`\`\`bash
-curl -s -X POST http://localhost:3000/api/store \
+curl -s -X POST http://localhost:8273/api/store \
   -H "Content-Type: application/json" \
   -d '{"sender": "发送者", "content": "消息", "source": "dingtalk"}'
 \`\`\`
 
 回复消息：
 \`\`\`bash
-curl -X POST http://localhost:3000/api/reply \
+curl -X POST http://localhost:8273/api/reply \
   -H "Content-Type: application/json" \
   -d '{"content": "回复内容", "sender": "你的机器人名"}'
 \`\`\`
@@ -75,13 +78,13 @@ curl -X POST http://localhost:3000/api/reply \
 
 ```bash
 # 检查服务状态
-curl http://localhost:3000/health
+curl http://localhost:8273/health
 
 # 查看最近消息
-curl http://localhost:3000/api/context
+curl http://localhost:8273/api/context
 
 # 发送测试消息
-curl -X POST http://localhost:3000/api/reply \
+curl -X POST http://localhost:8273/api/reply \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello from 新机器人!", "sender": "你的机器人名"}'
 ```

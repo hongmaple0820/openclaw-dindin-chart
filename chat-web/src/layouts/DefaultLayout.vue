@@ -52,6 +52,54 @@
             />
           </el-menu-item>
           <el-menu-item index="/files" v-if="userStore.isLoggedIn">个人网盘</el-menu-item>
+          <el-sub-menu index="tools" v-if="userStore.isLoggedIn">
+            <template #title>
+              <el-icon><Tools /></el-icon>
+              工具
+            </template>
+            <el-menu-item index="/agents">
+              <el-icon><User /></el-icon>
+              智能体
+            </el-menu-item>
+            <el-menu-item index="/skills">
+              <el-icon><MagicStick /></el-icon>
+              技能库
+            </el-menu-item>
+            <el-menu-item index="/tasks">
+              <el-icon><List /></el-icon>
+              任务
+            </el-menu-item>
+            <el-menu-item index="/scheduler">
+              <el-icon><Clock /></el-icon>
+              调度器
+            </el-menu-item>
+            <el-menu-item index="/sandboxes">
+              <el-icon><Monitor /></el-icon>
+              沙箱
+            </el-menu-item>
+            <el-menu-item index="/workspaces">
+              <el-icon><FolderOpened /></el-icon>
+              工作空间
+            </el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="admin" v-if="userStore.isLoggedIn && userStore.isAdmin">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              管理
+            </template>
+            <el-menu-item index="/observability">
+              <el-icon><DataAnalysis /></el-icon>
+              可观测性
+            </el-menu-item>
+            <el-menu-item index="/admin">
+              <el-icon><DataBoard /></el-icon>
+              数据仪表盘
+            </el-menu-item>
+            <el-menu-item index="/admin/users">
+              <el-icon><UserFilled /></el-icon>
+              用户管理
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </div>
       
@@ -85,6 +133,27 @@
             />
           </el-menu-item>
           <el-menu-item index="/files" v-if="userStore.isLoggedIn">个人网盘</el-menu-item>
+          <el-sub-menu index="tools-mobile" v-if="userStore.isLoggedIn">
+            <template #title>
+              <el-icon><Tools /></el-icon>
+              工具
+            </template>
+            <el-menu-item index="/agents">智能体</el-menu-item>
+            <el-menu-item index="/skills">技能库</el-menu-item>
+            <el-menu-item index="/tasks">任务</el-menu-item>
+            <el-menu-item index="/scheduler">调度器</el-menu-item>
+            <el-menu-item index="/sandboxes">沙箱</el-menu-item>
+            <el-menu-item index="/workspaces">工作空间</el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="admin-mobile" v-if="userStore.isLoggedIn && userStore.isAdmin">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              管理
+            </template>
+            <el-menu-item index="/observability">可观测性</el-menu-item>
+            <el-menu-item index="/admin">数据仪表盘</el-menu-item>
+            <el-menu-item index="/admin/users">用户管理</el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </div>
 
@@ -150,6 +219,12 @@ import { useUserStore } from '@/stores/user';
 import { useFriendStore } from '@/stores/friends';
 import { useGroupStore } from '@/stores/groups';
 import { ElMessage } from 'element-plus';
+import { 
+  Menu, ChatDotRound, ArrowDown, User, UserFilled, 
+  ChatLineRound, SwitchButton, Tools, MagicStick, 
+  List, Clock, Monitor, FolderOpened, Setting, 
+  DataAnalysis, DataBoard 
+} from '@element-plus/icons-vue';
 
 const route = useRoute();
 const router = useRouter();

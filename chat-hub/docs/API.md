@@ -1,10 +1,13 @@
 # API 接口文档
 
+> **完整 API 规范请参考 [OpenAPI 文档](./OPENAPI.md)**
+> **使用示例请参考 [使用示例文档](./EXAMPLES.md)**
+
 ## 概述
 
 chat-hub 提供 RESTful API，用于消息的存储、发送、查询和同步。
 
-基础 URL：`http://localhost:3000`
+**基础 URL：** `http://localhost:8273`
 
 ## 认证
 

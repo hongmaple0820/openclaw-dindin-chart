@@ -111,7 +111,7 @@ onMounted(async () => {
 });
 
 function goToDetail(id) {
-  router.push(\`/sandboxes/\${id}\`);
+  router.push(`/sandboxes/${id}`);
 }
 
 async function handleCreate() {

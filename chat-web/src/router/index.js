@@ -78,6 +78,13 @@ const routes = [
         component: () => import('@/views/Stats.vue'),
         meta: { title: '数据统计', requiresAuth: true, requiresAdmin: true }
       },
+      // 可观测性仪表板
+      {
+        path: 'observability',
+        name: 'ObservabilityDashboard',
+        component: () => import('@/views/ObservabilityDashboard.vue'),
+        meta: { title: '可观测性仪表板', requiresAuth: true }
+      },
       // 群聊相关路由
       {
         path: 'groups',

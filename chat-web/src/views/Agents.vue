@@ -273,6 +273,7 @@ onMounted(() => loadAgents());
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
   .page-header h2 { font-size: 20px; }
   .tab-header { flex-direction: column; align-items: stretch; }
-  .tab-header .el-input, .tab-header .el-select { max-width: 100% !important; width: 100% !important; ts-grid { grid-template-columns: 1fr; gap: 12px; }
+  .tab-header .el-input, .tab-header .el-select { max-width: 100% !important; width: 100% !important; }
+  .agents-grid { grid-template-columns: 1fr; gap: 12px; }
 }
 </style>

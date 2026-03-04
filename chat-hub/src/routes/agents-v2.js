@@ -8,6 +8,8 @@
  * - 记忆管理 API
  * - 会话和统计
  * - API Token 管理
+ * - 会话持久化和消息存储
+ * - Token 计费统计
  */
 
 const express = require('express');
@@ -23,6 +25,9 @@ const {
   MemoryStore 
 } = require('../agent');
 
+// 导入会话管理
+const { SessionManagerV2 } = require('../agent/session-manager-v2');
+
 // 导入数据库
 const Database = require('better-sqlite3');
 const path = require('path');
@@ -35,6 +40,10 @@ db.pragma('journal_mode = WAL');
 
 const registry = new AgentRegistry(dbPath);
 const streamingHandler = new StreamingHandler();
+const sessionManager = new SessionManagerV2(db);
+
+// 会话缓存（用于断线重连）
+const sessionCache = new Map();
 
 // ============================================================
 // Agent CRUD
@@ -369,11 +378,16 @@ router.post('/:id/toggle-public', async (req, res) => {
  * - temperature: 温度参数
  * - max_tokens: 最大 token
  * - stream: false (非流式)
+ * - sessionId: 会话 ID (可选，用于持久化会话)
  */
 router.post('/:id/chat', async (req, res) => {
+  const startTime = Date.now();
+  let sessionId = req.body.sessionId;
+  let logId = null;
+  
   try {
     const { id } = req.params;
-    const userId = req.headers['x-user-id'];
+    const userId = req.headers['x-user-id'] || 'anonymous';
     
     // 检查权限
     const agentBase = registry.getAgentWithPermission(id, userId);
@@ -402,8 +416,24 @@ router.post('/:id/chat', async (req, res) => {
       });
     }
     
+    // 获取或创建会话（会话持久化）
+    let session;
+    if (sessionId) {
+      session = sessionManager.getSession(sessionId);
+    }
+    if (!session) {
+      session = await sessionManager.createSession(userId, id, { sessionType: 'chat' });
+      sessionId = session.id;
+    }
+    
+    // 创建 API 日志记录
+    logId = 'log_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    
     // 创建 OpenAI 适配器
     const adapter = new OpenAIAdapter(agent);
+    
+    // 估算输入 tokens
+    const inputTokens = sessionManager.estimateTokens(messages);
     
     // 调用 API
     const response = await adapter.chatCompletion({
@@ -415,14 +445,75 @@ router.post('/:id/chat', async (req, res) => {
       ...restParams
     });
     
-    // 更新统计
+    const latency = Date.now() - startTime;
+    
+    // 保存用户消息
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+    if (lastUserMessage) {
+      await sessionManager.addMessage(sessionId, {
+        role: 'user',
+        content: typeof lastUserMessage.content === 'string' 
+          ? lastUserMessage.content 
+          : JSON.stringify(lastUserMessage.content)
+      });
+    }
+    
+    // 保存助手响应
+    const assistantContent = response.choices?.[0]?.message?.content || '';
+    if (assistantContent) {
+      await sessionManager.addMessage(sessionId, {
+        role: 'assistant',
+        content: assistantContent
+      });
+    }
+    
+    // 记录 API 日志（Token 计费统计）
+    const outputTokens = response.usage?.completion_tokens || sessionManager.estimateTokens([{ content: assistantContent }]);
+    const totalTokens = response.usage?.total_tokens || (inputTokens + outputTokens);
+    
+    db.prepare(`
+      INSERT INTO agent_api_logs (
+        id, agent_id, session_id, user_id, request_type,
+        request_tokens, response_tokens, is_streaming, latency_ms, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      logId, id, sessionId, userId, 'chat',
+      inputTokens, outputTokens, 0, latency, 'success', Date.now()
+    );
+    
+    // 更新 Agent 统计
     registry.incrementRequestCount(id);
     
-    console.log('[Agents V2] 对话: ' + agent.nickname + ' (' + id + '), tokens: ' + (response.usage?.total_tokens || 0));
+    // 更新会话 token 统计
+    db.prepare(`
+      UPDATE agent_sessions 
+      SET total_tokens = total_tokens + ?, last_active = ?
+      WHERE id = ?
+    `).run(totalTokens, Date.now(), sessionId);
     
-    res.json(response);
+    console.log('[Agents V2] 对话: ' + agent.nickname + ' (' + id + '), tokens: ' + totalTokens + ', latency: ' + latency + 'ms');
+    
+    // 返回响应（包含会话信息）
+    res.json({
+      ...response,
+      session_id: sessionId
+    });
   } catch (error) {
     console.error('[Agents V2] 对话失败:', error);
+    
+    // 记录错误日志
+    if (logId) {
+      const latency = Date.now() - startTime;
+      db.prepare(`
+        INSERT INTO agent_api_logs (
+          id, agent_id, session_id, user_id, request_type,
+          latency_ms, status, error_message, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        logId, req.params.id, sessionId, req.headers['x-user-id'] || 'anonymous', 'chat',
+        latency, 'error', error.message, Date.now()
+      );
+    }
     
     // OpenAI 格式错误响应
     res.status(error.status || 500).json({
@@ -443,11 +534,17 @@ router.post('/:id/chat', async (req, res) => {
  * - messages: 消息数组
  * - model: 模型名称 (可选)
  * - stream: true (流式)
+ * - sessionId: 会话 ID (可选，用于持久化会话)
  */
 router.post('/:id/chat/stream', async (req, res) => {
+  const startTime = Date.now();
+  let sessionId = req.body.sessionId;
+  let logId = null;
+  let totalContent = '';
+  
   try {
     const { id } = req.params;
-    const userId = req.headers['x-user-id'];
+    const userId = req.headers['x-user-id'] || 'anonymous';
     
     // 检查权限
     const agentBase = registry.getAgentWithPermission(id, userId);
@@ -476,8 +573,38 @@ router.post('/:id/chat/stream', async (req, res) => {
       });
     }
     
+    // 获取或创建会话（会话持久化）
+    let session;
+    if (sessionId) {
+      session = sessionManager.getSession(sessionId);
+    }
+    if (!session) {
+      session = await sessionManager.createSession(userId, id, { sessionType: 'chat' });
+      sessionId = session.id;
+    }
+    
+    // 缓存会话（用于断线重连）
+    sessionCache.set(sessionId, {
+      agentId: id,
+      userId,
+      messages,
+      createdAt: Date.now()
+    });
+    
+    // 创建 API 日志记录
+    logId = 'log_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    
+    // 估算输入 tokens
+    const inputTokens = sessionManager.estimateTokens(messages);
+    
     // 设置 SSE 响应头
     streamingHandler.createSSE(res);
+    
+    // 发送会话信息
+    streamingHandler.sendEvent(res, 'session', {
+      session_id: sessionId,
+      agent_id: id
+    });
     
     // 创建 OpenAI 适配器
     const adapter = new OpenAIAdapter(agent);
@@ -487,6 +614,17 @@ router.post('/:id/chat/stream', async (req, res) => {
     
     // 启动心跳
     const stopHeartbeat = streamingHandler.startHeartbeat(res);
+    
+    // 保存用户消息
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+    if (lastUserMessage) {
+      await sessionManager.addMessage(sessionId, {
+        role: 'user',
+        content: typeof lastUserMessage.content === 'string' 
+          ? lastUserMessage.content 
+          : JSON.stringify(lastUserMessage.content)
+      });
+    }
     
     // 调用流式 API
     const iterator = await adapter.chatCompletion({
@@ -499,20 +637,80 @@ router.post('/:id/chat/stream', async (req, res) => {
     });
     
     // 流式输出
-    await streamingHandler.streamOpenAIFormat(
-      res, 
-      streamId, 
-      iterator, 
-      model || agent.model
+    for await (const chunk of iterator) {
+      const content = streamingHandler.extractContent(chunk);
+      if (content) {
+        totalContent += content;
+      }
+      
+      // 发送 SSE 事件
+      const formatted = streamingHandler.formatOpenAIStream(content || '', model || agent.model, streamId);
+      streamingHandler.sendEvent(res, 'message', formatted);
+    }
+    
+    // 发送结束标记
+    const endChunk = streamingHandler.formatOpenAIStreamEnd(model || agent.model, streamId);
+    streamingHandler.sendEvent(res, 'message', endChunk);
+    res.write('data: [DONE]\n\n');
+    
+    // 停止心跳
+    stopHeartbeat();
+    
+    const latency = Date.now() - startTime;
+    
+    // 保存助手响应
+    if (totalContent) {
+      await sessionManager.addMessage(sessionId, {
+        role: 'assistant',
+        content: totalContent
+      });
+    }
+    
+    // 记录 API 日志（Token 计费统计）
+    const outputTokens = sessionManager.estimateTokens([{ content: totalContent }]);
+    
+    db.prepare(`
+      INSERT INTO agent_api_logs (
+        id, agent_id, session_id, user_id, request_type,
+        request_tokens, response_tokens, is_streaming, latency_ms, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      logId, id, sessionId, userId, 'chat',
+      inputTokens, outputTokens, 1, latency, 'success', Date.now()
     );
     
-    // 更新统计
+    // 更新 Agent 统计
     registry.incrementRequestCount(id);
     
-    console.log('[Agents V2] 流式对话完成: ' + agent.nickname + ' (' + id + ')');
+    // 更新会话 token 统计
+    db.prepare(`
+      UPDATE agent_sessions 
+      SET total_tokens = total_tokens + ?, last_active = ?
+      WHERE id = ?
+    `).run(inputTokens + outputTokens, Date.now(), sessionId);
     
+    // 清理会话缓存
+    sessionCache.delete(sessionId);
+    
+    console.log('[Agents V2] 流式对话完成: ' + agent.nickname + ' (' + id + '), tokens: ' + (inputTokens + outputTokens) + ', latency: ' + latency + 'ms');
+    
+    res.end();
   } catch (error) {
     console.error('[Agents V2] 流式对话失败:', error);
+    
+    // 记录错误日志
+    if (logId) {
+      const latency = Date.now() - startTime;
+      db.prepare(`
+        INSERT INTO agent_api_logs (
+          id, agent_id, session_id, user_id, request_type,
+          latency_ms, status, error_message, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        logId, req.params.id, sessionId, req.headers['x-user-id'] || 'anonymous', 'chat',
+        latency, 'error', error.message, Date.now()
+      );
+    }
     
     // 尝试发送错误事件
     streamingHandler.sendEvent(res, 'error', {
@@ -945,6 +1143,343 @@ router.delete('/tokens/:tokenId', async (req, res) => {
     });
   } catch (error) {
     console.error('[Agents V2] 删除 Token 失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// 会话消息 API
+// ============================================================
+
+/**
+ * GET /api/agents/:id/sessions/:sessionId/messages
+ * 获取会话消息历史
+ */
+router.get('/:id/sessions/:sessionId/messages', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    const { limit, offset, includeSummary } = req.query;
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 验证会话属于该 Agent
+    const session = db.prepare('SELECT * FROM agent_sessions WHERE id = ? AND agent_id = ?').get(sessionId, id);
+    if (!session) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Session not found' 
+      });
+    }
+    
+    // 获取消息
+    const messages = await sessionManager.getMessages(sessionId, {
+      limit: limit ? parseInt(limit) : undefined,
+      offset: offset ? parseInt(offset) : undefined,
+      includeSummary: includeSummary === 'true'
+    });
+    
+    res.json({
+      success: true,
+      sessionId,
+      count: messages.length,
+      messages
+    });
+  } catch (error) {
+    console.error('[Agents V2] 获取会话消息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/agents/:id/sessions/:sessionId
+ * 删除会话
+ */
+router.delete('/:id/sessions/:sessionId', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 验证会话属于该 Agent
+    const session = db.prepare('SELECT * FROM agent_sessions WHERE id = ? AND agent_id = ?').get(sessionId, id);
+    if (!session) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Session not found' 
+      });
+    }
+    
+    // 删除会话消息
+    db.prepare('DELETE FROM session_messages WHERE session_id = ?').run(sessionId);
+    
+    // 删除压缩记录
+    db.prepare('DELETE FROM context_compressions WHERE session_id = ?').run(sessionId);
+    
+    // 删除会话
+    db.prepare('DELETE FROM agent_sessions WHERE id = ?').run(sessionId);
+    
+    console.log('[Agents V2] 删除会话: ' + sessionId);
+    
+    res.json({
+      success: true,
+      message: 'Session deleted'
+    });
+  } catch (error) {
+    console.error('[Agents V2] 删除会话失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================
+// Token 计费统计 API
+// ============================================================
+
+/**
+ * GET /api/agents/:id/billing
+ * 获取 Token 计费统计
+ * 
+ * Query:
+ * - startDate: 开始日期 (YYYY-MM-DD 或时间戳)
+ * - endDate: 结束日期
+ * - groupBy: 分组方式 (day/hour)
+ */
+router.get('/:id/billing', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { startDate, endDate, groupBy = 'day' } = req.query;
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 解析日期
+    let startTimestamp = startDate ? new Date(startDate).getTime() : Date.now() - 30 * 24 * 60 * 60 * 1000;
+    let endTimestamp = endDate ? new Date(endDate).getTime() : Date.now();
+    
+    // 获取总统计
+    const totalStats = db.prepare(`
+      SELECT 
+        COUNT(*) as total_requests,
+        SUM(request_tokens) as total_input_tokens,
+        SUM(response_tokens) as total_output_tokens,
+        SUM(request_tokens + response_tokens) as total_tokens,
+        AVG(latency_ms) as avg_latency,
+        SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
+      FROM agent_api_logs 
+      WHERE agent_id = ? AND created_at >= ? AND created_at <= ?
+    `).get(id, startTimestamp, endTimestamp);
+    
+    // 按时间分组统计
+    const timeFormat = groupBy === 'hour' 
+      ? "strftime('%Y-%m-%d %H:00', created_at / 1000, 'unixepoch')"
+      : "date(created_at / 1000, 'unixepoch')";
+    
+    const groupedStats = db.prepare(`
+      SELECT 
+        ${timeFormat} as time,
+        COUNT(*) as requests,
+        SUM(request_tokens) as input_tokens,
+        SUM(response_tokens) as output_tokens,
+        AVG(latency_ms) as avg_latency
+      FROM agent_api_logs 
+      WHERE agent_id = ? AND created_at >= ? AND created_at <= ?
+      GROUP BY time
+      ORDER BY time ASC
+    `).all(id, startTimestamp, endTimestamp);
+    
+    // 按会话统计
+    const sessionStats = db.prepare(`
+      SELECT 
+        session_id,
+        COUNT(*) as requests,
+        SUM(request_tokens) as input_tokens,
+        SUM(response_tokens) as output_tokens
+      FROM agent_api_logs 
+      WHERE agent_id = ? AND created_at >= ? AND created_at <= ? AND session_id IS NOT NULL
+      GROUP BY session_id
+      ORDER BY requests DESC
+      LIMIT 10
+    `).all(id, startTimestamp, endTimestamp);
+    
+    // 计算费用（假设每 1K tokens $0.002）
+    const inputCostPer1K = 0.0015;  // GPT-3.5-turbo input
+    const outputCostPer1K = 0.002;  // GPT-3.5-turbo output
+    
+    const inputCost = ((totalStats.total_input_tokens || 0) / 1000) * inputCostPer1K;
+    const outputCost = ((totalStats.total_output_tokens || 0) / 1000) * outputCostPer1K;
+    const totalCost = inputCost + outputCost;
+    
+    res.json({
+      success: true,
+      billing: {
+        period: {
+          start: startTimestamp,
+          end: endTimestamp
+        },
+        summary: {
+          totalRequests: totalStats.total_requests || 0,
+          totalInputTokens: totalStats.total_input_tokens || 0,
+          totalOutputTokens: totalStats.total_output_tokens || 0,
+          totalTokens: totalStats.total_tokens || 0,
+          avgLatency: Math.round(totalStats.avg_latency || 0),
+          errorCount: totalStats.error_count || 0,
+          errorRate: totalStats.total_requests > 0 
+            ? ((totalStats.error_count || 0) / totalStats.total_requests * 100).toFixed(2)
+            : '0.00'
+        },
+        cost: {
+          inputCost: inputCost.toFixed(6),
+          outputCost: outputCost.toFixed(6),
+          totalCost: totalCost.toFixed(6),
+          currency: 'USD',
+          rates: {
+            inputPer1K: inputCostPer1K,
+            outputPer1K: outputCostPer1K
+          }
+        },
+        byTime: groupedStats,
+        topSessions: sessionStats
+      }
+    });
+  } catch (error) {
+    console.error('[Agents V2] 获取计费统计失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/agents/:id/billing/export
+ * 导出计费数据 (CSV)
+ */
+router.get('/:id/billing/export', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { startDate, endDate, format = 'csv' } = req.query;
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 解析日期
+    let startTimestamp = startDate ? new Date(startDate).getTime() : Date.now() - 30 * 24 * 60 * 60 * 1000;
+    let endTimestamp = endDate ? new Date(endDate).getTime() : Date.now();
+    
+    // 获取详细日志
+    const logs = db.prepare(`
+      SELECT 
+        id, session_id, user_id, request_type,
+        request_tokens, response_tokens, is_streaming,
+        latency_ms, status, error_message, created_at
+      FROM agent_api_logs 
+      WHERE agent_id = ? AND created_at >= ? AND created_at <= ?
+      ORDER BY created_at ASC
+    `).all(id, startTimestamp, endTimestamp);
+    
+    if (format === 'csv') {
+      // 生成 CSV
+      const headers = ['ID', 'Session ID', 'User ID', 'Type', 'Input Tokens', 'Output Tokens', 'Streaming', 'Latency (ms)', 'Status', 'Error', 'Timestamp'];
+      const rows = logs.map(log => [
+        log.id,
+        log.session_id || '',
+        log.user_id || '',
+        log.request_type || '',
+        log.request_tokens || 0,
+        log.response_tokens || 0,
+        log.is_streaming ? 'Yes' : 'No',
+        log.latency_ms || 0,
+        log.status || '',
+        log.error_message || '',
+        new Date(log.created_at).toISOString()
+      ]);
+      
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="agent_${id}_billing_${new Date().toISOString().slice(0,10)}.csv"`);
+      res.send(csv);
+    } else {
+      res.json({
+        success: true,
+        logs
+      });
+    }
+  } catch (error) {
+    console.error('[Agents V2] 导出计费数据失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/agents/:id/sessions/:sessionId/resume
+ * 恢复会话（断线重连）
+ */
+router.post('/:id/sessions/:sessionId/resume', async (req, res) => {
+  try {
+    const { id, sessionId } = req.params;
+    const userId = req.headers['x-user-id'] || 'anonymous';
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 检查会话是否存在
+    const session = db.prepare('SELECT * FROM agent_sessions WHERE id = ? AND agent_id = ?').get(sessionId, id);
+    if (!session) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Session not found' 
+      });
+    }
+    
+    // 检查缓存中是否有未完成的流
+    const cachedSession = sessionCache.get(sessionId);
+    
+    // 更新会话活跃时间
+    db.prepare('UPDATE agent_sessions SET last_active = ? WHERE id = ?').run(Date.now(), sessionId);
+    
+    // 获取消息历史
+    const messages = await sessionManager.getMessages(sessionId, { includeSummary: true });
+    
+    res.json({
+      success: true,
+      session: {
+        id: session.id,
+        agentId: session.agent_id,
+        userId: session.user_id,
+        messageCount: session.message_count,
+        totalTokens: session.total_tokens,
+        createdAt: session.created_at,
+        lastActive: Date.now()
+      },
+      messages,
+      hasPendingStream: !!cachedSession
+    });
+  } catch (error) {
+    console.error('[Agents V2] 恢复会话失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

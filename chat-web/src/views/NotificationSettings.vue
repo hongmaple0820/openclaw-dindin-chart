@@ -374,7 +374,7 @@ const loadSettings = () => {
 const saveSettings = async () => {
   saving.value = true;
   try {
-    localStorage.sificationSettings', JSON.stringify(settings));
+    localStorage.setItem('notificationSettings', JSON.stringify(settings));
     ElMessage.success('通知设置已保存');
   } catch (error) {
     ElMessage.error('保存设置失败');
