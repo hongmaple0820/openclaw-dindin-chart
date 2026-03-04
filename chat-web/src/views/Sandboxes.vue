@@ -53,7 +53,7 @@
         @delete="handleDelete"
       />
 
-      <el-empty v-if="sandboxStore.sandboxes.length === 0 && !sandboxStore.loadinion="暂无沙箱" />
+      <el-empty v-if="sandboxStore.sandboxes.length === 0 && !sandboxStore.loading" description="暂无沙箱" />
     </div>
 
     <!-- 创建沙箱对话框 -->
@@ -95,7 +95,8 @@ import { useSandboxStore } from '@/stores/sandbox';
 import SandboxCard from '@/components/SandboxCard.vue';
 
 const router = useRouter();
-const sandboxStore = useSandboxSt
+const sandboxStore = useSandboxStore();
+
 const showCreateDialog = ref(false);
 const creating = ref(false);
 const createForm = ref({
@@ -110,7 +111,7 @@ onMounted(async () => {
 });
 
 function goToDetail(id) {
-  router.push(`/sandboxes/${id}`);
+  router.push(\`/sandboxes/\${id}\`);
 }
 
 async function handleCreate() {
@@ -242,4 +243,6 @@ async function handleDelete(id) {
 
   .sandbox-list {
     grid-template-columns: 1fr;
- /style>
+  }
+}
+</style>
