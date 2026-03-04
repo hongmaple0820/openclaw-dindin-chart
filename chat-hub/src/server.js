@@ -1979,6 +1979,10 @@ async function start() {
 
   // 项目群系统路由
   const projectRoutes = require('./routes/projects');
+  
+  // 任务系统路由
+  const taskRoutes = require('./routes/tasks');
+  app.use('/api/tasks', taskRoutes);
   app.use('/api/projects', projectRoutes);
 
   // 定时任务系统路由
