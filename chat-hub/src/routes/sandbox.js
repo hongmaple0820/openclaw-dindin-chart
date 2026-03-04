@@ -49,10 +49,12 @@ async function listSandboxes(req, res) {
     
     // 获取总数
     let countQuery = 'SELECT COUNT(*) as total FROM sandboxes';
+    const countParams = [];
     if (status) {
       countQuery += ' WHERE status = ?';
+      countParams.push(status);
     }
-    const total = req.app.locals.db.prepare(countQuery).get(status);
+    const total = req.app.locals.db.prepare(countQuery).get(...countParams);
     
     res.json({
       success: true,
