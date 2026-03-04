@@ -1,229 +1,336 @@
 <!--
-  默认布局组件
+  默认布局组件 - 重构版
+  左边栏 + 顶部栏 + 内容区域 + 底部聊天框
   @author 小琳
-  @date 2026-02-06
+  @date 2026-03-05
 -->
 <template>
-  <div class="layout">
-    <!-- 移动端遮罩 -->
-    <div class="mobile-overlay" :class="{ show: showMobileMenu }" @click="showMobileMenu = false"></div>
-    
-    <!-- 顶部导航 -->
-    <el-header class="header">
-      <div class="header-left">
-        <!-- 移动端菜单按钮 -->
-        <el-button class="mobile-menu-toggle" text @click="showMobileMenu = !showMobileMenu">
-          <el-icon :size="24"><Menu /></el-icon>
-        </el-button>
-        
+  <div class="layout" :class="{ 'sidebar-collapsed': settingsStore.sidebarCollapsed }">
+    <!-- 左边栏 -->
+    <aside class="sidebar" :class="{ 'mobile-show': showMobileSidebar }">
+      <div class="sidebar-header">
         <router-link to="/" class="logo">
           <el-icon><ChatDotRound /></el-icon>
-          <span>枫琳</span>
+          <span v-show="!settingsStore.sidebarCollapsed">枫琳</span>
         </router-link>
-        
-        <!-- 桌面端导航菜单 -->
-        <el-menu
-          class="desktop-menu"
-          mode="horizontal"
-          :router="true"
-          :default-active="route.path"
-          :ellipsis="false"
-          @select="showMobileMenu = false"
+        <el-button
+          v-if="!isMobile"
+          class="collapse-btn"
+          text
+          @click="settingsStore.toggleSidebar()"
         >
-          <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/chat" v-if="userStore.isLoggedIn">协作空间</el-menu-item>
-          <el-menu-item index="/dm" v-if="userStore.isLoggedIn">枫语私语</el-menu-item>
+          <el-icon :size="18">
+            <DArrowLeft v-if="!settingsStore.sidebarCollapsed" />
+            <DArrowRight v-else />
+          </el-icon>
+        </el-button>
+      </div>
+
+      <el-scrollbar class="sidebar-menu">
+        <el-menu
+          :default-active="route.path"
+          :router="true"
+          :collapse="settingsStore.sidebarCollapsed && !isMobile"
+          @select="handleMenuSelect"
+        >
+          <el-menu-item index="/about">
+            <el-icon><HomeFilled /></el-icon>
+            <template #title>首页</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/chat" v-if="userStore.isLoggedIn">
+            <el-icon><Monitor /></el-icon>
+            <template #title>协作空间</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/dm" v-if="userStore.isLoggedIn">
+            <el-icon><ChatLineSquare /></el-icon>
+            <template #title>私聊</template>
+          </el-menu-item>
+          
           <el-menu-item index="/groups" v-if="userStore.isLoggedIn">
-            群聊
-            <el-badge 
-              v-if="groupUnreadCount > 0" 
-              :value="groupUnreadCount" 
-              :max="99"
-              class="nav-badge"
-            />
-          </el-menu-item>
-          <el-menu-item index="/friends" v-if="userStore.isLoggedIn">
-            好友
-            <el-badge 
-              v-if="pendingFriendRequests > 0" 
-              :value="pendingFriendRequests" 
-              :max="99"
-              class="nav-badge"
-            />
-          </el-menu-item>
-          <el-menu-item index="/files" v-if="userStore.isLoggedIn">个人网盘</el-menu-item>
-          <el-sub-menu index="tools" v-if="userStore.isLoggedIn">
+            <el-icon><ChatDotRound /></el-icon>
             <template #title>
-              <el-icon><Tools /></el-icon>
-              工具
+              群聊
+              <el-badge v-if="groupUnreadCount > 0" :value="groupUnreadCount" :max="99" class="menu-badge" />
             </template>
-            <el-menu-item index="/agents">
-              <el-icon><User /></el-icon>
-              智能体
-            </el-menu-item>
-            <el-menu-item index="/skills">
-              <el-icon><MagicStick /></el-icon>
-              技能库
-            </el-menu-item>
-            <el-menu-item index="/tasks">
-              <el-icon><List /></el-icon>
-              任务
-            </el-menu-item>
-            <el-menu-item index="/scheduler">
-              <el-icon><Clock /></el-icon>
-              调度器
-            </el-menu-item>
-            <el-menu-item index="/sandboxes">
-              <el-icon><Monitor /></el-icon>
-              沙箱
-            </el-menu-item>
-            <el-menu-item index="/workspaces">
-              <el-icon><FolderOpened /></el-icon>
-              工作空间
-            </el-menu-item>
-          </el-sub-menu>
+          </el-menu-item>
+          
+          <el-menu-item index="/friends" v-if="userStore.isLoggedIn">
+            <el-icon><User /></el-icon>
+            <template #title>
+              好友
+              <el-badge v-if="pendingFriendRequests > 0" :value="pendingFriendRequests" :max="99" class="menu-badge" />
+            </template>
+          </el-menu-item>
+          
+          <el-menu-item index="/files" v-if="userStore.isLoggedIn">
+            <el-icon><FolderOpened /></el-icon>
+            <template #title>个人网盘</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/agents" v-if="userStore.isLoggedIn">
+            <el-icon><UserFilled /></el-icon>
+            <template #title>智能体</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/skills" v-if="userStore.isLoggedIn">
+            <el-icon><MagicStick /></el-icon>
+            <template #title>技能库</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/tasks" v-if="userStore.isLoggedIn">
+            <el-icon><List /></el-icon>
+            <template #title>任务</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/settings" v-if="userStore.isLoggedIn">
+            <el-icon><Setting /></el-icon>
+            <template #title>设置</template>
+          </el-menu-item>
+          
+          <!-- 管理员菜单 -->
           <el-sub-menu index="admin" v-if="userStore.isLoggedIn && userStore.isAdmin">
             <template #title>
-              <el-icon><Setting /></el-icon>
-              管理
+              <el-icon><DataBoard /></el-icon>
+              <span>管理</span>
             </template>
             <el-menu-item index="/observability">
               <el-icon><DataAnalysis /></el-icon>
-              可观测性
+              <template #title>可观测性</template>
             </el-menu-item>
             <el-menu-item index="/admin">
               <el-icon><DataBoard /></el-icon>
-              数据仪表盘
+              <template #title>数据仪表盘</template>
             </el-menu-item>
             <el-menu-item index="/admin/users">
               <el-icon><UserFilled /></el-icon>
-              用户管理
+              <template #title>用户管理</template>
             </el-menu-item>
           </el-sub-menu>
         </el-menu>
-      </div>
-      
-      <!-- 移动端导航菜单 -->
-      <div class="mobile-menu" :class="{ 'show-mobile': showMobileMenu }">
-        <el-menu
-          mode="vertical"
-          :router="true"
-          :default-active="route.path"
-          @select="showMobileMenu = false"
-        >
-          <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/chat" v-if="userStore.isLoggedIn">协作空间</el-menu-item>
-          <el-menu-item index="/dm" v-if="userStore.isLoggedIn">枫语私语</el-menu-item>
-          <el-menu-item index="/groups" v-if="userStore.isLoggedIn">
-            群聊
-            <el-badge 
-              v-if="groupUnreadCount > 0" 
-              :value="groupUnreadCount" 
-              :max="99"
-              class="nav-badge"
-            />
-          </el-menu-item>
-          <el-menu-item index="/friends" v-if="userStore.isLoggedIn">
-            好友
-            <el-badge 
-              v-if="pendingFriendRequests > 0" 
-              :value="pendingFriendRequests" 
-              :max="99"
-              class="nav-badge"
-            />
-          </el-menu-item>
-          <el-menu-item index="/files" v-if="userStore.isLoggedIn">个人网盘</el-menu-item>
-          <el-sub-menu index="tools-mobile" v-if="userStore.isLoggedIn">
-            <template #title>
-              <el-icon><Tools /></el-icon>
-              工具
-            </template>
-            <el-menu-item index="/agents">智能体</el-menu-item>
-            <el-menu-item index="/skills">技能库</el-menu-item>
-            <el-menu-item index="/tasks">任务</el-menu-item>
-            <el-menu-item index="/scheduler">调度器</el-menu-item>
-            <el-menu-item index="/sandboxes">沙箱</el-menu-item>
-            <el-menu-item index="/workspaces">工作空间</el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="admin-mobile" v-if="userStore.isLoggedIn && userStore.isAdmin">
-            <template #title>
-              <el-icon><Setting /></el-icon>
-              管理
-            </template>
-            <el-menu-item index="/observability">可观测性</el-menu-item>
-            <el-menu-item index="/admin">数据仪表盘</el-menu-item>
-            <el-menu-item index="/admin/users">用户管理</el-menu-item>
-          </el-sub-menu>
-        </el-menu>
-      </div>
+      </el-scrollbar>
 
-      <div class="header-right">
-        <template v-if="userStore.isLoggedIn">
-          <el-dropdown trigger="click">
-            <span class="user-info">
-              <el-avatar :size="32" :src="userStore.user?.avatar">
-                {{ userStore.nickname.charAt(0) }}
-              </el-avatar>
+      <!-- 底部用户信息 -->
+      <div class="sidebar-footer" v-if="userStore.isLoggedIn">
+        <el-dropdown trigger="click" placement="right-start">
+          <div class="user-card" :class="{ collapsed: settingsStore.sidebarCollapsed }">
+            <el-avatar :size="36" :src="userStore.user?.avatar">
+              {{ userStore.nickname.charAt(0) }}
+            </el-avatar>
+            <div class="user-info" v-show="!settingsStore.sidebarCollapsed || isMobile">
               <span class="username">{{ userStore.nickname }}</span>
-              <el-icon><ArrowDown /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="router.push('/profile')">
-                  <el-icon><User /></el-icon>
-                  个人中心
-                </el-dropdown-item>
-                <el-dropdown-item @click="router.push('/friends')">
-                  <el-icon><UserFilled /></el-icon>
-                  我的好友
-                </el-dropdown-item>
-                <el-dropdown-item @click="router.push('/groups')">
-                  <el-icon><ChatLineRound /></el-icon>
-                  我的群聊
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="handleLogout">
-                  <el-icon><SwitchButton /></el-icon>
-                  退出登录
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-        <template v-else>
-          <el-button type="primary" @click="router.push('/login')">登录</el-button>
-          <el-button class="register-btn" @click="router.push('/register')">注册</el-button>
-        </template>
+              <span class="user-status">在线</span>
+            </div>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="router.push('/profile')">
+                <el-icon><User /></el-icon>
+                个人中心
+              </el-dropdown-item>
+              <el-dropdown-item @click="router.push('/settings')">
+                <el-icon><Setting /></el-icon>
+                设置
+              </el-dropdown-item>
+              <el-dropdown-item divided @click="handleLogout">
+                <el-icon><SwitchButton /></el-icon>
+                退出登录
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
-    </el-header>
+    </aside>
 
-    <!-- 主内容区 -->
-    <el-main class="main">
-      <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" />
-        </transition>
-      </router-view>
-    </el-main>
+    <!-- 移动端遮罩 -->
+    <div class="mobile-overlay" :class="{ show: showMobileSidebar }" @click="showMobileSidebar = false"></div>
 
-    <!-- 底部 -->
-    <el-footer class="footer">
-      <span>© 2026 枫琳 Fenlin. 人机共生，自然之道</span>
-    </el-footer>
+    <!-- 右侧主区域 -->
+    <div class="main-container">
+      <!-- 顶部栏 -->
+      <header class="header">
+        <div class="header-left">
+          <!-- 移动端菜单按钮 -->
+          <el-button class="mobile-menu-btn" text @click="showMobileSidebar = !showMobileSidebar">
+            <el-icon :size="24"><Menu /></el-icon>
+          </el-button>
+          
+          <!-- Logo（移动端显示） -->
+          <router-link to="/" class="mobile-logo">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>枫琳</span>
+          </router-link>
+          
+          <!-- 当前页面标题 -->
+          <h2 class="page-title">{{ pageTitle }}</h2>
+        </div>
+
+        <div class="header-right">
+          <!-- 未登录 -->
+          <template v-if="!userStore.isLoggedIn">
+            <el-button type="primary" @click="router.push('/login')">登录</el-button>
+            <el-button @click="router.push('/register')">注册</el-button>
+          </template>
+          
+          <!-- 已登录 -->
+          <template v-else>
+            <!-- 设置按钮 -->
+            <el-tooltip content="设置" placement="bottom">
+              <el-button text @click="showSettingsPanel = true">
+                <el-icon :size="20"><Setting /></el-icon>
+              </el-button>
+            </el-tooltip>
+            
+            <!-- 用户头像（桌面端） -->
+            <el-dropdown trigger="click" class="user-dropdown">
+              <div class="header-user">
+                <el-avatar :size="32" :src="userStore.user?.avatar">
+                  {{ userStore.nickname.charAt(0) }}
+                </el-avatar>
+                <span class="username">{{ userStore.nickname }}</span>
+                <el-icon><ArrowDown /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="router.push('/profile')">
+                    <el-icon><User /></el-icon>
+                    个人中心
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/friends')">
+                    <el-icon><UserFilled /></el-icon>
+                    我的好友
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/settings')">
+                    <el-icon><Setting /></el-icon>
+                    设置
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="handleLogout">
+                    <el-icon><SwitchButton /></el-icon>
+                    退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+        </div>
+      </header>
+
+      <!-- 内容区域 -->
+      <main class="content" :class="{ 'with-chat': showChatBox && userStore.isLoggedIn }">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </main>
+
+      <!-- 底部聊天框 -->
+      <div class="chat-box" v-if="showChatBox && userStore.isLoggedIn">
+        <div class="chat-header">
+          <span class="chat-title">
+            <el-icon><ChatDotRound /></el-icon>
+            快捷对话
+          </span>
+          <div class="chat-actions">
+            <el-button text @click="expandChat = !expandChat">
+              <el-icon :size="16">
+                <ArrowUp v-if="!expandChat" />
+                <ArrowDown v-else />
+              </el-icon>
+            </el-button>
+            <el-button text @click="showChatBox = false">
+              <el-icon :size="16"><Close /></el-icon>
+            </el-button>
+          </div>
+        </div>
+        <div class="chat-content" v-show="expandChat">
+          <el-scrollbar ref="chatScrollbar">
+            <div class="messages">
+              <div
+                v-for="(msg, index) in quickMessages"
+                :key="index"
+                class="message"
+                :class="{ 'is-user': msg.isUser }"
+              >
+                <div class="message-content">{{ msg.content }}</div>
+              </div>
+            </div>
+          </el-scrollbar>
+        </div>
+        <div class="chat-input">
+          <el-input
+            v-model="chatInput"
+            placeholder="输入消息..."
+            @keyup.enter="sendQuickMessage"
+          >
+            <template #suffix>
+              <el-button type="primary" text @click="sendQuickMessage" :disabled="!chatInput.trim()">
+                <el-icon><Promotion /></el-icon>
+              </el-button>
+            </template>
+          </el-input>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置面板 -->
+    <el-drawer
+      v-model="showSettingsPanel"
+      title="设置"
+      direction="rtl"
+      size="360px"
+    >
+      <el-form label-position="top">
+        <el-form-item label="主题">
+          <el-radio-group v-model="themeSetting" @change="handleThemeChange">
+            <el-radio-button value="light">亮色</el-radio-button>
+            <el-radio-button value="dark">暗色</el-radio-button>
+            <el-radio-button value="system">跟随系统</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        
+        <el-form-item label="字体">
+          <el-select v-model="fontSetting" @change="handleFontChange" style="width: 100%">
+            <el-option
+              v-for="font in AVAILABLE_FONTS"
+              :key="font.value"
+              :label="font.label"
+              :value="font.value"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="字体大小">
+          <el-radio-group v-model="fontSizeSetting" @change="handleFontSizeChange">
+            <el-radio-button v-for="size in FONT_SIZES" :key="size.value" :value="size.value">
+              {{ size.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="showSettingsPanel = false">关闭</el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useFriendStore } from '@/stores/friends';
 import { useGroupStore } from '@/stores/groups';
+import { useSettingsStore, AVAILABLE_FONTS, FONT_SIZES } from '@/stores/settings';
 import { ElMessage } from 'element-plus';
 import { 
   Menu, ChatDotRound, ArrowDown, User, UserFilled, 
-  ChatLineRound, SwitchButton, Tools, MagicStick, 
-  List, Clock, Monitor, FolderOpened, Setting, 
-  DataAnalysis, DataBoard 
+  ChatLineSquare, SwitchButton, MagicStick, List, 
+  Setting, DataAnalysis, DataBoard, HomeFilled,
+  Monitor, FolderOpened, DArrowLeft, DArrowRight,
+  ArrowUp, ArrowDown as ArrowDownIcon, Close, Promotion
 } from '@element-plus/icons-vue';
 
 const route = useRoute();
@@ -231,7 +338,25 @@ const router = useRouter();
 const userStore = useUserStore();
 const friendStore = useFriendStore();
 const groupStore = useGroupStore();
-const showMobileMenu = ref(false);
+const settingsStore = useSettingsStore();
+
+// 响应式状态
+const isMobile = ref(window.innerWidth < 768);
+const showMobileSidebar = ref(false);
+const showSettingsPanel = ref(false);
+const showChatBox = ref(true);
+const expandChat = ref(false);
+
+// 设置本地状态
+const themeSetting = ref(settingsStore.theme);
+const fontSetting = ref(settingsStore.fontFamily);
+const fontSizeSetting = ref(settingsStore.fontSize);
+
+// 聊天相关
+const chatInput = ref('');
+const quickMessages = ref([
+  { content: '你好！有什么可以帮助你的吗？', isUser: false }
+]);
 
 // 好友申请数量
 const pendingFriendRequests = computed(() => friendStore.pendingRequestCount);
@@ -239,345 +364,492 @@ const pendingFriendRequests = computed(() => friendStore.pendingRequestCount);
 // 群聊未读数
 const groupUnreadCount = computed(() => groupStore.totalUnread);
 
-// 初始化时获取好友申请数量和群聊列表
+// 页面标题
+const pageTitle = computed(() => {
+  return route.meta.title || '枫琳';
+});
+
+// 监听窗口大小变化
+const handleResize = () => {
+  isMobile.value = window.innerWidth < 768;
+  if (isMobile.value && settingsStore.sidebarCollapsed) {
+    settingsStore.sidebarCollapsed = false;
+  }
+};
+
+// 菜单选择
+const handleMenuSelect = () => {
+  if (isMobile.value) {
+    showMobileSidebar.value = false;
+  }
+};
+
+// 设置变更
+const handleThemeChange = (value) => {
+  settingsStore.setTheme(value);
+};
+
+const handleFontChange = (value) => {
+  settingsStore.setFontFamily(value);
+};
+
+const handleFontSizeChange = (value) => {
+  settingsStore.setFontSize(value);
+};
+
+// 发送快捷消息
+const sendQuickMessage = () => {
+  if (!chatInput.value.trim()) return;
+  
+  quickMessages.value.push({
+    content: chatInput.value,
+    isUser: true
+  });
+  
+  // 模拟 AI 回复
+  setTimeout(() => {
+    quickMessages.value.push({
+      content: '收到你的消息了！这是一个快捷对话功能，完整功能请前往协作空间。',
+      isUser: false
+    });
+  }, 500);
+  
+  chatInput.value = '';
+};
+
+// 退出登录
+const handleLogout = async () => {
+  await userStore.logout();
+  ElMessage.success('已退出登录');
+  router.push('/');
+};
+
+// 初始化
 onMounted(async () => {
+  window.addEventListener('resize', handleResize);
+  settingsStore.init();
+  
   if (userStore.isLoggedIn) {
     await friendStore.fetchRequests();
     await groupStore.fetchGroups();
   }
 });
 
-const handleLogout = async () => {
-  await userStore.logout();
-  ElMessage.success('已退出登录');
-  router.push('/');
-};
+// 监听路由变化
+watch(() => route.path, () => {
+  showMobileSidebar.value = false;
+});
 </script>
 
 <style scoped>
 .layout {
   display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   background: var(--fenlin-bg, #FAFAFA);
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 64px;
+  --header-height: 56px;
+  --chat-box-height: 120px;
+  transition: var(--fenlin-transition, all 0.3s ease);
 }
 
-/* 移动端遮罩 */
-.mobile-overlay {
-  display: none;
-  position: fixed;
-  top: 60px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+/* 侧边栏 */
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: white;
+  border-right: 1px solid var(--fenlin-border, #E0E0E0);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  z-index: 100;
+  flex-shrink: 0;
 }
 
-.mobile-overlay.show {
-  display: block;
-  opacity: 1;
+.layout.sidebar-collapsed .sidebar {
+  width: var(--sidebar-collapsed-width);
 }
 
-/* 移动端菜单按钮 */
-.mobile-menu-toggle {
-  display: none;
-  margin-right: 12px;
-  color: var(--fenlin-primary);
-}
-
-.header {
+.sidebar-header {
+  height: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--fenlin-border, #E0E0E0);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fenlin-primary, #C41E3A);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.logo .el-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.collapse-btn {
+  color: var(--fenlin-text-secondary, #5A6C7D);
+}
+
+.sidebar-menu {
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar-menu :deep(.el-menu) {
+  border-right: none;
+}
+
+.sidebar-menu :deep(.el-menu-item) {
+  height: 48px;
+  line-height: 48px;
+  margin: 4px 8px;
+  border-radius: var(--fenlin-radius-sm, 8px);
+  color: var(--fenlin-text-secondary, #5A6C7D);
+  transition: var(--fenlin-transition, all 0.3s ease);
+}
+
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background: rgba(196, 30, 58, 0.05);
+  color: var(--fenlin-primary, #C41E3A);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: rgba(196, 30, 58, 0.1);
+  color: var(--fenlin-primary, #C41E3A);
+  font-weight: 600;
+}
+
+.menu-badge {
+  margin-left: 8px;
+}
+
+.menu-badge :deep(.el-badge__content) {
+  font-size: 10px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--fenlin-border, #E0E0E0);
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--fenlin-radius-md, 12px);
+  cursor: pointer;
+  transition: var(--fenlin-transition, all 0.3s ease);
+}
+
+.user-card:hover {
+  background: var(--fenlin-bg, #FAFAFA);
+}
+
+.user-card.collapsed {
+  padding: 8px;
+  justify-content: center;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.username {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fenlin-text-primary, #2C3E50);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-status {
+  font-size: 12px;
+  color: var(--fenlin-accent, #228B22);
+}
+
+/* 主容器 */
+.main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 顶部栏 */
+.header {
+  height: var(--header-height);
   background: white;
-  box-shadow: 0 2px 12px rgba(196, 30, 58, 0.08);
-  padding: 0 32px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid var(--fenlin-border, #E0E0E0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 24px;
-  flex: 1;
+  gap: 16px;
 }
 
-.header-left .logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 20px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #C41E3A 0%, #D4A017 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.header-left .logo:hover {
-  transform: scale(1.05);
-}
-
-.header-left .logo :deep(.el-icon) {
-  color: #C41E3A;
-  font-size: 24px;
-}
-
-/* 桌面端菜单 */
-.desktop-menu {
-  display: flex;
-  border-bottom: none;
-  background: transparent;
-}
-
-.desktop-menu :deep(.el-menu-item) {
-  font-weight: 500;
-  color: var(--fenlin-text-secondary, #5A6C7D);
-  transition: all 0.3s ease;
-  border-radius: 8px;
-  margin: 0 4px;
-  position: relative;
-}
-
-.desktop-menu :deep(.el-menu-item:hover) {
-  background: rgba(196, 30, 58, 0.05);
-  color: #C41E3A;
-}
-
-.desktop-menu :deep(.el-menu-item.is-active) {
-  color: #C41E3A;
-  background: rgba(196, 30, 58, 0.1);
-  font-weight: 600;
-  border-bottom: 3px solid #C41E3A;
-}
-
-.nav-badge {
-  margin-left: 4px;
-}
-
-.nav-badge :deep(.el-badge__content) {
-  font-size: 10px;
-  height: 16px;
-  line-height: 16px;
-  padding: 0 5px;
-}
-
-/* 移动端菜单 */
-.mobile-menu {
+.mobile-menu-btn {
   display: none;
+  color: var(--fenlin-primary, #C41E3A);
+}
+
+.mobile-logo {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fenlin-primary, #C41E3A);
+  text-decoration: none;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fenlin-text-primary, #2C3E50);
+  margin: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
-.header-right :deep(.el-button) {
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.header-right :deep(.el-button--primary) {
-  background: linear-gradient(135deg, #C41E3A 0%, #E63950 100%);
-  border: none;
-  box-shadow: 0 2px 8px rgba(196, 30, 58, 0.3);
-}
-
-.header-right :deep(.el-button--primary:hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(196, 30, 58, 0.4);
-}
-
-.header-right :deep(.el-button--default) {
-  border: 1px solid #C41E3A;
-  color: #C41E3A;
-}
-
-.header-right :deep(.el-button--default:hover) {
-  background: rgba(196, 30, 58, 0.05);
-}
-
-.user-info {
+.header-user {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 24px;
-  transition: all 0.3s ease;
+  transition: var(--fenlin-transition, all 0.3s ease);
 }
 
-.user-info:hover {
-  background: rgba(196, 30, 58, 0.05);
+.header-user:hover {
+  background: var(--fenlin-bg, #FAFAFA);
 }
 
-.user-info :deep(.el-avatar) {
-  border: 2px solid #C41E3A;
-  background: linear-gradient(135deg, #C41E3A 0%, #D4A017 100%);
-}
-
-.username {
-  color: var(--fenlin-text-primary, #2C3E50);
+.header-user .username {
   font-weight: 500;
 }
 
-.main {
+/* 内容区域 */
+.content {
   flex: 1;
-  margin-top: 60px;
-  padding: 32px;
-  position: relative;
+  overflow: auto;
+  padding: 24px;
+  transition: padding-bottom 0.3s ease;
 }
 
-.footer {
-  text-align: center;
-  color: var(--fenlin-text-tertiary, #95A5A6);
-  font-size: 14px;
+.content.with-chat {
+  padding-bottom: calc(var(--chat-box-height) + 24px);
+}
+
+/* 聊天框 */
+.chat-box {
+  position: fixed;
+  bottom: 0;
+  left: calc(var(--sidebar-width) + 0px);
+  right: 0;
   background: white;
   border-top: 1px solid var(--fenlin-border, #E0E0E0);
-  padding: 24px;
-  position: relative;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  transition: left 0.3s ease;
 }
 
-.footer::before {
-  content: '🍁';
-  position: absolute;
-  left: 50%;
-  top: -15px;
-  transform: translateX(-50%);
-  font-size: 24px;
-  opacity: 0.3;
+.layout.sidebar-collapsed .chat-box {
+  left: var(--sidebar-collapsed-width);
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--fenlin-bg, #FAFAFA);
+  border-bottom: 1px solid var(--fenlin-border, #E0E0E0);
+}
+
+.chat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--fenlin-text-primary, #2C3E50);
+}
+
+.chat-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.chat-content {
+  height: 200px;
+  border-bottom: 1px solid var(--fenlin-border, #E0E0E0);
+}
+
+.messages {
+  padding: 12px;
+}
+
+.message {
+  margin-bottom: 12px;
+}
+
+.message.is-user {
+  text-align: right;
+}
+
+.message-content {
+  display: inline-block;
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: var(--fenlin-radius-md, 12px);
+  background: var(--fenlin-bg, #FAFAFA);
+  color: var(--fenlin-text-primary, #2C3E50);
+  text-align: left;
+}
+
+.message.is-user .message-content {
+  background: var(--fenlin-primary, #C41E3A);
+  color: white;
+}
+
+.chat-input {
+  padding: 8px 16px;
 }
 
 /* 页面切换动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.2s ease;
 }
 
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
+.fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
 }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
+  .layout {
+    --sidebar-width: 260px;
+  }
+  
+  .sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    height: 100vh;
+    box-shadow: none;
+    z-index: 200;
+  }
+  
+  .sidebar.mobile-show {
+    left: 0;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+  }
+  
+  .mobile-overlay.show {
+    display: block;
+  }
+  
   .header {
     padding: 0 16px;
   }
   
-  .mobile-menu-toggle {
+  .mobile-menu-btn {
     display: inline-flex;
   }
   
-  .header-left {
-    gap: 12px;
+  .mobile-logo {
+    display: flex;
   }
   
-  .header-left .logo {
-    font-size: 18px;
-  }
-  
-  .header-left .logo :deep(.el-icon) {
-    font-size: 20px;
-  }
-  
-  /* 隐藏桌面端菜单 */
-  .desktop-menu {
-    display: none !important;
-  }
-  
-  /* 显示移动端菜单 */
-  .mobile-menu {
-    display: block;
-    position: fixed;
-    top: 60px;
-    left: -100%;
-    width: 280px;
-    height: calc(100vh - 60px);
-    background: white;
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    transition: left 0.3s ease;
-    padding: 20px 0;
-    overflow-y: auto;
-  }
-  
-  .mobile-menu.show-mobile {
-    left: 0;
-  }
-  
-  .mobile-menu :deep(.el-menu) {
-    border: none;
-  }
-  
-  .mobile-menu :deep(.el-menu-item) {
-    width: 100%;
-    margin: 4px 0;
-    padding: 16px 24px;
-    border-radius: 0;
-    border-left: 4px solid transparent;
-  }
-  
-  .mobile-menu :deep(.el-menu-item.is-active) {
-    border-left-color: #C41E3A;
-    border-bottom: none;
-    background: rgba(196, 30, 58, 0.05);
-  }
-  
-  .header-right {
-    gap: 8px;
-  }
-  
-  .header-right .register-btn {
+  .page-title {
     display: none;
   }
   
-  .username {
+  .header-user .username {
     display: none;
   }
   
-  .user-info {
-    padding: 4px;
-  }
-  
-  .main {
+  .content {
     padding: 16px;
   }
   
-  .footer {
-    font-size: 12px;
-    padding: 16px;
+  .chat-box {
+    left: 0 !important;
+  }
+  
+  .chat-content {
+    height: 150px;
   }
 }
 
-/* 小屏手机 */
-@media (max-width: 375px) {
-  .header-left .logo span {
-    display: none;
-  }
-  
-  .header-right :deep(.el-button) {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
+/* 暗色主题 */
+:root[data-theme="dark"] {
+  --fenlin-bg: #1a1a1a;
+  --fenlin-bg-secondary: #2a2a2a;
+  --fenlin-surface: #242424;
+  --fenlin-border: #333;
+  --fenlin-text-primary: #e0e0e0;
+  --fenlin-text-secondary: #a0a0a0;
+  --fenlin-text-tertiary: #666;
+}
+
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .header,
+:root[data-theme="dark"] .chat-box {
+  background: var(--fenlin-surface);
+  border-color: var(--fenlin-border);
+}
+
+:root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item) {
+  color: var(--fenlin-text-secondary);
+}
+
+:root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item:hover),
+:root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item.is-active) {
+  background: rgba(196, 30, 58, 0.2);
+}
+
+:root[data-theme="dark"] .message-content {
+  background: var(--fenlin-bg-secondary);
 }
 </style>

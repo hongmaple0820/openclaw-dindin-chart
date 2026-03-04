@@ -19,6 +19,12 @@ const routes = [
         meta: { title: '首页' }
       },
       {
+        path: 'about',
+        name: 'About',
+        component: () => import('@/views/About.vue'),
+        meta: { title: '关于我们' }
+      },
+      {
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/Chat.vue'),
