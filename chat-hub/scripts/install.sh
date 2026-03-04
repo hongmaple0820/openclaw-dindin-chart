@@ -2,7 +2,7 @@
 #
 # Chat-Hub 一键安装脚本
 # 
-# 用法: curl -fsSL https://get.mapleclaw.io/chat-hub | bash
+# 用法: curl -fsSL https://your-install-url/chat-hub | bash
 #
 
 set -e
@@ -117,8 +117,8 @@ configure_chat_hub() {
     case $mode_choice in
         2)
             read -p "请输入云端 Token: " cloud_token
-            read -p "云端端点 (默认: https://cloud.mapleclaw.io): " cloud_endpoint
-            cloud_endpoint=${cloud_endpoint:-"https://cloud.mapleclaw.io"}
+            read -p "云端端点 (默认: https://your-cloud-endpoint.com): " cloud_endpoint
+            cloud_endpoint=${cloud_endpoint:-"https://your-cloud-endpoint.com"}
             
             cat > "$CONFIG_FILE" << EOF
 # Chat-Hub 配置文件
