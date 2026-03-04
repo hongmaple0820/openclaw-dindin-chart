@@ -169,8 +169,8 @@ router.post('/register', async (req, res) => {
     }
 
     // 生成实例 ID
-    const finalInstanceId = instanceId || \`inst_\${uuidv4().replace(/-/g, '')}\`;
-    const finalName = name || \`instance-\${finalInstanceId.substring(0, 8)}\`;
+    const finalInstanceId = instanceId || `inst_${uuidv4().replace(/-/g, '')}`;
+    const finalName = name || `instance-${finalInstanceId.substring(0, 8)}`;
 
     // 生成 Token
     const tokenResult = await auth.generateToken(finalInstanceId, finalName, role);
@@ -186,7 +186,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    console.log(\`[Relay Routes] 实例已注册: \${finalInstanceId} (\${finalName})\`);
+    console.log(`[Relay Routes] 实例已注册: ${finalInstanceId} (${finalName})`);
 
     res.json({
       success: true,
@@ -280,7 +280,7 @@ router.post('/revoke', authenticateToken, async (req, res) => {
         await connMgr.unregisterInstance(req.instanceId);
       }
 
-      console.log(\`[Relay Routes] Token 已撤销: \${req.instanceId}\`);
+      console.log(`[Relay Routes] Token 已撤销: ${req.instanceId}`);
       res.json({
         success: true,
         message: 'Token revoked successfully'
@@ -441,7 +441,7 @@ router.post('/sync/message', authenticateToken, requirePermission(['sync:push'])
     // 更新实例最后同步时间
     await connMgr.updateInstancePing(req.instanceId);
 
-    console.log(\`[Relay Routes] 同步消息: \${syncCount} 条 (实例: \${req.instanceId})\`);
+    console.log(`[Relay Routes] 同步消息: ${syncCount} 条 (实例: ${req.instanceId})`);
 
     res.json({
       success: true,
@@ -511,7 +511,7 @@ router.post('/sync/file', authenticateToken, requirePermission(['file:write']), 
     // 更新实例活动时间
     await connMgr.updateInstancePing(req.instanceId);
 
-    console.log(\`[Relay Routes] 同步文件: \${fileName} (\${fileId})\`);
+    console.log(`[Relay Routes] 同步文件: ${fileName} (${fileId})`);
 
     res.json({
       success: true,
@@ -573,7 +573,7 @@ router.post('/sync/config', authenticateToken, requirePermission(['sync:full']),
     // 更新实例活动时间
     await connMgr.updateInstancePing(req.instanceId);
 
-    console.log(\`[Relay Routes] 同步配置: \${configKey}\`);
+    console.log(`[Relay Routes] 同步配置: ${configKey}`);
 
     res.json({
       success: true,
@@ -668,7 +668,7 @@ router.get('/sse', async (req, res) => {
     });
 
     // 生成连接 ID
-    const connectionId = \`sse_\${Date.now()}_\${Math.random().toString(36).substr(2, 9)}\`;
+    const connectionId = `sse_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // 添加连接
     const addResult = connMgr.addConnection(connectionId, tokenData.instanceId, {
@@ -678,7 +678,7 @@ router.get('/sse', async (req, res) => {
     });
 
     if (!addResult.success) {
-      res.write(\`event: error\\ndata: \${JSON.stringify({ error: addResult.reason })}\\n\\n\`);
+      res.write(`event: error\\ndata: ${JSON.stringify({ error: addResult.reason })}\\n\\n`);
       return res.end();
     }
 
@@ -690,9 +690,9 @@ router.get('/sse', async (req, res) => {
       timestamp: Date.now(),
       message: 'SSE connection established'
     };
-    res.write(\`event: connected\\ndata: \${JSON.stringify(connectEvent)}\\n\\n\`);
+    res.write(`event: connected\\ndata: ${JSON.stringify(connectEvent)}\\n\\n`);
 
-    console.log(\`[Relay Routes] SSE 连接建立: \${connectionId} (实例: \${tokenData.instanceId})\`);
+    console.log(`[Relay Routes] SSE 连接建立: ${connectionId} (实例: ${tokenData.instanceId})`);
 
     // 心跳定时器
     const heartbeatInterval = setInterval(() => {
@@ -700,13 +700,13 @@ router.get('/sse', async (req, res) => {
         clearInterval(heartbeatInterval);
         return;
       }
-      res.write(\`event: heartbeat\\ndata: \${JSON.stringify({ timestamp: Date.now() })}\\n\\n\`);
+      res.write(`event: heartbeat\\ndata: ${JSON.stringify({ timestamp: Date.now() })}\\n\\n`);
     }, 30000);
 
     // 监听频道消息
     const messageHandler = (message) => {
       if (res.writableEnded) return;
-      res.write(\`event: message\\ndata: \${JSON.stringify(message)}\\n\\n\`);
+      res.write(`event: message\\ndata: ${JSON.stringify(message)}\\n\\n`);
     };
 
     // 订阅频道（如果 ConnectionManager 支持）
@@ -720,12 +720,12 @@ router.get('/sse', async (req, res) => {
     req.on('close', () => {
       clearInterval(heartbeatInterval);
       connMgr.removeConnection(connectionId, 'client-close');
-      console.log(\`[Relay Routes] SSE 连接关闭: \${connectionId}\`);
+      console.log(`[Relay Routes] SSE 连接关闭: ${connectionId}`);
     });
 
     // 监听错误
     req.on('error', (error) => {
-      console.error(\`[Relay Routes] SSE 连接错误: \${connectionId}\`, error);
+      console.error(`[Relay Routes] SSE 连接错误: ${connectionId}`, error);
       clearInterval(heartbeatInterval);
       connMgr.removeConnection(connectionId, 'error');
     });
@@ -760,15 +760,6 @@ router.get('/health', (req, res) => {
   const connMgr = getConnectionManager();
   const health = connMgr ? connMgr.getHealth() : { status: 'unknown' };
 
-  res.json({
-    status: health.status === 'healthy' ? 'healthy' : 'degraded',
-    connections: health.currentConnections || 0,
-    instances: health.onlineInstances || 0,
-    timestamp: Date.now()
-  });
-});
-
-module.exports = router;
   res.json({
     status: health.status === 'healthy' ? 'healthy' : 'degraded',
     connections: health.currentConnections || 0,

@@ -2,13 +2,13 @@
  * Agent Manager - Agent管理入口
  */
 
-const { AgentRegistry } = require('./registry');
-const { OpenAIAdapter } = require('./openai-adapter');
-const { StreamingHandler } = require('./streaming-handler');
-const { CapabilityRouter } = require('./capability-router');
-const { MemoryStore } = require('./memory/store');
-const { MemoryVectors } = require('./memory/vectors');
-const { MemoryRetrieval } = require('./memory/retrieval');
+const AgentRegistry = require('./registry');
+const OpenAIAdapter = require('./openai-adapter');
+const StreamingHandler = require('./streaming-handler');
+const CapabilityRouter = require('./capability-router');
+const MemoryStore = require('./memory/store');
+const MemoryVectors = require('./memory/vectors');
+const MemoryRetrieval = require('./memory/retrieval');
 
 class AgentManager {
   constructor(db, config = {}) {

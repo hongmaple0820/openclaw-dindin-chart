@@ -34,7 +34,7 @@ router.get('/connect', (req, res) => {
     });
   }
 
-  console.log(\`[SSE Routes] 收到连接请求: \${userId}\`);
+  console.log(`[SSE Routes] 收到连接请求: ${userId}`);
   
   // 使用 SSE 管理器建立连接
   sseManager.connect(userId, res);
@@ -138,7 +138,7 @@ router.post('/send', (req, res) => {
     const sent = sseManager.sendToUser(targetUserId, event, data);
     
     if (sent) {
-      console.log(\`[SSE Routes] 发送消息到 \${targetUserId}:\`, event);
+      console.log(`[SSE Routes] 发送消息到 ${targetUserId}:`, event);
       res.json({ 
         success: true, 
         userId: targetUserId,
@@ -188,7 +188,7 @@ router.post('/broadcast', (req, res) => {
     // 广播消息
     sseManager.broadcast(event, data, excludeUsers);
     
-    console.log(\`[SSE Routes] 广播消息: \${event} -> \${sentCount}/\${onlineCount} 用户\`);
+    console.log(`[SSE Routes] 广播消息: ${event} -> ${sentCount}/${onlineCount} 用户`);
     
     res.json({ 
       success: true, 
@@ -224,10 +224,10 @@ router.delete('/disconnect/:userId', (req, res) => {
     
     sseManager.disconnect(userId);
     
-    console.log(\`[SSE Routes] 断开用户连接: \${userId}\`);
+    console.log(`[SSE Routes] 断开用户连接: ${userId}`);
     res.json({ 
       success: true, 
-      message: \`User \${userId} disconnected\` 
+      message: `User ${userId} disconnected` 
     });
   } catch (error) {
     console.error('[SSE Routes] 断开连接失败:', error);

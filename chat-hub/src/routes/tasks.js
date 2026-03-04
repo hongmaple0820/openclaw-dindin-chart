@@ -212,7 +212,7 @@ function updateTask(req, res) {
     }
     
     params.push(id);
-    db.prepare(`UPDATE tasks SET \${updates.join(', ')} WHERE id = ?`).run(...params);
+    db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`).run(...params);
     
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     task.context = task.context ? JSON.parse(task.context) : null;
@@ -270,7 +270,7 @@ function startTask(req, res) {
     }
     
     if (existing.status !== 'pending') {
-      return res.status(400).json({ success: false, message: `任务状态为 \${existing.status}，无法启动` });
+      return res.status(400).json({ success: false, message: `任务状态为 ${existing.status}，无法启动` });
     }
     
     const now = Date.now();
@@ -567,7 +567,7 @@ function addContextItem(req, res) {
     if (!validTypes.includes(type)) {
       return res.status(400).json({ 
         success: false, 
-        message: `type 必须是: \${validTypes.join(', ')}` 
+        message: `type 必须是: ${validTypes.join(', ')}` 
       });
     }
     

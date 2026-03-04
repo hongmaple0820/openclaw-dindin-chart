@@ -1989,6 +1989,26 @@ async function start() {
   const schedulerRoutes = require('./routes/scheduler');
   app.use('/api/scheduler', schedulerRoutes);
 
+  // V2 新增路由
+  const skillsModule = require('./routes/skills');
+  const agentsV2Module = require('./routes/agents-v2');
+  const sandboxModule = require('./routes/sandbox');
+  const workspaceModule = require('./routes/workspace');
+  const relayModule = require('./routes/relay');
+  
+  // 提取 router
+  const skillsRoutes = skillsModule.router || skillsModule;
+  const agentsV2Routes = agentsV2Module.router || agentsV2Module;
+  const sandboxRoutes = sandboxModule.router || sandboxModule;
+  const workspaceRoutes = workspaceModule.router || workspaceModule;
+  const relayRoutes = relayModule.router || relayModule;
+  
+  app.use('/api/skills', skillsRoutes);
+  app.use('/api/agents', agentsV2Routes);
+  app.use('/api/sandbox', sandboxRoutes);
+  app.use('/api/workspace', workspaceRoutes);
+  app.use('/api/relay', relayRoutes);
+
 // 邮箱通道路由
   const emailRoutes = require('./routes/email');
 
