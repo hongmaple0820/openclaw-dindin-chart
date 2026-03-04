@@ -72,7 +72,7 @@ const treeProps = {
 
 const treeData = computed(() => props.data);
 const contextMenuRef = ref();
-const currentNode = null);
+const currentNode = ref(null);
 
 function getFileIcon(data) {
   if (data.type === 'directory') {
@@ -127,7 +127,8 @@ function handleCommand(command) {
 }
 
 .node-size {
-  font-size: 12pxn  color: #909399;
+  font-size: 12px;
+  color: #909399;
 }
 
 :deep(.el-tree-node__content) {

@@ -179,7 +179,10 @@ function formatTime(dateString) {
 .workspace-footer {
   display: flex;
   justify-content: space-between;
-  align-items: cenupdate-time {
+  align-items: center;
+}
+
+.update-time {
   font-size: 12px;
   color: #c0c4cc;
 }

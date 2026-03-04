@@ -418,8 +418,8 @@ onMounted(() => loadAgent());
 .meta-tags { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
 .status-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 2px 8px; border-radius: 4px; }
 .status-badge.status-active { color: #67c23a; background: #f0f9ff; }
-.status-badge.status-inactive { color: #909399; backgroun4f4f5; }
-.status-badus-error { color: #f56c6c; background: #fef0f0; }
+.status-badge.status-inactive { color: #909399; background: #f4f4f5; }
+.status-badge.status-error { color: #f56c6c; background: #fef0f0; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .agent-description { color: #606266; line-height: 1.6; margin: 0; }
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
@@ -428,7 +428,8 @@ onMounted(() => loadAgent());
 .stat-label { font-size: 13px; color: #909399; }
 .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .capability-section { margin-bottom: 20px; }
-.capability-section:last-child { margin-bottom:n.capability-section h4 { margin: 0 0 12px; font-size: 15px; color: #303133; }
+.capability-section:last-child { margin-bottom: 0; }
+.capability-section h4 { margin: 0 0 12px; font-size: 15px; color: #303133; }
 .prompt-display { font-family: 'Courier New', monospace; }
 .capability-tags, .tools-list { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 768px) {

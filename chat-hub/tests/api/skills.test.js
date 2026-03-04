@@ -48,9 +48,11 @@ describe('Skills API', () => {
       register: jest.fn(),
       unregister: jest.fn(),
       getUserSkills: jest.fn(),
+      getUserSkill: jest.fn(),
       bindUserSkill: jest.fn(),
       unbindUserSkill: jest.fn(),
       recordUsage: jest.fn(),
+      _invalidateCache: jest.fn(),
       db: null
     },
     executor: {
@@ -420,13 +422,22 @@ describe('Skills API', () => {
   
   describe('错误处理', () => {
     it('应该处理未初始化的管理器', async () => {
+      // 重置 manager 为 null
       skillsRouter.setSkillsManager(null);
       
-      const res = await request(app)
+      // 创建一个新的应用，不设置 manager
+      const newApp = express();
+      newApp.use(express.json());
+      newApp.use('/api/skills', skillsRouter.router);
+      
+      const res = await request(newApp)
         .get('/api/skills')
         .expect(500);
       
       expect(res.body.error).toBe('Skills manager not initialized');
+      
+      // 恢复 manager
+      skillsRouter.setSkillsManager(mockSkillsManager);
     });
   });
 });

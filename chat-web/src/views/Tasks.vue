@@ -432,10 +432,11 @@ watch(() => route.params.id, (id) => {
 
 .pinned-section {
   background: white;
-  border-bom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.section-headery: flex;
+.section-header {
+  display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
@@ -473,7 +474,10 @@ watch(() => route.params.id, (id) => {
 
 .tasks-list :deep(.task-card.active) {
   border-left: 3px solid #C41E3A;
-  background: #fn.tasks-main {
+  background: #fff5f5;
+}
+
+.tasks-main {
   flex: 1;
   display: flex;
   flex-direction: column;

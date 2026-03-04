@@ -241,7 +241,7 @@ module.exports = {{className}};
   async importFromGit(gitUrl, options = {}) {
     const tempDir = path.join(this.skillsDir, '.temp_' + uuidv4());
     const { execSync } = require('child_process');
-    execSync(\`git clone --depth 1 \${gitUrl} \${tempDir}\`, { stdio: 'pipe' });
+    execSync(`git clone --depth 1 ${gitUrl} ${tempDir}`, { stdio: 'pipe' });
     
     const findYaml = (dir) => {
       for (const file of fs.readdirSync(dir)) {
@@ -321,9 +321,3 @@ module.exports = {{className}};
   }
 }
 
-module.exports = PluginCreator;
-.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') + 'Plugin';
-  }
-}
-
-module.exports = PluginCreator;

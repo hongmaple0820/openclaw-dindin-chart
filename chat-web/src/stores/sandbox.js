@@ -157,7 +157,8 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     try {
       const res = await sandboxApi.delete(id);
       if (res.success) {
-        sandboxes.value = sandboxes.value.filter(s => s.id !==        if (currentSandbox.value?.id === id) {
+        sandboxes.value = sandboxes.value.filter(s => s.id !== id);
+        if (currentSandbox.value?.id === id) {
           clearCurrentSandbox();
         }
         return true;
