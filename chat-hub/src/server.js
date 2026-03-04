@@ -2,6 +2,7 @@ const express = require('express');
 const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
 const TransportManager = require('./transport');
@@ -1989,6 +1990,48 @@ async function start() {
   const schedulerRoutes = require('./routes/scheduler');
   app.use('/api/scheduler', schedulerRoutes);
 
+  // ==================== V2 Manager 初始化 ====================
+  const Database = require('better-sqlite3');
+  const DbWrapper = require('./db-wrapper');
+  const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'chat-hub.db');
+  const v2DbRaw = new Database(dbPath);
+  v2DbRaw.pragma('journal_mode = WAL');
+  const v2Db = new DbWrapper(v2DbRaw); // 包装为 async API
+  app.locals.db = v2DbRaw; // V2 数据库（供路由使用）
+
+  // Skills Manager
+  let skillsManager = null;
+  try {
+    const { SkillsManager } = require('./skills');
+    skillsManager = new SkillsManager(v2Db, config);
+    await skillsManager.init();
+    console.log('[Server] SkillsManager 初始化完成');
+  } catch (e) {
+    console.log('[Server] SkillsManager 初始化失败:', e.message);
+  }
+
+  // Sandbox Manager (uses raw db with prepare())
+  let sandboxManager = null;
+  try {
+    const { SandboxManager } = require('./sandbox');
+    sandboxManager = new SandboxManager(v2DbRaw, config);
+    await sandboxManager.init();
+    console.log('[Server] SandboxManager 初始化完成');
+  } catch (e) {
+    console.log('[Server] SandboxManager 初始化失败:', e.message);
+  }
+
+  // Workspace Manager (uses raw db with prepare())
+  let workspaceManager = null;
+  try {
+    const { WorkspaceManager } = require('./workspace');
+    workspaceManager = new WorkspaceManager(v2DbRaw, config);
+    await workspaceManager.init();
+    console.log('[Server] WorkspaceManager 初始化完成');
+  } catch (e) {
+    console.log('[Server] WorkspaceManager 初始化失败:', e.message);
+  }
+
   // V2 新增路由
   const skillsModule = require('./routes/skills');
   const agentsV2Module = require('./routes/agents-v2');
@@ -2002,6 +2045,17 @@ async function start() {
   const sandboxRoutes = sandboxModule.router || sandboxModule;
   const workspaceRoutes = workspaceModule.router || workspaceModule;
   const relayRoutes = relayModule.router || relayModule;
+  
+  // 注入 Manager 到路由
+  if (skillsManager && skillsModule.setSkillsManager) {
+    skillsModule.setSkillsManager(skillsManager);
+  }
+  if (sandboxManager && sandboxRoutes.setManager) {
+    sandboxRoutes.setManager(sandboxManager);
+  }
+  if (workspaceManager && workspaceRoutes.setManager) {
+    workspaceRoutes.setManager(workspaceManager);
+  }
   
   app.use('/api/skills', skillsRoutes);
   app.use('/api/agents', agentsV2Routes);
