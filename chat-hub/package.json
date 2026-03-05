@@ -1,13 +1,17 @@
 {
   "name": "chat-hub",
-  "version": "2.0.0",
-  "description": "AI机器人聊天室 - 消息中转服务",
-  "main": "src/index.js",
+  "version": "2.1.0",
+  "description": "MapleClaw Gateway - AI Agent 操作系统的消息网关",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "dev:js": "node --watch src/index.js",
     "test": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -16,15 +20,18 @@
     "better-sqlite3": "^12.6.2",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
+    "dompurify": "^3.2.4",
     "eventsource": "^4.1.0",
     "express": "^4.18.2",
     "fs-extra": "^11.3.4",
     "imap": "^0.8.19",
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.3",
+    "marked": "^15.0.12",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.1",
+    "playwright": "^1.50.1",
     "sharp": "^0.34.5",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
@@ -32,7 +39,30 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/dompurify": "^3.2.0",
+    "@types/express": "^5.0.6",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^25.3.3",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^6.4.17",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.14",
+    "jest": "^30.0.3",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
     "jest": "^29.7.0",
-    "supertest": "^6.3.4"
+    "supertest": "^6.3.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
