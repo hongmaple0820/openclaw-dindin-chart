@@ -156,3 +156,28 @@ export interface DbWrapper {
   run(sql: string, params?: unknown[]): Promise<{ changes: number; lastInsertRowid: number | bigint }>;
   exec(sql: string): void;
 }
+
+// ==================== 工具类型 ====================
+
+/** 将 unknown 转换为 Record<string, unknown> */
+export function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+/** 安全解析 JSON */
+export function safeParseJson(value: unknown): Record<string, unknown> {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}

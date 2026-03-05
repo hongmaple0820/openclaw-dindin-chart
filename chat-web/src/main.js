@@ -4,7 +4,6 @@
  * @date 2026-02-06
  */
 import { createApp } from 'vue';
-import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 
@@ -17,13 +16,14 @@ import './styles/mobile.css';
 
 const app = createApp(App);
 
-// 注册 Element Plus 图标
+// 注册 Element Plus 图标 (按需)
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component);
 }
 
 app.use(pinia);
 app.use(router);
-app.use(ElementPlus);
+
+// ElementPlus 组件通过 unplugin-vue-components 自动按需引入，无需全局注册
 
 app.mount('#app');
