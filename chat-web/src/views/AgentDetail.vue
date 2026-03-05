@@ -101,6 +101,63 @@
         </div>
       </el-card>
 
+      <!-- 绑定链接 -->
+      <el-card v-if="canEdit" class="bind-card">
+        <template #header>
+          <div class="card-header">
+            <span>绑定链接</span>
+            <el-icon><Link /></el-icon>
+          </div>
+        </template>
+
+        <div v-if="bindStatus.loading" class="bind-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>检查绑定状态...</span>
+        </div>
+
+        <div v-else-if="bindStatus.bound" class="bind-info bound">
+          <el-alert type="success" :closable="false" show-icon>
+            <template #title>
+              <span>Agent 已绑定到 OpenClaw</span>
+            </template>
+            <template #default>
+              绑定时间: {{ formatDate(bindStatus.boundAt) }}
+            </template>
+          </el-alert>
+        </div>
+
+        <div v-else-if="bindStatus.bindLink" class="bind-info">
+          <div class="bind-link-container">
+            <el-input
+              :model-value="getFullBindLink()"
+              readonly
+              class="bind-link-input"
+            >
+              <template #append>
+                <el-button @click="copyBindLink">
+                  <el-icon><CopyDocument /></el-icon>
+                  复制
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+          <div class="bind-meta">
+            <span>有效期至: {{ formatDate(bindStatus.bindLink.expiresAt) }}</span>
+            <el-button type="primary" text size="small" @click="generateBindLink">
+              重新生成
+            </el-button>
+          </div>
+        </div>
+
+        <div v-else class="bind-actions">
+          <el-button type="primary" @click="generateBindLink" :loading="generatingLink">
+            <el-icon><Link /></el-icon>
+            生成绑定链接
+          </el-button>
+          <p class="bind-tip">生成链接后，可在 OpenClaw 中绑定此 Agent</p>
+        </div>
+      </el-card>
+
       <!-- API 配置 -->
       <el-card class="config-card">
         <template #header>
@@ -232,7 +289,8 @@ import {
   Delete,
   Setting,
   MagicStick,
-  Tools
+  Tools,
+  Link
 } from '@element-plus/icons-vue';
 import AgentConfig from '@/components/AgentConfig.vue';
 import api from '@/api';
@@ -246,6 +304,13 @@ const loading = ref(false);
 const submitting = ref(false);
 const showEditDialog = ref(false);
 const agent = ref(null);
+const generatingLink = ref(false);
+const bindStatus = ref({
+  loading: false,
+  bound: false,
+  boundAt: null,
+  bindLink: null
+});
 
 const canEdit = computed(() => {
   const userId = userStore.user?.id;
@@ -403,7 +468,73 @@ function getToolName(tool) {
   return names[tool] || tool;
 }
 
-onMounted(() => loadAgent());
+// 绑定链接相关
+async function loadBindStatus() {
+  if (!agent.value) return;
+  
+  bindStatus.value.loading = true;
+  try {
+    const res = await api.get(`/agents/${agent.value.id}/bind-status`);
+    if (res.success) {
+      bindStatus.value = {
+        loading: false,
+        bound: res.status.bound,
+        boundAt: res.status.boundAt,
+        bindLink: res.status.bindLink
+      };
+    }
+  } catch (error) {
+    console.error('获取绑定状态失败:', error);
+  } finally {
+    bindStatus.value.loading = false;
+  }
+}
+
+async function generateBindLink() {
+  if (!agent.value) return;
+  
+  generatingLink.value = true;
+  try {
+    const res = await api.post(`/agents/${agent.value.id}/bind-link`, { expiresIn: 168 });
+    if (res.success) {
+      bindStatus.value.bindLink = {
+        token: res.bindToken,
+        expiresAt: res.expiresAt
+      };
+      ElMessage.success('绑定链接已生成');
+    } else {
+      ElMessage.error(res.error || '生成失败');
+    }
+  } catch (error) {
+    console.error('生成绑定链接失败:', error);
+    ElMessage.error('生成失败');
+  } finally {
+    generatingLink.value = false;
+  }
+}
+
+function getFullBindLink() {
+  if (!bindStatus.value.bindLink) return '';
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/bind?agent=${agent.value.id}&token=${bindStatus.value.bindLink.token}`;
+}
+
+function copyBindLink() {
+  const link = getFullBindLink();
+  navigator.clipboard.writeText(link).then(() => {
+    ElMessage.success('已复制到剪贴板');
+  }).catch(() => {
+    ElMessage.error('复制失败');
+  });
+}
+
+onMounted(() => {
+  loadAgent().then(() => {
+    if (canEdit.value) {
+      loadBindStatus();
+    }
+  });
+});
 </script>
 
 <style scoped>
@@ -411,7 +542,15 @@ onMounted(() => loadAgent());
 .loading-container, .error-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 20px; color: #909399; }
 .loading-container p { margin-top: 16px; }
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }er-actions { display: flex; gap: 12px; }
-.info-card, .config-card, .capability-card { margin-bottom: 20px; }
+.info-card, .config-card, .capability-card, .bind-card { margin-bottom: 20px; }
+.bind-card .bind-loading { display: flex; align-items: center; gap: 8px; color: #909399; padding: 20px; }
+.bind-info { padding: 10px 0; }
+.bind-info.bound { padding: 0; }
+.bind-link-container { margin-bottom: 12px; }
+.bind-link-input { font-family: monospace; }
+.bind-meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #909399; }
+.bind-actions { text-align: center; padding: 20px 0; }
+.bind-tip { margin-top: 12px; font-size: 13px; color: #909399; }
 .agent-header { display: flex; gap: 20px; }
 .agent-meta { flex: 1; }
 .agent-meta h2 { margin: 0 0 8px; font-size: 24px; color: #303133; }

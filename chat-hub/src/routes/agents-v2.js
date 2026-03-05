@@ -1484,4 +1484,232 @@ router.post('/:id/sessions/:sessionId/resume', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/agents/:id/bind-link
+ * 生成绑定链接
+ * 
+ * Body:
+ * - expiresIn: 过期时间（小时，默认 168 = 7天）
+ */
+router.post('/:id/bind-link', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { expiresIn = 168 } = req.body;
+    const userId = req.headers['x-user-id'];
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 验证所有权
+    if (userId && agent.ownerId && agent.ownerId !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Permission denied' 
+      });
+    }
+    
+    // 生成绑定 Token
+    const bindToken = 'bind_' + crypto.randomBytes(16).toString('base64url');
+    const expiresAt = Date.now() + expiresIn * 60 * 60 * 1000;
+    
+    // 先删除旧的绑定 Token
+    db.prepare('DELETE FROM agent_bind_tokens WHERE agent_id = ?').run(id);
+    
+    // 存储绑定 Token
+    db.prepare(`
+      INSERT INTO agent_bind_tokens (id, agent_id, token, created_by, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      'btk_' + Date.now(),
+      id,
+      bindToken,
+      userId || 'system',
+      expiresAt,
+      Date.now()
+    );
+    
+    // 生成绑定链接
+    const baseUrl = process.env.BASE_URL || 'https://openclaw.ai';
+    const bindLink = `${baseUrl}/bind?agent=${id}&token=${bindToken}`;
+    
+    console.log('[Agents V2] 生成绑定链接: ' + agent.nickname + ' (' + id + ')');
+    
+    res.json({
+      success: true,
+      bindLink,
+      bindToken,
+      expiresIn,
+      expiresAt
+    });
+  } catch (error) {
+    console.error('[Agents V2] 生成绑定链接失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/agents/bind
+ * 绑定 Agent 到 OpenClaw
+ * 
+ * Body:
+ * - agentId: Agent ID
+ * - token: 绑定 Token
+ * - config: 绑定配置
+ */
+router.post('/bind', async (req, res) => {
+  try {
+    const { agentId, token, config = {} } = req.body;
+    
+    if (!agentId || !token) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'agentId and token are required' 
+      });
+    }
+    
+    // 验证绑定 Token
+    const bindRecord = db.prepare(`
+      SELECT * FROM agent_bind_tokens 
+      WHERE agent_id = ? AND token = ? AND used_at IS NULL AND expires_at > ?
+    `).get(agentId, token, Date.now());
+    
+    if (!bindRecord) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid or expired bind token' 
+      });
+    }
+    
+    // 获取 Agent
+    const agent = registry.getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 标记 Token 已使用
+    db.prepare(`
+      UPDATE agent_bind_tokens 
+      SET used_at = ?, used_by = ?
+      WHERE id = ?
+    `).run(Date.now(), config.openclawId || 'unknown', bindRecord.id);
+    
+    // 更新 Agent 状态为已绑定
+    registry.updateAgent(agentId, {
+      status: 'active',
+      bindConfig: config
+    });
+    
+    console.log('[Agents V2] Agent 已绑定: ' + agent.nickname + ' (' + agentId + ')');
+    
+    res.json({
+      success: true,
+      agent: {
+        id: agent.id,
+        nickname: agent.nickname,
+        status: 'active',
+        boundAt: Date.now()
+      }
+    });
+  } catch (error) {
+    console.error('[Agents V2] 绑定失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/agents/:id/bind-status
+ * 获取绑定状态
+ */
+router.get('/:id/bind-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 获取绑定 Token 信息
+    const bindRecord = db.prepare(`
+      SELECT * FROM agent_bind_tokens WHERE agent_id = ?
+    `).get(id);
+    
+    res.json({
+      success: true,
+      status: {
+        bound: !!agent.bindConfig,
+        bindLink: bindRecord && !bindRecord.used_at ? {
+          token: bindRecord.token,
+          expiresAt: bindRecord.expires_at,
+          createdAt: bindRecord.created_at
+        } : null,
+        boundAt: agent.bindConfig?.boundAt || null
+      }
+    });
+  } catch (error) {
+    console.error('[Agents V2] 获取绑定状态失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/agents/:id/duplicate
+ * 复制 Agent
+ */
+router.post('/:id/duplicate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.headers['x-user-id'];
+    
+    const agent = registry.getAgent(id);
+    if (!agent) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent not found' 
+      });
+    }
+    
+    // 复制 Agent
+    const newAgent = registry.register({
+      nickname: agent.nickname + ' (副本)',
+      avatar: agent.avatar,
+      description: agent.description,
+      type: agent.type,
+      isPublic: false,  // 副本默认私有
+      ownerId: userId || agent.ownerId,
+      apiEndpoint: agent.apiEndpoint,
+      apiKey: agent.apiKey,  // 复制时也复制 API Key
+      model: agent.model,
+      params: agent.params,
+      capabilities: agent.capabilities,
+      memoryEnabled: agent.memoryEnabled,
+      memoryConfig: agent.memoryConfig,
+      skills: agent.skills
+    });
+    
+    console.log('[Agents V2] 复制 Agent: ' + agent.nickname + ' -> ' + newAgent.nickname);
+    
+    const { apiKeyEncrypted, ...safeAgent } = newAgent;
+    
+    res.status(201).json({
+      success: true,
+      agent: safeAgent
+    });
+  } catch (error) {
+    console.error('[Agents V2] 复制失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;
