@@ -1991,7 +1991,36 @@ async function start() {
   const v2Db = new DbWrapper(v2DbRaw); // 包装为 async API
   app.locals.db = v2DbRaw; // V2 数据库（供路由使用）
 
-  // Skills Manager
+  // 运行数据库迁移
+  try {
+    const { runMigration } = require('./migrations/v1_skills_mcp');
+    await runMigration(v2Db);
+    console.log('[Server] 数据库迁移完成');
+  } catch (e) {
+    console.log('[Server] 数据库迁移跳过:', e.message);
+  }
+
+  // Skills Service V2
+  let skillsService = null;
+  try {
+    const { SkillsService } = require('./services/skills-service');
+    skillsService = new SkillsService(v2Db);
+    console.log('[Server] SkillsService V2 初始化完成');
+  } catch (e) {
+    console.log('[Server] SkillsService V2 初始化失败:', e.message);
+  }
+
+  // MCP Service V2
+  let mcpService = null;
+  try {
+    const { MCPService } = require('./services/mcp-service');
+    mcpService = new MCPService(v2Db);
+    console.log('[Server] MCPService V2 初始化完成');
+  } catch (e) {
+    console.log('[Server] MCPService V2 初始化失败:', e.message);
+  }
+
+  // Skills Manager (Legacy)
   let skillsManager = null;
   try {
     const { SkillsManager } = require('./skills');
@@ -2062,6 +2091,8 @@ async function start() {
   const workspaceModule = require('./routes/workspace');
   const relayModule = require('./routes/relay');
   const marketplaceModule = require('./routes/marketplace');
+  const skillsV2Module = require('./routes/skills-v2');
+  const mcpV2Module = require('./routes/mcp-v2');
   
   // 提取 router
   const skillsRoutes = skillsModule.router || skillsModule;
@@ -2070,6 +2101,8 @@ async function start() {
   const workspaceRoutes = workspaceModule.router || workspaceModule;
   const relayRoutes = relayModule.router || relayModule;
   const marketplaceRoutes = marketplaceModule.router || marketplaceModule;
+  const skillsV2Routes = skillsV2Module.router || skillsV2Module;
+  const mcpV2Routes = mcpV2Module.router || mcpV2Module;
   
   // 注入 Manager 到路由
   if (skillsManager && skillsModule.setSkillsManager) {
@@ -2078,18 +2111,22 @@ async function start() {
   if (skillsManager && marketplaceModule.setMarketplaceIntegration) {
     marketplaceModule.setMarketplaceIntegration(skillsManager.marketplace);
   }
+  if (skillsService && skillsV2Module.setSkillsService) {
+    skillsV2Module.setSkillsService(skillsService);
+  }
+  if (mcpService && mcpV2Module.setMCPService) {
+    mcpV2Module.setMCPService(mcpService);
+  }
   if (sandboxManager && sandboxRoutes.setManager) {
     sandboxRoutes.setManager(sandboxManager);
   }
   if (workspaceManager && workspaceRoutes.setManager) {
     workspaceRoutes.setManager(workspaceManager);
   }
-  if (skillsManager && marketplaceModule.setMarketplaceIntegration) {
-    marketplaceModule.setMarketplaceIntegration(skillsManager.marketplace);
-  }
   
   app.use('/api/skills', skillsRoutes);
-  app.use('/api/marketplace', marketplaceRoutes);
+  app.use('/api/skills/v2', skillsV2Routes);
+  app.use('/api/mcp/v2', mcpV2Routes);
   app.use('/api/marketplace', marketplaceRoutes);
   app.use('/api/agents', agentsV2Routes);
   app.use('/api/sandbox', sandboxRoutes);
