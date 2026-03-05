@@ -2130,7 +2130,8 @@ async function start() {
   app.use('/api/marketplace', marketplaceRoutes);
   app.use('/api/agents', agentsV2Routes);
   app.use('/api/sandbox', sandboxRoutes);
-  app.use('/api/workspace', workspaceRoutes);
+  app.use('/api/workspace', workspaceRoutes);  // 文件管理工作区
+  app.use('/api/workspaces', require('./routes/workspaces'));  // 协作空间
   app.use('/api/relay', relayRoutes);
 
   // Observability 路由
