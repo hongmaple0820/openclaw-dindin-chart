@@ -7,6 +7,11 @@ const { SkillRouter } = require('./router');
 const { SkillExecutor } = require('./executor');
 const { SkillLoader } = require('./loader');
 const { MCPorterBridge } = require('./mcporter-bridge');
+const { initSkillsTables, importSkillsFromKnowledgeBase } = require('./db-init');
+
+// 共享知识库路径
+const KNOWLEDGE_BASE_PATH = process.env.KNOWLEDGE_BASE_PATH || 
+  require('path').join(require('os').homedir(), '.openclaw', 'ai-collab-space');
 
 class SkillsManager {
   constructor(db, config = {}) {
@@ -14,6 +19,7 @@ class SkillsManager {
     this.config = {
       skillsPath: config.skillsPath || [],
       builtinSkillsPath: config.builtinSkillsPath,
+      knowledgeBasePath: config.knowledgeBasePath || KNOWLEDGE_BASE_PATH,
       ...config
     };
     
@@ -25,9 +31,25 @@ class SkillsManager {
   }
 
   async init() {
+    // 初始化数据库表
+    await initSkillsTables(this.db);
+    
+    // 初始化注册表
     await this.registry.init();
+    
+    // 从共享知识库导入技能
+    const importResults = await importSkillsFromKnowledgeBase(
+      this.db, 
+      this.config.knowledgeBasePath
+    );
+    console.log(`[SkillsManager] 从知识库导入: ${importResults.imported} 个技能`);
+    
+    // 加载内置技能
     await this.loader.loadBuiltinSkills();
+    
+    // 初始化 MCP 桥接
     await this.mcporterBridge.init();
+    
     console.log('[SkillsManager] 初始化完成');
   }
 
