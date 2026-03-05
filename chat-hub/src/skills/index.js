@@ -7,6 +7,7 @@ const { SkillRouter } = require('./router');
 const { SkillExecutor } = require('./executor');
 const { SkillLoader } = require('./loader');
 const { MCPorterBridge } = require('./mcporter-bridge');
+const { MarketplaceIntegration } = require('./marketplace');
 const { initSkillsTables } = require('./db-init');
 
 class SkillsManager {
@@ -23,6 +24,7 @@ class SkillsManager {
     this.executor = new SkillExecutor(db, this.config);
     this.loader = new SkillLoader(db, this.config);
     this.mcporterBridge = new MCPorterBridge(db, this.config);
+    this.marketplace = new MarketplaceIntegration(db, this.config);
   }
 
   async init() {
@@ -83,4 +85,12 @@ class SkillsManager {
   }
 }
 
-module.exports = { SkillsManager, SkillRegistry, SkillRouter, SkillExecutor, SkillLoader, MCPorterBridge };
+module.exports = { 
+  SkillsManager, 
+  SkillRegistry, 
+  SkillRouter, 
+  SkillExecutor, 
+  SkillLoader, 
+  MCPorterBridge,
+  MarketplaceIntegration
+};
