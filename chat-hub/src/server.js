@@ -2061,6 +2061,7 @@ async function start() {
   const sandboxModule = require('./routes/sandbox');
   const workspaceModule = require('./routes/workspace');
   const relayModule = require('./routes/relay');
+  const marketplaceModule = require('./routes/marketplace');
   
   // 提取 router
   const skillsRoutes = skillsModule.router || skillsModule;
@@ -2068,10 +2069,14 @@ async function start() {
   const sandboxRoutes = sandboxModule.router || sandboxModule;
   const workspaceRoutes = workspaceModule.router || workspaceModule;
   const relayRoutes = relayModule.router || relayModule;
+  const marketplaceRoutes = marketplaceModule.router || marketplaceModule;
   
   // 注入 Manager 到路由
   if (skillsManager && skillsModule.setSkillsManager) {
     skillsModule.setSkillsManager(skillsManager);
+  }
+  if (skillsManager && marketplaceModule.setMarketplaceIntegration) {
+    marketplaceModule.setMarketplaceIntegration(skillsManager.marketplace);
   }
   if (sandboxManager && sandboxRoutes.setManager) {
     sandboxRoutes.setManager(sandboxManager);
@@ -2079,8 +2084,13 @@ async function start() {
   if (workspaceManager && workspaceRoutes.setManager) {
     workspaceRoutes.setManager(workspaceManager);
   }
+  if (skillsManager && marketplaceModule.setMarketplaceIntegration) {
+    marketplaceModule.setMarketplaceIntegration(skillsManager.marketplace);
+  }
   
   app.use('/api/skills', skillsRoutes);
+  app.use('/api/marketplace', marketplaceRoutes);
+  app.use('/api/marketplace', marketplaceRoutes);
   app.use('/api/agents', agentsV2Routes);
   app.use('/api/sandbox', sandboxRoutes);
   app.use('/api/workspace', workspaceRoutes);
