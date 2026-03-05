@@ -227,6 +227,13 @@ const routes = [
         component: () => import('@/views/WorkspaceFiles.vue'),
         meta: { title: '工作空间文件', requiresAuth: true }
       },
+      // 协作空间路由
+      {
+        path: 'collab',
+        name: 'CollabSpaces',
+        component: () => import('@/views/Workspaces.vue'),
+        meta: { title: '协作空间', requiresAuth: true }
+      },
       // 设置相关路由
       {
         path: 'settings',
