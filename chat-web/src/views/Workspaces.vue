@@ -197,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Plus, Search, UserFilled, Setting } from '@element-plus/icons-vue';
 import api from '@/api';
@@ -234,6 +234,7 @@ const inviteUserId = ref('');
 const inviteAgentId = ref('');
 
 const messagesRef = ref(null);
+let eventSource = null;  // SSE 连接
 
 const currentUserId = computed(() => userStore.user?.id || 'anonymous');
 
@@ -458,8 +459,52 @@ function scrollToBottom() {
   });
 }
 
+// SSE 连接
+function connectSSE() {
+  if (eventSource) {
+    eventSource.close();
+  }
+  
+  const sseUrl = `${window.location.protocol}//${window.location.hostname}:8273/api/sse/connect?userId=${currentUserId.value}`;
+  
+  eventSource = new EventSource(sseUrl);
+  
+  eventSource.onopen = () => {
+    console.log('[Workspaces] SSE 连接成功');
+  };
+  
+  eventSource.addEventListener('workspace_message', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('[Workspaces] 收到新消息:', data);
+      
+      // 只处理当前空间的消息
+      if (data.space_id === currentSpaceId.value && data.message) {
+        messages.value.push(data.message);
+        scrollToBottom();
+      }
+    } catch (e) {
+      console.error('[Workspaces] 解析消息失败:', e);
+    }
+  });
+  
+  eventSource.onerror = (error) => {
+    console.error('[Workspaces] SSE 错误:', error);
+    // 5秒后重连
+    setTimeout(connectSSE, 5000);
+  };
+}
+
 onMounted(async () => {
   await Promise.all([loadSpaces(), loadAgents()]);
+  connectSSE();
+});
+
+onUnmounted(() => {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
 });
 </script>
 
