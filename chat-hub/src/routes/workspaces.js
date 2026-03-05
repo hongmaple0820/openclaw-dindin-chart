@@ -8,6 +8,7 @@
  * - 成员管理（添加、移除、角色更新）
  * - 消息管理（发送、接收、搜索）
  * - Agent 触发
+ * - SSE 实时推送
  */
 
 const express = require('express');
@@ -19,6 +20,12 @@ const os = require('os');
 
 const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'chat-hub.db');
 const db = new Database(dbPath);
+
+// SSE 管理器（从 app.locals 获取）
+let sseManager = null;
+router.setSSEManager = (manager) => {
+  sseManager = manager;
+};
 
 // 表名常量
 const TABLES = {
@@ -453,7 +460,7 @@ router.get('/:id/messages', (req, res) => {
  * POST /api/workspaces/:id/messages
  * 发送消息
  */
-router.post('/:id/messages', (req, res) => {
+router.post('/:id/messages', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.headers['x-user-id'] || 'anonymous';
@@ -499,6 +506,26 @@ router.post('/:id/messages', (req, res) => {
     
     console.log('[Workspaces] 发送消息: ' + userId + ' -> ' + id);
     
+    // SSE 实时推送给空间成员
+    if (sseManager) {
+      sseManager.broadcast('workspace_message', {
+        space_id: id,
+        message: {
+          id: messageId,
+          space_id: id,
+          sender_id: userId,
+          sender_type: member.member_type,
+          content,
+          reply_to: replyTo || null,
+          metadata: metadata || {},
+          created_at: now
+        }
+      });
+    }
+    
+    // 异步触发 Agent（不阻塞响应）
+    triggerAgentsAsync(id, userId, content);
+    
     res.status(201).json({
       success: true,
       message: {
@@ -517,5 +544,117 @@ router.post('/:id/messages', (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * 异步触发 Agent 响应
+ */
+async function triggerAgentsAsync(spaceId, senderId, content) {
+  try {
+    // 获取空间中的 Agent 成员
+    const agentMembers = db.prepare(`
+      SELECT * FROM collab_space_members 
+      WHERE space_id = ? AND member_type = 'agent' AND role IN ('assistant', 'admin')
+    `).all(spaceId);
+    
+    if (agentMembers.length === 0) return;
+    
+    // 检查触发条件
+    const mentionPattern = /@(\S+)/g;
+    const mentions = content.match(mentionPattern) || [];
+    const hasKeywords = ['帮我', '请', '能不能', '可以吗', '帮忙'].some(kw => content.includes(kw));
+    
+    // 只在 @ 或关键词触发时响应
+    if (mentions.length === 0 && !hasKeywords) return;
+    
+    console.log('[Workspaces] 触发 Agent 响应: ' + agentMembers.length + ' 个 Agent');
+    
+    // 遍历 Agent，异步调用
+    for (const agentMember of agentMembers) {
+      const agentId = agentMember.member_id;
+      
+      // 检查是否被 @ 或全局触发
+      const isMentioned = mentions.some(m => m.includes(agentId) || m.toLowerCase().includes('agent'));
+      
+      if (!isMentioned && !hasKeywords) continue;
+      
+      // 异步调用 Agent API（不等待响应）
+      callAgentAsync(spaceId, agentId, content, senderId).catch(err => {
+        console.error('[Workspaces] Agent 调用失败:', err.message);
+      });
+    }
+  } catch (error) {
+    console.error('[Workspaces] 触发 Agent 失败:', error);
+  }
+}
+
+/**
+ * 异步调用 Agent API
+ */
+async function callAgentAsync(spaceId, agentId, content, senderId) {
+  // 获取 Agent 配置
+  const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(agentId);
+  
+  if (!agent || !agent.api_endpoint || !agent.api_key) {
+    console.log('[Workspaces] Agent 未配置 API: ' + agentId);
+    return;
+  }
+  
+  // 简单的 prompt 构建
+  const prompt = `[协作空间消息]
+发送者: ${senderId}
+内容: ${content}
+
+请回复:`;
+
+  try {
+    // 调用 Agent API
+    const response = await fetch(agent.api_endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${agent.api_key}`
+      },
+      body: JSON.stringify({
+        model: agent.model || 'gpt-4',
+        messages: [
+          { role: 'system', content: agent.system_prompt || '你是一个有用的助手' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: agent.max_tokens || 500
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('API 调用失败: ' + response.status);
+    }
+    
+    const data = await response.json();
+    const replyContent = data.choices?.[0]?.message?.content;
+    
+    if (!replyContent) return;
+    
+    // 保存 Agent 响应消息
+    const replyId = 'msg_' + Date.now() + '_' + uuidv4().slice(0, 8);
+    const now = Date.now();
+    
+    db.prepare(`
+      INSERT INTO collab_space_messages (id, space_id, sender_id, sender_type, content, reply_to, metadata, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      replyId,
+      spaceId,
+      agentId,
+      'agent',
+      replyContent,
+      null,
+      JSON.stringify({ model: agent.model }),
+      now
+    );
+    
+    console.log('[Workspaces] Agent 响应已保存: ' + agentId);
+  } catch (error) {
+    console.error('[Workspaces] Agent API 调用失败:', error);
+  }
+}
 
 module.exports = router;
