@@ -217,7 +217,7 @@
       </header>
 
       <!-- 内容区域 -->
-      <main class="content" :class="{ 'with-chat': showChatBox && userStore.isLoggedIn }">
+      <main class="content">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />
@@ -225,54 +225,7 @@
         </router-view>
       </main>
 
-      <!-- 底部聊天框 -->
-      <div class="chat-box" v-if="showChatBox && userStore.isLoggedIn">
-        <div class="chat-header">
-          <span class="chat-title">
-            <el-icon><ChatDotRound /></el-icon>
-            快捷对话
-          </span>
-          <div class="chat-actions">
-            <el-button text @click="expandChat = !expandChat">
-              <el-icon :size="16">
-                <ArrowUp v-if="!expandChat" />
-                <ArrowDown v-else />
-              </el-icon>
-            </el-button>
-            <el-button text @click="showChatBox = false">
-              <el-icon :size="16"><Close /></el-icon>
-            </el-button>
-          </div>
-        </div>
-        <div class="chat-content" v-show="expandChat">
-          <el-scrollbar ref="chatScrollbar">
-            <div class="messages">
-              <div
-                v-for="(msg, index) in quickMessages"
-                :key="index"
-                class="message"
-                :class="{ 'is-user': msg.isUser }"
-              >
-                <div class="message-content">{{ msg.content }}</div>
-              </div>
-            </div>
-          </el-scrollbar>
-        </div>
-        <div class="chat-input">
-          <el-input
-            v-model="chatInput"
-            placeholder="输入消息..."
-            @keyup.enter="sendQuickMessage"
-          >
-            <template #suffix>
-              <el-button type="primary" text @click="sendQuickMessage" :disabled="!chatInput.trim()">
-                <el-icon><Promotion /></el-icon>
-              </el-button>
-            </template>
-          </el-input>
-        </div>
       </div>
-    </div>
 
     <!-- 设置面板 -->
     <el-drawer
@@ -329,8 +282,7 @@ import {
   Menu, ChatDotRound, ArrowDown, User, UserFilled, 
   ChatLineSquare, SwitchButton, MagicStick, List, 
   Setting, DataAnalysis, DataBoard, HomeFilled,
-  Monitor, FolderOpened, DArrowLeft, DArrowRight,
-  ArrowUp, ArrowDown as ArrowDownIcon, Close, Promotion
+  Monitor, FolderOpened, DArrowLeft, DArrowRight
 } from '@element-plus/icons-vue';
 
 const route = useRoute();
@@ -344,19 +296,11 @@ const settingsStore = useSettingsStore();
 const isMobile = ref(window.innerWidth < 768);
 const showMobileSidebar = ref(false);
 const showSettingsPanel = ref(false);
-const showChatBox = ref(true);
-const expandChat = ref(false);
 
 // 设置本地状态
 const themeSetting = ref(settingsStore.theme);
 const fontSetting = ref(settingsStore.fontFamily);
 const fontSizeSetting = ref(settingsStore.fontSize);
-
-// 聊天相关
-const chatInput = ref('');
-const quickMessages = ref([
-  { content: '你好！有什么可以帮助你的吗？', isUser: false }
-]);
 
 // 好友申请数量
 const pendingFriendRequests = computed(() => friendStore.pendingRequestCount);
@@ -397,25 +341,7 @@ const handleFontSizeChange = (value) => {
   settingsStore.setFontSize(value);
 };
 
-// 发送快捷消息
-const sendQuickMessage = () => {
-  if (!chatInput.value.trim()) return;
-  
-  quickMessages.value.push({
-    content: chatInput.value,
-    isUser: true
-  });
-  
-  // 模拟 AI 回复
-  setTimeout(() => {
-    quickMessages.value.push({
-      content: '收到你的消息了！这是一个快捷对话功能，完整功能请前往协作空间。',
-      isUser: false
-    });
-  }, 500);
-  
-  chatInput.value = '';
-};
+
 
 // 退出登录
 const handleLogout = async () => {
@@ -449,7 +375,6 @@ watch(() => route.path, () => {
   --sidebar-width: 220px;
   --sidebar-collapsed-width: 64px;
   --header-height: 56px;
-  --chat-box-height: 120px;
   transition: var(--fenlin-transition, all 0.3s ease);
 }
 
@@ -661,86 +586,6 @@ watch(() => route.path, () => {
   flex: 1;
   overflow: auto;
   padding: 24px;
-  transition: padding-bottom 0.3s ease;
-}
-
-.content.with-chat {
-  padding-bottom: calc(var(--chat-box-height) + 24px);
-}
-
-/* 聊天框 */
-.chat-box {
-  position: fixed;
-  bottom: 0;
-  left: calc(var(--sidebar-width) + 0px);
-  right: 0;
-  background: white;
-  border-top: 1px solid var(--fenlin-border, #E0E0E0);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-  z-index: 50;
-  transition: left 0.3s ease;
-}
-
-.layout.sidebar-collapsed .chat-box {
-  left: var(--sidebar-collapsed-width);
-}
-
-.chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--fenlin-bg, #FAFAFA);
-  border-bottom: 1px solid var(--fenlin-border, #E0E0E0);
-}
-
-.chat-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-  color: var(--fenlin-text-primary, #2C3E50);
-}
-
-.chat-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.chat-content {
-  height: 200px;
-  border-bottom: 1px solid var(--fenlin-border, #E0E0E0);
-}
-
-.messages {
-  padding: 12px;
-}
-
-.message {
-  margin-bottom: 12px;
-}
-
-.message.is-user {
-  text-align: right;
-}
-
-.message-content {
-  display: inline-block;
-  max-width: 70%;
-  padding: 10px 14px;
-  border-radius: var(--fenlin-radius-md, 12px);
-  background: var(--fenlin-bg, #FAFAFA);
-  color: var(--fenlin-text-primary, #2C3E50);
-  text-align: left;
-}
-
-.message.is-user .message-content {
-  background: var(--fenlin-primary, #C41E3A);
-  color: white;
-}
-
-.chat-input {
-  padding: 8px 16px;
 }
 
 /* 页面切换动画 */
@@ -812,14 +657,6 @@ watch(() => route.path, () => {
   .content {
     padding: 16px;
   }
-  
-  .chat-box {
-    left: 0 !important;
-  }
-  
-  .chat-content {
-    height: 150px;
-  }
 }
 
 /* 暗色主题 */
@@ -834,8 +671,7 @@ watch(() => route.path, () => {
 }
 
 :root[data-theme="dark"] .sidebar,
-:root[data-theme="dark"] .header,
-:root[data-theme="dark"] .chat-box {
+:root[data-theme="dark"] .header {
   background: var(--fenlin-surface);
   border-color: var(--fenlin-border);
 }
@@ -847,9 +683,5 @@ watch(() => route.path, () => {
 :root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item:hover),
 :root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item.is-active) {
   background: rgba(196, 30, 58, 0.2);
-}
-
-:root[data-theme="dark"] .message-content {
-  background: var(--fenlin-bg-secondary);
 }
 </style>
