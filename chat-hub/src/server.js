@@ -2131,7 +2131,14 @@ async function start() {
   app.use('/api/agents', agentsV2Routes);
   app.use('/api/sandbox', sandboxRoutes);
   app.use('/api/workspace', workspaceRoutes);  // 文件管理工作区
-  app.use('/api/workspaces', require('./routes/workspaces'));  // 协作空间
+  
+  // 协作空间 - 注入 SSE 管理器
+  const workspacesRoutes = require('./routes/workspaces');
+  if (workspacesRoutes.setSSEManager) {
+    workspacesRoutes.setSSEManager(sseManager);
+  }
+  app.use('/api/workspaces', workspacesRoutes);
+  
   app.use('/api/relay', relayRoutes);
 
   // Observability 路由
