@@ -154,6 +154,20 @@ const routes = [
         component: () => import('@/views/SkillDetail.vue'),
         meta: { title: '技能详情', requiresAuth: true }
       },
+      // Skills V2 路由
+      {
+        path: 'skills-v2',
+        name: 'SkillsV2',
+        component: () => import('@/views/skills/SkillsPage.vue'),
+        meta: { title: '技能中心', requiresAuth: true }
+      },
+      // MCP 路由
+      {
+        path: 'mcp',
+        name: 'MCP',
+        component: () => import('@/views/mcp/MCPPage.vue'),
+        meta: { title: 'MCP 中心', requiresAuth: true }
+      },
       // Agent 相关路由
       {
         path: 'agents',
