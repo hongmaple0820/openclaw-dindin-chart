@@ -3,12 +3,14 @@
  * 增强版：支持亲密度计算、关系阶段、行为调整
  */
 
-const Database = require('better-sqlite3');
-const path = require('path');
-const os = require('os');
+import Database from 'better-sqlite3';
+import path from 'path';
+import os from 'os';
+
+type SqliteDatabase = ReturnType<typeof Database>;
 
 // 关系发展阶段定义
-const STAGES = {
+export const STAGES: Record<string, { min: number; max: number; label: string; description: string }> = {
   stranger: { min: 0, max: 20, label: '陌生人', description: '初次相识，彼此还不熟悉' },
   acquaintance: { min: 21, max: 40, label: '泛泛之交', description: '有过一些互动，但还不够深入' },
   friend: { min: 41, max: 60, label: '朋友', description: '熟悉彼此，能愉快交流' },
@@ -17,7 +19,7 @@ const STAGES = {
 };
 
 // 亲密度变化规则
-const INTIMACY_RULES = {
+export const INTIMACY_RULES: Record<string, Record<string, { delta: number; description: string }>> = {
   // 增加亲密度的行为
   positive: {
     validConversation: { delta: 5, description: '每次有效对话' },
@@ -41,7 +43,13 @@ const INTIMACY_RULES = {
 };
 
 // 行为调整配置
-const BEHAVIOR_ADJUSTMENTS = {
+export const BEHAVIOR_ADJUSTMENTS: Record<string, {
+  tone: string;
+  topics: string[];
+  emojiFrequency: number;
+  personalQuestions: boolean;
+  specialInteractions: string[];
+}> = {
   stranger: {
     tone: 'polite_formal',
     topics: ['basic_intro', 'weather', 'general_interests'],
@@ -80,7 +88,7 @@ const BEHAVIOR_ADJUSTMENTS = {
 };
 
 // 特殊互动定义
-const SPECIAL_INTERACTIONS = {
+export const SPECIAL_INTERACTIONS: Record<string, { minStage: string; description: string }> = {
   greeting_special: { minStage: 'acquaintance', description: '特殊问候' },
   share_photo: { minStage: 'friend', description: '分享生活照片' },
   suggest_activity: { minStage: 'closeFriend', description: '建议一起活动' },
@@ -89,16 +97,126 @@ const SPECIAL_INTERACTIONS = {
   plan_future: { minStage: 'intimate', description: '规划未来' }
 };
 
-class RelationshipManager {
-  constructor(dbPath) {
+// 类型定义
+export interface RelationshipData {
+  type?: string;
+  intimacyLevel?: number;
+}
+
+export interface Relationship {
+  id?: number;
+  character_id: string;
+  user_id: string;
+  relationship_type?: string;
+  intimacy_level: number;
+  interaction_count?: number;
+  last_interaction?: number;
+  metadata?: Record<string, unknown>;
+  created_at?: number;
+  updated_at?: number;
+}
+
+export interface IntimacyContext {
+  multiplier?: number;
+  bonus?: number;
+  daysSince?: number;
+  reason?: string;
+}
+
+export interface IntimacyDeltaResult {
+  delta: number;
+  reason: string;
+  rule: { delta: number; description: string } | null;
+  type: string;
+}
+
+export interface StageInfo {
+  min: number;
+  max: number;
+  label: string;
+  description: string;
+}
+
+export interface RelationshipStageResult {
+  stage: string;
+  info: StageInfo;
+  progress?: number;
+}
+
+export interface BehaviorAdjustment {
+  tone: string;
+  topics: string[];
+  emojiFrequency: number;
+  personalQuestions: boolean;
+  specialInteractions: string[];
+  stage?: string;
+  stageInfo?: StageInfo;
+  intimacyLevel?: number;
+  timeContext?: { period: string; energy: string; formality: string };
+  moodAdjustment?: { empathy: string; energy: string };
+}
+
+export interface InteractionCheck {
+  name: string;
+  minStage: string;
+  description: string;
+  requiredStage?: string;
+}
+
+export interface UnlockedInteractions {
+  unlocked: InteractionCheck[];
+  locked: InteractionCheck[];
+  nextUnlocks: InteractionCheck[];
+  nextStageName?: string;
+  pointsToNext?: number;
+}
+
+export interface IntimacyHistory {
+  id?: number;
+  character_id: string;
+  user_id: string;
+  action: string;
+  delta: number;
+  old_level: number;
+  new_level: number;
+  context: Record<string, unknown> | null;
+  created_at?: number;
+}
+
+export interface UpdateIntimacyResult {
+  relationship: Relationship;
+  delta: number;
+  oldLevel: number;
+  newLevel: number;
+  stageChanged: boolean;
+  oldStage: StageInfo;
+  newStage: StageInfo;
+  reason: string;
+  rule: { delta: number; description: string } | null;
+  type: string;
+}
+
+export interface FullRelationshipInfo {
+  relationship: Relationship;
+  stage: string;
+  stageInfo: StageInfo;
+  progress: number | undefined;
+  behaviorAdjustment: BehaviorAdjustment;
+  interactions: UnlockedInteractions;
+}
+
+export class RelationshipManager {
+  private db: SqliteDatabase;
+
+  constructor(dbPath?: string) {
     if (!dbPath) {
       dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'messages.db');
     }
-    this.db = new Database(dbPath);
+    this.db = Database(dbPath);
     this.initTables();
   }
 
-  initTables() {
+  private initTables(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS relationships (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,7 +255,7 @@ class RelationshipManager {
   // ============ 原有方法（保持向后兼容） ============
 
   // 创建或更新关系
-  createOrUpdateRelationship(characterId, userId, data = {}) {
+  createOrUpdateRelationship(characterId: string, userId: string, data: RelationshipData = {}): Relationship {
     const { type = 'friend', intimacyLevel = 50 } = data;
     const now = Date.now();
 
@@ -149,23 +267,23 @@ class RelationshipManager {
         updated_at = excluded.updated_at
     `).run(characterId, userId, type, intimacyLevel, now, now);
 
-    return this.getRelationship(characterId, userId);
+    return this.getRelationship(characterId, userId)!;
   }
 
   // 获取关系
-  getRelationship(characterId, userId) {
+  getRelationship(characterId: string, userId: string): Relationship | undefined {
     const rel = this.db.prepare(`
       SELECT * FROM relationships WHERE character_id = ? AND user_id = ?
-    `).get(characterId, userId);
+    `).get(characterId, userId) as Relationship | undefined;
 
     if (rel && rel.metadata) {
-      rel.metadata = JSON.parse(rel.metadata);
+      rel.metadata = JSON.parse(rel.metadata as unknown as string);
     }
     return rel;
   }
 
   // 更新亲密度
-  updateIntimacy(characterId, userId, delta) {
+  updateIntimacy(characterId: string, userId: string, delta: number): Relationship {
     const now = Date.now();
 
     this.db.prepare(`
@@ -177,42 +295,42 @@ class RelationshipManager {
       WHERE character_id = ? AND user_id = ?
     `).run(delta, now, now, characterId, userId);
 
-    return this.getRelationship(characterId, userId);
+    return this.getRelationship(characterId, userId)!;
   }
 
   // 获取角色的所有关系
-  getCharacterRelationships(characterId) {
+  getCharacterRelationships(characterId: string): Relationship[] {
     const rels = this.db.prepare(`
       SELECT * FROM relationships WHERE character_id = ? ORDER BY intimacy_level DESC
-    `).all(characterId);
+    `).all(characterId) as Relationship[];
 
     return rels.map(r => ({
       ...r,
-      metadata: r.metadata ? JSON.parse(r.metadata) : {}
+      metadata: r.metadata ? JSON.parse(r.metadata as unknown as string) : {}
     }));
   }
 
   // 获取用户与所有角色的关系
-  getUserRelationships(userId) {
+  getUserRelationships(userId: string): Relationship[] {
     const rels = this.db.prepare(`
       SELECT * FROM relationships WHERE user_id = ? ORDER BY intimacy_level DESC
-    `).all(userId);
+    `).all(userId) as Relationship[];
 
     return rels.map(r => ({
       ...r,
-      metadata: r.metadata ? JSON.parse(r.metadata) : {}
+      metadata: r.metadata ? JSON.parse(r.metadata as unknown as string) : {}
     }));
   }
 
   // 删除关系
-  deleteRelationship(characterId, userId) {
+  deleteRelationship(characterId: string, userId: string): void {
     this.db.prepare(`
       DELETE FROM relationships WHERE character_id = ? AND user_id = ?
     `).run(characterId, userId);
   }
 
   // 获取关系统计
-  getStats(characterId) {
+  getStats(characterId: string): { relationship_type: string; count: number; avg_intimacy: number }[] {
     const stats = this.db.prepare(`
       SELECT 
         relationship_type,
@@ -221,7 +339,7 @@ class RelationshipManager {
       FROM relationships 
       WHERE character_id = ?
       GROUP BY relationship_type
-    `).all(characterId);
+    `).all(characterId) as { relationship_type: string; count: number; avg_intimacy: number }[];
 
     return stats;
   }
@@ -230,11 +348,8 @@ class RelationshipManager {
 
   /**
    * 计算亲密度的变化
-   * @param {string} action - 行为类型
-   * @param {object} context - 上下文信息
-   * @returns {object} { delta, reason, rule }
    */
-  calculateIntimacyDelta(action, context = {}) {
+  calculateIntimacyDelta(action: string, context: IntimacyContext = {}): IntimacyDeltaResult {
     // 查找正向规则
     if (INTIMACY_RULES.positive[action]) {
       const rule = INTIMACY_RULES.positive[action];
@@ -285,10 +400,8 @@ class RelationshipManager {
 
   /**
    * 获取关系阶段
-   * @param {number} intimacyLevel - 亲密度等级
-   * @returns {object} { stage, info }
    */
-  getRelationshipStage(intimacyLevel) {
+  getRelationshipStage(intimacyLevel: number): RelationshipStageResult {
     for (const [stageName, stageInfo] of Object.entries(STAGES)) {
       if (intimacyLevel >= stageInfo.min && intimacyLevel <= stageInfo.max) {
         return {
@@ -309,7 +422,7 @@ class RelationshipManager {
   /**
    * 计算当前阶段内的进度
    */
-  calculateStageProgress(intimacyLevel, stageInfo) {
+  private calculateStageProgress(intimacyLevel: number, stageInfo: StageInfo): number {
     const range = stageInfo.max - stageInfo.min + 1;
     const progress = intimacyLevel - stageInfo.min;
     return Math.round((progress / range) * 100);
@@ -317,17 +430,14 @@ class RelationshipManager {
 
   /**
    * 根据关系调整行为
-   * @param {object} relationship - 关系对象
-   * @param {object} context - 上下文
-   * @returns {object} 行为调整配置
    */
-  adjustBehaviorByRelationship(relationship, context = {}) {
+  adjustBehaviorByRelationship(relationship: Relationship | null, context: { timeOfDay?: number; userMood?: string } = {}): BehaviorAdjustment {
     const intimacyLevel = relationship?.intimacy_level ?? 50;
     const { stage, info } = this.getRelationshipStage(intimacyLevel);
     const baseBehavior = BEHAVIOR_ADJUSTMENTS[stage] || BEHAVIOR_ADJUSTMENTS.friend;
 
     // 基于上下文微调
-    const adjustedBehavior = {
+    const adjustedBehavior: BehaviorAdjustment = {
       ...baseBehavior,
       stage,
       stageInfo: info,
@@ -350,7 +460,7 @@ class RelationshipManager {
   /**
    * 获取时间上下文
    */
-  getTimeContext(hour) {
+  private getTimeContext(hour: number): { period: string; energy: string; formality: string } {
     if (hour >= 6 && hour < 12) {
       return { period: 'morning', energy: 'high', formality: 'normal' };
     } else if (hour >= 12 && hour < 18) {
@@ -365,8 +475,8 @@ class RelationshipManager {
   /**
    * 根据用户情绪获取调整
    */
-  getMoodAdjustment(mood, stage) {
-    const adjustments = {
+  private getMoodAdjustment(mood: string, _stage: string): { empathy: string; energy: string } {
+    const adjustments: Record<string, { empathy: string; energy: string }> = {
       happy: { empathy: 'share_joy', energy: 'match' },
       sad: { empathy: 'comfort', energy: 'gentle' },
       angry: { empathy: 'listen', energy: 'calm' },
@@ -378,16 +488,14 @@ class RelationshipManager {
 
   /**
    * 检查是否解锁特殊互动
-   * @param {object} relationship - 关系对象
-   * @returns {object} { unlocked: [], locked: [], nextUnlocks: [] }
    */
-  checkUnlockedInteractions(relationship) {
+  checkUnlockedInteractions(relationship: Relationship | null): UnlockedInteractions {
     const intimacyLevel = relationship?.intimacy_level ?? 50;
     const { stage } = this.getRelationshipStage(intimacyLevel);
     const stageOrder = ['stranger', 'acquaintance', 'friend', 'closeFriend', 'intimate'];
     const currentIndex = stageOrder.indexOf(stage);
 
-    const result = {
+    const result: UnlockedInteractions = {
       unlocked: [],
       locked: [],
       nextUnlocks: []
@@ -420,11 +528,8 @@ class RelationshipManager {
 
   /**
    * 定期衰减检查
-   * @param {string} characterId - 角色ID
-   * @param {string} userId - 用户ID
-   * @returns {object} { decayed: boolean, delta: number, newLevel: number }
    */
-  checkIntimacyDecay(characterId, userId) {
+  checkIntimacyDecay(characterId: string, userId: string): { decayed: boolean; delta?: number; oldLevel?: number; newLevel?: number; reason?: string } {
     const relationship = this.getRelationship(characterId, userId);
     if (!relationship) {
       return { decayed: false, reason: 'no_relationship' };
@@ -472,7 +577,7 @@ class RelationshipManager {
   /**
    * 记录亲密度变化历史
    */
-  recordIntimacyHistory(characterId, userId, action, delta, oldLevel, newLevel, context = null) {
+  private recordIntimacyHistory(characterId: string, userId: string, action: string, delta: number, oldLevel: number, newLevel: number, context: Record<string, unknown> | null = null): void {
     const now = Date.now();
     this.db.prepare(`
       INSERT INTO intimacy_history (character_id, user_id, action, delta, old_level, new_level, context, created_at)
@@ -482,19 +587,15 @@ class RelationshipManager {
 
   /**
    * 增强版更新亲密度（带历史记录）
-   * @param {string} characterId
-   * @param {string} userId
-   * @param {string} action - 行为类型
-   * @param {object} context - 上下文
    */
-  updateIntimacyWithHistory(characterId, userId, action, context = {}) {
+  updateIntimacyWithHistory(characterId: string, userId: string, action: string, context: IntimacyContext = {}): UpdateIntimacyResult {
     const relationship = this.getRelationship(characterId, userId);
     if (!relationship) {
       // 如果关系不存在，先创建
       this.createOrUpdateRelationship(characterId, userId, { intimacyLevel: 50 });
     }
 
-    const currentRel = this.getRelationship(characterId, userId);
+    const currentRel = this.getRelationship(characterId, userId)!;
     const oldLevel = currentRel.intimacy_level;
 
     // 计算变化
@@ -530,25 +631,25 @@ class RelationshipManager {
   /**
    * 获取亲密度历史
    */
-  getIntimacyHistory(characterId, userId, options = {}) {
+  getIntimacyHistory(characterId: string, userId: string, options: { limit?: number; offset?: number } = {}): IntimacyHistory[] {
     const { limit = 50, offset = 0 } = options;
     const history = this.db.prepare(`
       SELECT * FROM intimacy_history 
       WHERE character_id = ? AND user_id = ?
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `).all(characterId, userId, limit, offset);
+    `).all(characterId, userId, limit, offset) as IntimacyHistory[];
 
     return history.map(h => ({
       ...h,
-      context: h.context ? JSON.parse(h.context) : null
+      context: h.context ? JSON.parse(h.context as unknown as string) : null
     }));
   }
 
   /**
    * 获取关系完整信息（包含阶段、解锁等）
    */
-  getFullRelationshipInfo(characterId, userId) {
+  getFullRelationshipInfo(characterId: string, userId: string): FullRelationshipInfo | null {
     const relationship = this.getRelationship(characterId, userId);
     if (!relationship) {
       return null;
@@ -571,9 +672,9 @@ class RelationshipManager {
   /**
    * 批量衰减检查（可定时调用）
    */
-  batchDecayCheck(characterId) {
+  batchDecayCheck(characterId: string): { userId: string; decayed: boolean; delta?: number; oldLevel?: number; newLevel?: number; reason?: string }[] {
     const relationships = this.getCharacterRelationships(characterId);
-    const results = [];
+    const results: { userId: string; decayed: boolean; delta?: number; oldLevel?: number; newLevel?: number; reason?: string }[] = [];
 
     for (const rel of relationships) {
       const decayResult = this.checkIntimacyDecay(characterId, rel.user_id);
@@ -590,202 +691,21 @@ class RelationshipManager {
 
   // ============ 静态属性 ============
 
-  static get STAGES() {
+  static get STAGES(): typeof STAGES {
     return STAGES;
   }
 
-  static get INTIMACY_RULES() {
+  static get INTIMACY_RULES(): typeof INTIMACY_RULES {
     return INTIMACY_RULES;
   }
 
-  static get BEHAVIOR_ADJUSTMENTS() {
+  static get BEHAVIOR_ADJUSTMENTS(): typeof BEHAVIOR_ADJUSTMENTS {
     return BEHAVIOR_ADJUSTMENTS;
   }
 
-  static get SPECIAL_INTERACTIONS() {
+  static get SPECIAL_INTERACTIONS(): typeof SPECIAL_INTERACTIONS {
     return SPECIAL_INTERACTIONS;
   }
 }
 
-// ============ 单元测试逻辑 ============
-
-/**
- * 运行单元测试
- * 可以通过 node relationship-manager.js test 来运行
- */
-function runTests() {
-  console.log('🧪 开始运行 RelationshipManager 单元测试\n');
-
-  // 使用内存数据库进行测试
-  const testDbPath = ':memory:';
-  const rm = new RelationshipManager(testDbPath);
-
-  let passed = 0;
-  let failed = 0;
-
-  function test(name, fn) {
-    try {
-      fn();
-      console.log(`✅ ${name}`);
-      passed++;
-    } catch (error) {
-      console.log(`❌ ${name}: ${error.message}`);
-      failed++;
-    }
-  }
-
-  function assertEqual(actual, expected, message = '') {
-    if (actual !== expected) {
-      throw new Error(`${message} 期望 ${expected}, 实际 ${actual}`);
-    }
-  }
-
-  // 测试1：创建关系
-  test('创建关系', () => {
-    const rel = rm.createOrUpdateRelationship('test_char', 'test_user', { type: 'friend' });
-    assertEqual(rel.character_id, 'test_char', 'character_id');
-    assertEqual(rel.user_id, 'test_user', 'user_id');
-  });
-
-  // 测试2：获取关系阶段
-  test('获取关系阶段 - 陌生人', () => {
-    const { stage, info } = rm.getRelationshipStage(10);
-    assertEqual(stage, 'stranger', 'stage');
-    assertEqual(info.label, '陌生人', 'label');
-  });
-
-  test('获取关系阶段 - 朋友', () => {
-    const { stage, info } = rm.getRelationshipStage(50);
-    assertEqual(stage, 'friend', 'stage');
-    assertEqual(info.label, '朋友', 'label');
-  });
-
-  test('获取关系阶段 - 亲密关系', () => {
-    const { stage, info } = rm.getRelationshipStage(90);
-    assertEqual(stage, 'intimate', 'stage');
-    assertEqual(info.label, '亲密关系', 'label');
-  });
-
-  // 测试3：计算亲密度变化
-  test('计算亲密度变化 - 正向', () => {
-    const result = rm.calculateIntimacyDelta('validConversation');
-    assertEqual(result.delta, 5, 'delta');
-    assertEqual(result.type, 'positive', 'type');
-  });
-
-  test('计算亲密度变化 - 负向', () => {
-    const result = rm.calculateIntimacyDelta('longNoInteraction');
-    assertEqual(result.delta, -5, 'delta');
-    assertEqual(result.type, 'negative', 'type');
-  });
-
-  test('计算亲密度变化 - 未知行为', () => {
-    const result = rm.calculateIntimacyDelta('unknownAction');
-    assertEqual(result.delta, 1, 'delta');
-  });
-
-  // 测试4：更新亲密度
-  test('更新亲密度', () => {
-    rm.createOrUpdateRelationship('char1', 'user1', { intimacyLevel: 50 });
-    const rel = rm.updateIntimacy('char1', 'user1', 10);
-    assertEqual(rel.intimacy_level, 60, 'intimacy_level');
-  });
-
-  test('更新亲密度 - 边界检查上限', () => {
-    rm.createOrUpdateRelationship('char2', 'user2', { intimacyLevel: 95 });
-    const rel = rm.updateIntimacy('char2', 'user2', 10);
-    assertEqual(rel.intimacy_level, 100, 'intimacy_level');
-  });
-
-  test('更新亲密度 - 边界检查下限', () => {
-    rm.createOrUpdateRelationship('char3', 'user3', { intimacyLevel: 5 });
-    const rel = rm.updateIntimacy('char3', 'user3', -10);
-    assertEqual(rel.intimacy_level, 0, 'intimacy_level');
-  });
-
-  // 测试5：带历史的亲密度更新
-  test('带历史的亲密度更新', () => {
-    const result = rm.updateIntimacyWithHistory('char1', 'user1', 'userCare');
-    assertEqual(result.delta, 10, 'delta');
-    assertEqual(typeof result.oldLevel, 'number', 'oldLevel');
-    assertEqual(typeof result.newLevel, 'number', 'newLevel');
-  });
-
-  // 测试6：行为调整
-  test('行为调整', () => {
-    rm.createOrUpdateRelationship('char4', 'user4', { intimacyLevel: 30 });
-    const rel = rm.getRelationship('char4', 'user4');
-    const behavior = rm.adjustBehaviorByRelationship(rel);
-    assertEqual(behavior.stage, 'acquaintance', 'stage');
-    assertEqual(Array.isArray(behavior.topics), true, 'topics is array');
-  });
-
-  // 测试7：特殊互动检查
-  test('特殊互动检查', () => {
-    rm.createOrUpdateRelationship('char5', 'user5', { intimacyLevel: 50 });
-    const rel = rm.getRelationship('char5', 'user5');
-    const interactions = rm.checkUnlockedInteractions(rel);
-    assertEqual(interactions.unlocked.length > 0, true, 'has unlocked');
-    assertEqual(interactions.locked.length > 0, true, 'has locked');
-  });
-
-  // 测试8：亲密度历史
-  test('亲密度历史', () => {
-    rm.createOrUpdateRelationship('char6', 'user6', { intimacyLevel: 50 });
-    rm.updateIntimacyWithHistory('char6', 'user6', 'validConversation');
-    rm.updateIntimacyWithHistory('char6', 'user6', 'userCare');
-    const history = rm.getIntimacyHistory('char6', 'user6');
-    assertEqual(history.length >= 2, true, 'history length');
-  });
-
-  // 测试9：完整关系信息
-  test('完整关系信息', () => {
-    rm.createOrUpdateRelationship('char7', 'user7', { intimacyLevel: 70 });
-    const info = rm.getFullRelationshipInfo('char7', 'user7');
-    assertEqual(info.stage, 'closeFriend', 'stage');
-    assertEqual(typeof info.behaviorAdjustment, 'object', 'behaviorAdjustment');
-    assertEqual(typeof info.interactions, 'object', 'interactions');
-  });
-
-  // 测试10：衰减检查
-  test('衰减检查 - 无衰减', () => {
-    rm.createOrUpdateRelationship('char8', 'user8', { intimacyLevel: 50 });
-    const rel = rm.getRelationship('char8', 'user8');
-    // 更新最后互动时间
-    rm.db.prepare(`
-      UPDATE relationships SET last_interaction = ? WHERE character_id = ? AND user_id = ?
-    `).run(Date.now(), 'char8', 'user8');
-
-    const result = rm.checkIntimacyDecay('char8', 'user8');
-    assertEqual(result.decayed, false, 'decayed');
-  });
-
-  test('衰减检查 - 有衰减', () => {
-    rm.createOrUpdateRelationship('char9', 'user9', { intimacyLevel: 50 });
-    // 设置5天前
-    const fiveDaysAgo = Date.now() - (5 * 24 * 60 * 60 * 1000);
-    rm.db.prepare(`
-      UPDATE relationships SET last_interaction = ? WHERE character_id = ? AND user_id = ?
-    `).run(fiveDaysAgo, 'char9', 'user9');
-
-    const result = rm.checkIntimacyDecay('char9', 'user9');
-    assertEqual(result.decayed, true, 'decayed');
-    assertEqual(result.delta < 0, true, 'negative delta');
-  });
-
-  // 测试结果
-  console.log(`\n📊 测试结果: ${passed} 通过, ${failed} 失败`);
-
-  return failed === 0;
-}
-
-// 如果直接运行此文件且参数为 test，则执行测试
-if (process.argv[2] === 'test') {
-  runTests();
-}
-
-module.exports = RelationshipManager;
-module.exports.STAGES = STAGES;
-module.exports.INTIMACY_RULES = INTIMACY_RULES;
-module.exports.BEHAVIOR_ADJUSTMENTS = BEHAVIOR_ADJUSTMENTS;
-module.exports.SPECIAL_INTERACTIONS = SPECIAL_INTERACTIONS;
+export default RelationshipManager;

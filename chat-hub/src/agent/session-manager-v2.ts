@@ -8,18 +8,84 @@
  * - 会话隔离
  */
 
-const { v4: uuidv4 } = require('uuid');
-const crypto = require('crypto');
+import { v4 as uuidv4 } from 'uuid';
+import Database from 'better-sqlite3';
+
+// Type alias for the database instance
+type SqliteDatabase = ReturnType<typeof Database>;
+
+interface SessionManagerConfig {
+  sliceSize?: number;
+  compressionThreshold?: number;
+  keepRecentMessages?: number;
+  sessionTTL?: number;
+}
+
+interface SessionMessage {
+  id: string;
+  timestamp: number;
+  role: string;
+  content: string;
+  isSummary?: boolean;
+}
+
+interface SessionSlice {
+  id: string;
+  sessionId: string;
+  sliceIndex: number;
+  messages: SessionMessage[];
+  tokenCount: number;
+}
+
+interface SessionInfo {
+  id: string;
+  agentId: string;
+  userId: string;
+  sessionType?: string;
+  createdAt: number;
+  lastActive?: number;
+  expiresAt?: number;
+  messageCount?: number;
+  contextTokens?: number;
+}
+
+interface SessionStats {
+  sessionId: string;
+  messageCount: number;
+  tokenCount: number;
+  sliceCount: number;
+  compressionCount: number;
+  createdAt: number;
+  lastActive: number;
+}
+
+interface CompressionResult {
+  compressionId: string;
+  summary: string;
+  messagesRemoved: number;
+}
+
+interface GetMessagesOptions {
+  limit?: number;
+  offset?: number;
+  includeSummary?: boolean;
+}
+
+interface CreateSessionOptions {
+  sessionType?: string;
+}
 
 class SessionManagerV2 {
-  constructor(db, options = {}) {
+  private db: SqliteDatabase;
+  private config: Required<SessionManagerConfig>;
+
+  constructor(db: SqliteDatabase, options: SessionManagerConfig = {}) {
     this.db = db;
     this.config = {
-      sliceSize: options.sliceSize || 50,           // 每片消息数
-      compressionThreshold: options.compressionThreshold || 100, // 压缩阈值
-      keepRecentMessages: options.keepRecentMessages || 20,       // 保留最近消息
-      sessionTTL: options.sessionTTL || 86400000,   // 会话过期时间 24小时
-      ...options
+      sliceSize: options.sliceSize || 50,
+      compressionThreshold: options.compressionThreshold || 100,
+      keepRecentMessages: options.keepRecentMessages || 20,
+      sessionTTL: options.sessionTTL || 86400000,
     };
   }
 
@@ -29,7 +95,7 @@ class SessionManagerV2 {
    * 生成规范化 Session ID
    * 格式: {user_id}_{agent_id}_{timestamp}
    */
-  generateSessionId(userId, agentId) {
+  generateSessionId(userId: string, agentId: string): string {
     const timestamp = Date.now();
     return `${userId}_${agentId}_${timestamp}`;
   }
@@ -37,7 +103,7 @@ class SessionManagerV2 {
   /**
    * 解析 Session ID
    */
-  parseSessionId(sessionId) {
+  parseSessionId(sessionId: string): { userId: string; agentId: string; timestamp: number } | null {
     const parts = sessionId.split('_');
     if (parts.length < 3) {
       return null;
@@ -51,7 +117,7 @@ class SessionManagerV2 {
   /**
    * 验证 Session ID 格式
    */
-  isValidSessionId(sessionId) {
+  isValidSessionId(sessionId: string): boolean {
     return this.parseSessionId(sessionId) !== null;
   }
 
@@ -60,7 +126,7 @@ class SessionManagerV2 {
   /**
    * 创建会话
    */
-  async createSession(userId, agentId, options = {}) {
+  async createSession(userId: string, agentId: string, options: CreateSessionOptions = {}): Promise<SessionInfo> {
     const sessionId = this.generateSessionId(userId, agentId);
     const now = Date.now();
 
@@ -92,14 +158,14 @@ class SessionManagerV2 {
   /**
    * 获取或创建会话
    */
-  async getOrCreateSession(userId, agentId) {
+  async getOrCreateSession(userId: string, agentId: string): Promise<any> {
     // 查找最近的活跃会话
     const existing = this.db.prepare(`
       SELECT * FROM agent_sessions 
       WHERE user_id = ? AND agent_id = ? AND expires_at > ?
       ORDER BY last_active DESC
       LIMIT 1
-    `).get(userId, agentId, Date.now());
+    `).get(userId, agentId, Date.now()) as any;
 
     if (existing) {
       // 更新活跃时间
@@ -115,7 +181,7 @@ class SessionManagerV2 {
   /**
    * 获取会话
    */
-  getSession(sessionId) {
+  getSession(sessionId: string): any {
     return this.db.prepare('SELECT * FROM agent_sessions WHERE id = ?').get(sessionId);
   }
 
@@ -124,7 +190,7 @@ class SessionManagerV2 {
   /**
    * 创建切片
    */
-  async createSlice(sessionId, sliceIndex) {
+  async createSlice(sessionId: string, sliceIndex: number): Promise<SessionSlice> {
     const sliceId = `${sessionId}_slice_${sliceIndex}`;
     
     this.db.prepare(`
@@ -144,13 +210,13 @@ class SessionManagerV2 {
   /**
    * 获取当前切片
    */
-  async getCurrentSlice(sessionId) {
+  async getCurrentSlice(sessionId: string): Promise<SessionSlice> {
     const result = this.db.prepare(`
       SELECT * FROM session_messages 
       WHERE session_id = ? 
       ORDER BY slice_index DESC 
       LIMIT 1
-    `).get(sessionId);
+    `).get(sessionId) as any;
 
     if (!result) {
       return this.createSlice(sessionId, 0);
@@ -165,20 +231,21 @@ class SessionManagerV2 {
   /**
    * 添加消息
    */
-  async addMessage(sessionId, message) {
+  async addMessage(sessionId: string, message: Omit<SessionMessage, 'id' | 'timestamp'>): Promise<SessionMessage> {
     let currentSlice = await this.getCurrentSlice(sessionId);
     
     // 检查是否需要新切片
     if (currentSlice.messages.length >= this.config.sliceSize) {
-      currentSlice = await this.createSlice(sessionId, currentSlice.slice_index + 1);
+      currentSlice = await this.createSlice(sessionId, currentSlice.sliceIndex + 1);
     }
 
     // 添加消息
-    currentSlice.messages.push({
+    const newMessage: SessionMessage = {
       ...message,
       id: uuidv4(),
       timestamp: Date.now()
-    });
+    };
+    currentSlice.messages.push(newMessage);
 
     // 保存切片
     this.db.prepare(`
@@ -198,27 +265,27 @@ class SessionManagerV2 {
           last_active = ?,
           context_tokens = context_tokens + ?
       WHERE id = ?
-    `).run(Date.now(), this.estimateTokens([message]), sessionId);
+    `).run(Date.now(), this.estimateTokens([newMessage]), sessionId);
 
     // 检查是否需要压缩
-    const session = this.getSession(sessionId);
-    if (session.message_count >= this.config.compressionThreshold) {
+    const session = this.getSession(sessionId) as any;
+    if (session && session.message_count >= this.config.compressionThreshold) {
       await this.compressContext(sessionId);
     }
 
-    return message;
+    return newMessage;
   }
 
   /**
    * 获取所有消息
    */
-  async getMessages(sessionId, options = {}) {
+  async getMessages(sessionId: string, options: GetMessagesOptions = {}): Promise<SessionMessage[]> {
     const { limit, offset, includeSummary } = options;
 
-    let query = 'SELECT * FROM session_messages WHERE session_id = ? ORDER BY slice_index ASC';
-    const slices = this.db.prepare(query).all(sessionId);
+    const query = 'SELECT * FROM session_messages WHERE session_id = ? ORDER BY slice_index ASC';
+    const slices = this.db.prepare(query).all(sessionId) as any[];
 
-    let messages = [];
+    let messages: SessionMessage[] = [];
     for (const slice of slices) {
       messages = messages.concat(JSON.parse(slice.messages || '[]'));
     }
@@ -230,13 +297,15 @@ class SessionManagerV2 {
         WHERE session_id = ? 
         ORDER BY created_at DESC 
         LIMIT 1
-      `).get(sessionId);
+      `).get(sessionId) as any;
       
       if (summary) {
         messages.unshift({
           role: 'system',
           content: `[历史摘要] ${summary.summary}`,
-          isSummary: true
+          isSummary: true,
+          id: 'summary',
+          timestamp: summary.created_at
         });
       }
     }
@@ -257,7 +326,7 @@ class SessionManagerV2 {
   /**
    * 压缩上下文
    */
-  async compressContext(sessionId) {
+  async compressContext(sessionId: string): Promise<CompressionResult | null> {
     const messages = await this.getMessages(sessionId);
     
     if (messages.length < this.config.compressionThreshold) {
@@ -284,7 +353,7 @@ class SessionManagerV2 {
       summary,
       oldMessages.length,
       this.estimateTokens(oldMessages),
-      this.estimateTokens([{ content: summary }]),
+      this.estimateTokens([{ content: summary } as SessionMessage]),
       Date.now()
     );
 
@@ -293,7 +362,7 @@ class SessionManagerV2 {
       SELECT id FROM session_messages 
       WHERE session_id = ? 
       ORDER BY slice_index ASC
-    `).all(sessionId);
+    `).all(sessionId) as any[];
 
     const slicesToDelete = slices.slice(0, -2); // 保留最后 2 个切片
     for (const slice of slicesToDelete) {
@@ -321,9 +390,9 @@ class SessionManagerV2 {
   /**
    * 生成摘要（简化版）
    */
-  generateSummary(messages) {
+  generateSummary(messages: SessionMessage[]): string {
     // 简化版：实际应调用 LLM
-    const roles = {};
+    const roles: Record<string, number> = {};
     for (const msg of messages) {
       roles[msg.role] = (roles[msg.role] || 0) + 1;
     }
@@ -335,7 +404,7 @@ class SessionManagerV2 {
   /**
    * 估算 Token 数
    */
-  estimateTokens(messages) {
+  estimateTokens(messages: SessionMessage[]): number {
     let total = 0;
     for (const msg of messages) {
       if (msg.content) {
@@ -349,11 +418,11 @@ class SessionManagerV2 {
   /**
    * 清理过期会话
    */
-  async cleanupExpiredSessions() {
+  async cleanupExpiredSessions(): Promise<number> {
     const now = Date.now();
     const expired = this.db.prepare(`
       SELECT id FROM agent_sessions WHERE expires_at < ?
-    `).all(now);
+    `).all(now) as any[];
 
     for (const session of expired) {
       // 删除切片
@@ -370,29 +439,29 @@ class SessionManagerV2 {
   /**
    * 获取会话统计
    */
-  getStats(sessionId) {
+  getStats(sessionId: string): SessionStats | null {
     const session = this.getSession(sessionId);
     if (!session) return null;
 
     const slices = this.db.prepare(`
       SELECT COUNT(*) as count, SUM(token_count) as tokens
       FROM session_messages WHERE session_id = ?
-    `).get(sessionId);
+    `).get(sessionId) as any;
 
     const compressions = this.db.prepare(`
       SELECT COUNT(*) as count FROM context_compressions WHERE session_id = ?
-    `).get(sessionId);
+    `).get(sessionId) as any;
 
     return {
       sessionId,
-      messageCount: session.message_count,
-      tokenCount: session.context_tokens || slices.tokens || 0,
+      messageCount: (session as any).message_count || 0,
+      tokenCount: (session as any).context_tokens || slices.tokens || 0,
       sliceCount: slices.count,
       compressionCount: compressions.count,
-      createdAt: session.created_at,
-      lastActive: session.last_active
+      createdAt: (session as any).created_at,
+      lastActive: (session as any).last_active
     };
   }
 }
 
-module.exports = { SessionManagerV2 };
+export { SessionManagerV2 };

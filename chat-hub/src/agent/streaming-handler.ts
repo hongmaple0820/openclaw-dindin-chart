@@ -7,33 +7,95 @@
  * - 取消处理
  */
 
-const EventEmitter = require('events');
+import EventEmitter from 'events';
+import { ServerResponse } from 'http';
+
+interface StreamingHandlerOptions {
+  chunkSize?: number;
+  throttleMs?: number;
+}
+
+interface StreamController {
+  cancelled: boolean;
+  cancel: () => void;
+}
+
+interface StreamTextOptions {
+  chunkSize?: number;
+  throttleMs?: number;
+  onChunk?: (chunk: string, index: number) => Promise<void> | void;
+}
+
+interface StreamIteratorOptions {
+  throttleMs?: number;
+}
+
+interface StreamResult {
+  streamId: string;
+  chars?: number;
+  chunks: number;
+  cancelled: boolean;
+  content?: string;
+  tokens?: { prompt: number; completion: number };
+}
+
+interface CompleteEvent {
+  streamId: string;
+  chars: number;
+  chunks: number;
+  cancelled: boolean;
+  latency: number;
+  tokens?: { prompt: number; completion: number };
+}
+
+interface CancelledEvent {
+  streamId: string;
+}
+
+interface OpenAIStreamChunk {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    delta: { content?: string };
+    finish_reason: string | null;
+  }>;
+}
 
 class StreamingHandler extends EventEmitter {
-  constructor(options = {}) {
+  private chunkSize: number;
+  private throttleMs: number;
+  private activeStreams: Map<string, StreamController>;
+
+  constructor(options: StreamingHandlerOptions = {}) {
     super();
-    this.chunkSize = options.chunkSize || 100; // 每块字符数
-    this.throttleMs = options.throttleMs || 10; // 块间延迟(ms)
+    this.chunkSize = options.chunkSize || 100;
+    this.throttleMs = options.throttleMs || 10;
     this.activeStreams = new Map();
   }
 
   /**
    * 创建 SSE 响应
    */
-  createSSE(response) {
+  createSSE(response: ServerResponse): void {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('Connection', 'keep-alive');
     response.setHeader('X-Accel-Buffering', 'no');
 
     // 禁用 nginx 缓冲
-    response.flush?.();
+    const responseWithFlush = response as any;
+    if (typeof responseWithFlush.flush === 'function') {
+      responseWithFlush.flush();
+    }
   }
 
   /**
    * 发送 SSE 事件
    */
-  sendEvent(response, event, data) {
+  sendEvent(response: ServerResponse, event: string, data: any): boolean {
     if (response.writableEnded) return false;
 
     try {
@@ -48,7 +110,7 @@ class StreamingHandler extends EventEmitter {
   /**
    * 流式输出文本
    */
-  async streamText(response, streamId, text, options = {}) {
+  async streamText(response: ServerResponse, streamId: string, text: string, options: StreamTextOptions = {}): Promise<StreamResult> {
     const {
       chunkSize = this.chunkSize,
       throttleMs = this.throttleMs,
@@ -56,7 +118,7 @@ class StreamingHandler extends EventEmitter {
     } = options;
 
     // 创建取消控制器
-    const controller = {
+    const controller: StreamController = {
       cancelled: false,
       cancel: () => { controller.cancelled = true; }
     };
@@ -115,7 +177,7 @@ class StreamingHandler extends EventEmitter {
         chunks: chunkCount,
         cancelled: controller.cancelled,
         latency: Date.now() - startTime
-      });
+      } as CompleteEvent);
 
     } finally {
       this.activeStreams.delete(streamId);
@@ -132,11 +194,11 @@ class StreamingHandler extends EventEmitter {
   /**
    * 流式输出迭代器
    */
-  async streamIterator(response, streamId, iterator, options = {}) {
+  async streamIterator(response: ServerResponse, streamId: string, iterator: AsyncIterable<any>, options: StreamIteratorOptions = {}): Promise<StreamResult> {
     const { throttleMs = this.throttleMs } = options;
 
     // 创建取消控制器
-    const controller = {
+    const controller: StreamController = {
       cancelled: false,
       cancel: () => { controller.cancelled = true; }
     };
@@ -187,12 +249,12 @@ class StreamingHandler extends EventEmitter {
         chunks: chunkCount,
         cancelled: controller.cancelled,
         latency: Date.now() - startTime
-      });
+      } as CompleteEvent);
 
     } catch (error) {
       this.sendEvent(response, 'error', {
         stream_id: streamId,
-        error: error.message
+        error: (error as Error).message
       });
       throw error;
     } finally {
@@ -210,7 +272,7 @@ class StreamingHandler extends EventEmitter {
   /**
    * 从 OpenAI 格式的 chunk 提取内容
    */
-  extractContent(chunk) {
+  extractContent(chunk: any): string | null {
     // OpenAI 格式
     if (chunk.choices?.[0]?.delta?.content) {
       return chunk.choices[0].delta.content;
@@ -232,12 +294,12 @@ class StreamingHandler extends EventEmitter {
   /**
    * 取消流
    */
-  cancelStream(streamId) {
+  cancelStream(streamId: string): boolean {
     const controller = this.activeStreams.get(streamId);
     if (controller) {
       controller.cancelled = true;
       this.activeStreams.delete(streamId);
-      this.emit('cancelled', { streamId });
+      this.emit('cancelled', { streamId } as CancelledEvent);
       return true;
     }
     return false;
@@ -246,11 +308,11 @@ class StreamingHandler extends EventEmitter {
   /**
    * 取消所有流
    */
-  cancelAll() {
+  cancelAll(): number {
     const count = this.activeStreams.size;
     for (const [streamId, controller] of this.activeStreams) {
       controller.cancelled = true;
-      this.emit('cancelled', { streamId });
+      this.emit('cancelled', { streamId } as CancelledEvent);
     }
     this.activeStreams.clear();
     return count;
@@ -259,14 +321,14 @@ class StreamingHandler extends EventEmitter {
   /**
    * 获取活跃流数量
    */
-  getActiveCount() {
+  getActiveCount(): number {
     return this.activeStreams.size;
   }
 
   /**
    * 发送心跳
    */
-  sendHeartbeat(response) {
+  sendHeartbeat(response: ServerResponse): boolean {
     if (response.writableEnded) return false;
     try {
       response.write(': heartbeat\n\n');
@@ -279,7 +341,7 @@ class StreamingHandler extends EventEmitter {
   /**
    * 启动心跳间隔
    */
-  startHeartbeat(response, intervalMs = 30000) {
+  startHeartbeat(response: ServerResponse, intervalMs: number = 30000): () => void {
     const interval = setInterval(() => {
       if (!this.sendHeartbeat(response)) {
         clearInterval(interval);
@@ -292,14 +354,14 @@ class StreamingHandler extends EventEmitter {
   /**
    * 辅助函数：sleep
    */
-  sleep(ms) {
+  sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
    * 格式化 OpenAI 流式响应
    */
-  formatOpenAIStream(chunk, model, streamId) {
+  formatOpenAIStream(chunk: string, model: string, streamId: string): OpenAIStreamChunk {
     return {
       id: `chatcmpl-${streamId}`,
       object: 'chat.completion.chunk',
@@ -318,7 +380,7 @@ class StreamingHandler extends EventEmitter {
   /**
    * 格式化 OpenAI 流结束
    */
-  formatOpenAIStreamEnd(model, streamId) {
+  formatOpenAIStreamEnd(model: string, streamId: string): OpenAIStreamChunk {
     return {
       id: `chatcmpl-${streamId}`,
       object: 'chat.completion.chunk',
@@ -335,7 +397,7 @@ class StreamingHandler extends EventEmitter {
   /**
    * 格式化错误响应
    */
-  formatError(error, code = 'internal_error') {
+  formatError(error: Error & { type?: string; code?: string | number }, code: string = 'internal_error'): { error: { message: string; type: string; param: null; code: string | number } } {
     return {
       error: {
         message: error.message || 'Unknown error',
@@ -349,11 +411,11 @@ class StreamingHandler extends EventEmitter {
   /**
    * 发送 OpenAI 格式流式响应
    */
-  async streamOpenAIFormat(response, streamId, iterator, model, options = {}) {
+  async streamOpenAIFormat(response: ServerResponse, streamId: string, iterator: AsyncIterable<any>, model: string, options: StreamIteratorOptions = {}): Promise<StreamResult> {
     const { throttleMs = this.throttleMs } = options;
 
     // 创建取消控制器
-    const controller = {
+    const controller: StreamController = {
       cancelled: false,
       cancel: () => { controller.cancelled = true; }
     };
@@ -402,10 +464,10 @@ class StreamingHandler extends EventEmitter {
         tokens: { prompt: promptTokens, completion: completionTokens },
         cancelled: controller.cancelled,
         latency: Date.now() - startTime
-      });
+      } as CompleteEvent);
 
     } catch (error) {
-      this.sendEvent(response, 'error', this.formatError(error));
+      this.sendEvent(response, 'error', this.formatError(error as Error));
       throw error;
     } finally {
       this.activeStreams.delete(streamId);
@@ -421,4 +483,4 @@ class StreamingHandler extends EventEmitter {
   }
 }
 
-module.exports = StreamingHandler;
+export default StreamingHandler;

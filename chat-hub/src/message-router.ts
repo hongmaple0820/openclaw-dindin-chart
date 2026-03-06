@@ -3,6 +3,13 @@ const sseManager = require('./sse-manager');
 const redisClient = require('./redis-client');
 const config = require('./config');
 
+// 路由选项类型
+interface RouteOptions {
+  conversationId?: string;
+  sessionId?: string;
+  type?: string;
+}
+
 class MessageRouter {
   transportManager: any;
   messageHandlers: Map<string, any>;
@@ -14,11 +21,11 @@ class MessageRouter {
     this.sessionSubscriptions = new Map();
   }
 
-  setTransportManager(transportManager) {
+  setTransportManager(transportManager: any): void {
     this.transportManager = transportManager;
   }
 
-  async routeMessage(message, options = {}) {
+  async routeMessage(message: any, options: RouteOptions = {}): Promise<boolean> {
     const { conversationId, sessionId, type = 'private' } = options;
 
     if (!conversationId && !sessionId) {

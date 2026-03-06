@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import fse from 'fs-extra';
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 interface WorkspaceManagerConfig {
   rootDir?: string;

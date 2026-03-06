@@ -1,6 +1,7 @@
-const config = require('../config');
-const redisClient = require('../redis-client');
-const dingtalk = require('../dingtalk');
+import * as config from '../config';
+import * as redisClient from '../redis-client';
+import * as dingtalk from '../dingtalk';
+import { Message } from './base-bot';
 
 /**
  * OpenClaw 机器人代理
@@ -11,21 +12,26 @@ const dingtalk = require('../dingtalk');
  * 2. OpenClaw 收到 @ 后处理并回复到钉钉群
  * 3. 钉钉 Outgoing Webhook 把 OpenClaw 的回复发送到聊天室
  */
-class OpenClawProxy {
-  constructor(name, openclawAtName) {
-    this.name = name;                    // 代理名称（如 "小明"）
-    this.openclawAtName = openclawAtName; // OpenClaw 在钉钉的 @ 名称（如 "@小明机器人"）
+export class OpenClawProxy {
+  name: string;
+  openclawAtName: string;
+  lastTriggerTime: number;
+  cooldownMs: number;
+
+  constructor(name: string, openclawAtName: string) {
+    this.name = name;
+    this.openclawAtName = openclawAtName;
     this.lastTriggerTime = 0;
-    this.cooldownMs = config.bots.cooldownMs || 5000;
+    this.cooldownMs = (config as any).bots?.cooldownMs || 5000;
   }
 
   /**
    * 启动代理，订阅消息频道
    */
-  async start() {
+  async start(): Promise<void> {
     console.log(`[${this.name}] OpenClaw 代理启动中...`);
 
-    await redisClient.subscribe(config.channels.messages, async (message) => {
+    await (redisClient as any).subscribe((config as any).channels.messages, async (message: Message) => {
       // 过滤：不响应机器人消息（避免循环）
       if (message.type === 'bot') {
         return;
@@ -59,7 +65,7 @@ class OpenClawProxy {
   /**
    * 判断是否应该触发 OpenClaw（子类可覆盖）
    */
-  async shouldTrigger(message) {
+  async shouldTrigger(message: Message): Promise<boolean> {
     // 默认：检查消息内容是否 @ 了这个机器人
     const content = message.content || '';
     return content.includes(this.openclawAtName) || content.includes(`@${this.name}`);
@@ -68,13 +74,13 @@ class OpenClawProxy {
   /**
    * 通过钉钉 @ OpenClaw 机器人
    */
-  async triggerOpenClaw(message) {
+  async triggerOpenClaw(message: Message): Promise<void> {
     // 构造消息：包含 @ 和原始消息
     const triggerMessage = `${this.openclawAtName} ${message.content}`;
 
     // 发送到钉钉群，@ 机器人会触发 OpenClaw
-    await dingtalk.sendText(triggerMessage, this.name);
+    await (dingtalk as any).sendText(triggerMessage, this.name);
   }
 }
 
-module.exports = OpenClawProxy;
+export default OpenClawProxy;

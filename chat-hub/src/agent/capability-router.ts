@@ -9,6 +9,7 @@
 
 import EventEmitter from 'events';
 import type AgentRegistry from './registry';
+import OpenAIAdapter from './openai-adapter';
 
 interface Agent {
   id: string;
@@ -227,10 +228,11 @@ class CapabilityRouter extends EventEmitter {
     const current = this.agentStatus.get(agentId) || { load: 0, status: 'online' };
     
     this.agentStatus.set(agentId, {
+      ...current,
       status: status ?? current.status ?? 'online',
       load: load ?? current.load ?? 0,
       lastCheck: Date.now(),
-      errorCount: status === 'error' ? (current.errorCount || 0) + 1 : 0
+      errorCount: status === 'error' ? ((current as AgentStatus).errorCount || 0) + 1 : 0
     });
 
     this.emit('status-update', { agentId, status: this.agentStatus.get(agentId) });
@@ -284,7 +286,6 @@ class CapabilityRouter extends EventEmitter {
     }
 
     try {
-      const OpenAIAdapter = require('./openai-adapter');
       const adapter = new OpenAIAdapter(agent);
       const health = await adapter.healthCheck();
 

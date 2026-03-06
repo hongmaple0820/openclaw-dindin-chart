@@ -9,13 +9,21 @@ const EventEmitter = require('events');
  * - 连接状态追踪
  * - 用户上线/下线通知
  */
+
+// SSE 配置类型
+interface SSEOptions {
+  heartbeatInterval?: number;
+  maxConnections?: number;
+  timeout?: number;
+}
+
 class SSEManager extends EventEmitter {
-  config: any;
+  config: SSEOptions;
   clients: Map<string, any>;
   heartbeatTimer: NodeJS.Timeout | null;
   stats: { totalConnections: number; totalDisconnections: number; messagesSent: number; messagesFailed: number };
 
-  constructor(options = {}) {
+  constructor(options: SSEOptions = {}) {
     super();
     
     // 配置

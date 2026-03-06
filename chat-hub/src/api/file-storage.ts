@@ -214,7 +214,7 @@ class LocalStorage extends BaseStorage {
     const chunkSize = end - start + 1;
     
     return {
-      stream: await fs.readFile(filePath, { start, end } as fs.ReadFileOptions),
+      stream: await fs.readFile(filePath, { start, end } as fs.BaseEncodingOptions & { start?: number; end?: number }),
       size: chunkSize,
       headers: {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -413,6 +413,7 @@ interface StorageProviderConfig extends BaseStorageConfig {
   password?: string;
   basePath?: string;
   secure?: boolean;
+  cleanupInterval?: number;
 }
 
 class StorageFactory {
@@ -493,14 +494,14 @@ interface Progress {
 }
 
 class FileStorageManager {
-  private config: FileStorageManagerConfig;
-  private defaultProvider: string;
-  private providers: Record<string, BaseStorage> = {};
-  private tempDir: string;
-  private chunkSize: number;
-  private maxFileSize: number;
-  private cleanupInterval: number;
-  private uploadSessions: Map<string, UploadInfo> = new Map();
+  protected config: FileStorageManagerConfig;
+  protected defaultProvider: string;
+  protected providers: Record<string, BaseStorage> = {};
+  protected tempDir: string;
+  protected chunkSize: number;
+  protected maxFileSize: number;
+  protected cleanupInterval: number;
+  protected uploadSessions: Map<string, UploadInfo> = new Map();
 
   constructor(config: FileStorageManagerConfig = {}) {
     this.config = config;
@@ -759,7 +760,7 @@ class FileStorageManager {
     }
   }
 
-  private async _exists(filePath: string): Promise<boolean> {
+  protected async _exists(filePath: string): Promise<boolean> {
     try {
       await fs.access(filePath);
       return true;
@@ -839,15 +840,6 @@ class FileStorage extends FileStorageManager {
       '.wav': 'audio/wav'
     };
     return mimeTypes[ext] || 'application/octet-stream';
-  }
-
-  private async _exists(filePath: string): Promise<boolean> {
-    try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
-    }
   }
 }
 

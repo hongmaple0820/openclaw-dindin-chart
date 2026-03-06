@@ -1,30 +1,82 @@
+import { spawn } from 'child_process';
+import * as config from '../config';
+import * as redisClient from '../redis-client';
+import { Message } from './base-bot';
+
+/**
+ * 智能对话管理器配置选项
+ */
+export interface SmartConversationOptions {
+  gatewayUrl?: string | null;
+  gatewayToken?: string | null;
+  checkIntervalMs?: number;
+  botCooldownMs?: number;
+  humanCooldownMs?: number;
+  maxConversationTurns?: number;
+}
+
+/**
+ * 对话状态
+ */
+interface ConversationState {
+  id: string;
+  participants: string[];
+  pendingMessages: Message[];
+  turns: number;
+  isBot: boolean;
+  lastActivity: number;
+  processing: boolean;
+  topicClosed: boolean;
+}
+
 /**
  * 智能对话管理器
  * 自主检测消息 + 智能判断回复 + 对话状态追踪
  * @author 小琳
  * @date 2026-02-06
  */
+export class SmartConversationManager {
+  name: string;
+  gatewayUrl: string | null;
+  gatewayToken: string | null;
+  
+  // 对话状态追踪
+  conversations: Map<string, ConversationState>;
+  recentMessages: string[];
+  lastCheckTime: number;
+  lastReplyTime: Record<string, number>;
+  
+  // 配置
+  checkIntervalMs: number;
+  botCooldownMs: number;
+  humanCooldownMs: number;
+  maxConversationTurns: number;
+  
+  // 机器人名单
+  botNames: string[];
+  
+  // 话题终结词
+  topicEnders: RegExp[];
+  
+  // 需要回复的信号
+  replySignals: RegExp[];
 
-const config = require('../config');
-const redisClient = require('../redis-client');
-
-class SmartConversationManager {
-  constructor(name, options = {}) {
+  constructor(name: string, options: SmartConversationOptions = {}) {
     this.name = name;
     this.gatewayUrl = options.gatewayUrl || null;
     this.gatewayToken = options.gatewayToken || null;
     
     // 对话状态追踪
-    this.conversations = new Map();  // conversationId -> 状态
-    this.recentMessages = [];        // 最近消息缓存
-    this.lastCheckTime = 0;          // 上次检查时间
-    this.lastReplyTime = {};         // 每个对话的上次回复时间
+    this.conversations = new Map();
+    this.recentMessages = [];
+    this.lastCheckTime = 0;
+    this.lastReplyTime = {};
     
     // 配置
-    this.checkIntervalMs = options.checkIntervalMs || 10000;  // 10秒检查一次
-    this.botCooldownMs = options.botCooldownMs || 30000;      // 机器人消息冷却30秒
-    this.humanCooldownMs = options.humanCooldownMs || 3000;   // 人类消息冷却3秒
-    this.maxConversationTurns = options.maxConversationTurns || 5;  // 单话题最多5轮
+    this.checkIntervalMs = options.checkIntervalMs || 10000;
+    this.botCooldownMs = options.botCooldownMs || 30000;
+    this.humanCooldownMs = options.humanCooldownMs || 3000;
+    this.maxConversationTurns = options.maxConversationTurns || 5;
     
     // 机器人名单
     this.botNames = ['小琳', '小猪', 'maple-bot', 'lin-bot'];
@@ -48,22 +100,30 @@ class SmartConversationManager {
     this.replySignals = [
       /@小琳/,
       /@小猪/,
-      /\?$/, /？$/,  // 问号结尾
-      /怎么/, /如何/, /为什么/, /什么/,  // 疑问词
-      /帮我/, /请/, /麻烦/,  // 请求
-      /你觉得/, /你认为/, /你看/,  // 征求意见
+      /\?$/,
+      /？$/,
+      /怎么/,
+      /如何/,
+      /为什么/,
+      /什么/,
+      /帮我/,
+      /请/,
+      /麻烦/,
+      /你觉得/,
+      /你认为/,
+      /你看/,
     ];
   }
 
   /**
    * 启动管理器
    */
-  async start() {
+  async start(): Promise<void> {
     console.log(`[${this.name}] 智能对话管理器启动...`);
     
     // 监听 Redis 消息
-    await redisClient.subscribe(config.channels.messages, (msg) => this.handleMessage(msg));
-    await redisClient.subscribe(config.channels.replies, (msg) => this.handleMessage(msg));
+    await (redisClient as any).subscribe((config as any).channels.messages, (msg: Message) => this.handleMessage(msg));
+    await (redisClient as any).subscribe((config as any).channels.replies, (msg: Message) => this.handleMessage(msg));
     
     // 定时自主检查
     this.startPeriodicCheck();
@@ -74,12 +134,13 @@ class SmartConversationManager {
   /**
    * 定时自主检查未处理消息
    */
-  startPeriodicCheck() {
+  startPeriodicCheck(): void {
     setInterval(async () => {
       try {
         await this.checkUnprocessedMessages();
-      } catch (error) {
-        console.error(`[${this.name}] 自主检查失败:`, error.message);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error(`[${this.name}] 自主检查失败:`, err.message);
       }
     }, this.checkIntervalMs);
   }
@@ -87,15 +148,15 @@ class SmartConversationManager {
   /**
    * 检查未处理的消息
    */
-  async checkUnprocessedMessages() {
+  async checkUnprocessedMessages(): Promise<void> {
     const now = Date.now();
     
     // 找出需要处理但还没处理的消息
-    for (const [convId, state] of this.conversations) {
+    this.conversations.forEach((state: ConversationState, convId: string) => {
       // 超过5分钟没活动的对话，清理掉
       if (now - state.lastActivity > 5 * 60 * 1000) {
         this.conversations.delete(convId);
-        continue;
+        return;
       }
       
       // 有待处理的消息且没在冷却中
@@ -104,16 +165,19 @@ class SmartConversationManager {
         const cooldown = state.isBot ? this.botCooldownMs : this.humanCooldownMs;
         
         if (now - lastReply >= cooldown) {
-          await this.processConversation(convId, state);
+          // 异步处理，不等待
+          this.processConversation(convId, state).catch(err => {
+            console.error(`[${this.name}] 处理对话失败:`, err.message);
+          });
         }
       }
-    }
+    });
   }
 
   /**
    * 处理收到的消息
    */
-  async handleMessage(message) {
+  async handleMessage(message: Message): Promise<void> {
     // 不处理自己的消息
     if (message.sender === this.name) return;
     
@@ -143,14 +207,14 @@ class SmartConversationManager {
     // 检查是否是话题终结
     if (this.isTopicEnder(message.content)) {
       state.topicClosed = true;
-      console.log(`[${this.name}] 话题终结: ${message.content.slice(0, 20)}`);
+      console.log(`[${this.name}] 话题终结: ${message.content?.slice(0, 20)}`);
       return;
     }
     
     // 检查是否需要回复
     const needsReply = this.shouldReply(message, state);
     if (!needsReply) {
-      console.log(`[${this.name}] 无需回复: ${message.content.slice(0, 30)}`);
+      console.log(`[${this.name}] 无需回复: ${message.content?.slice(0, 30)}`);
       return;
     }
     
@@ -170,7 +234,7 @@ class SmartConversationManager {
   /**
    * 判断是否应该回复
    */
-  shouldReply(message, state) {
+  shouldReply(message: Message, state: ConversationState): boolean {
     const content = message.content || '';
     
     // 话题已关闭，不回复
@@ -212,14 +276,14 @@ class SmartConversationManager {
   /**
    * 检查是否有回复信号
    */
-  hasReplySignal(content) {
+  hasReplySignal(content: string): boolean {
     return this.replySignals.some(pattern => pattern.test(content));
   }
 
   /**
    * 检查是否是话题终结词
    */
-  isTopicEnder(content) {
+  isTopicEnder(content?: string): boolean {
     const trimmed = (content || '').trim();
     return this.topicEnders.some(pattern => pattern.test(trimmed));
   }
@@ -227,7 +291,7 @@ class SmartConversationManager {
   /**
    * 检查是否是重复消息
    */
-  isRepetitive(content) {
+  isRepetitive(content: string): boolean {
     const hash = (content || '').slice(0, 50);
     if (this.recentMessages.includes(hash)) {
       return true;
@@ -242,7 +306,7 @@ class SmartConversationManager {
   /**
    * 处理对话
    */
-  async processConversation(convId, state) {
+  async processConversation(convId: string, state: ConversationState): Promise<void> {
     if (state.processing || state.pendingMessages.length === 0) return;
     
     state.processing = true;
@@ -261,8 +325,9 @@ class SmartConversationManager {
       state.turns++;
       this.lastReplyTime[convId] = Date.now();
       
-    } catch (error) {
-      console.error(`[${this.name}] 处理失败:`, error.message);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error(`[${this.name}] 处理失败:`, err.message);
     } finally {
       state.processing = false;
     }
@@ -271,11 +336,9 @@ class SmartConversationManager {
   /**
    * 触发 OpenClaw 处理
    */
-  async triggerOpenClaw(text) {
-    const { spawn } = require('child_process');
-    
-    return new Promise((resolve, reject) => {
-      const args = ['system', 'event', '--text', text, '--mode', 'now'];
+  async triggerOpenClaw(text: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const args: string[] = ['system', 'event', '--text', text, '--mode', 'now'];
       
       if (this.gatewayUrl) {
         args.push('--gateway-url', this.gatewayUrl);
@@ -288,11 +351,18 @@ class SmartConversationManager {
         env: { ...process.env, PATH: `${process.env.PATH}:${process.env.HOME}/.npm-global/bin` }
       });
       
-      let stdout = '', stderr = '';
-      child.stdout.on('data', d => stdout += d);
-      child.stderr.on('data', d => stderr += d);
+      let stdout = '';
+      let stderr = '';
       
-      child.on('close', code => {
+      child.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+      
+      child.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+      
+      child.on('close', (code: number | null) => {
         if (code === 0) {
           console.log(`[${this.name}] OpenClaw 触发成功`);
           resolve(stdout);
@@ -301,18 +371,20 @@ class SmartConversationManager {
         }
       });
       
-      child.on('error', reject);
+      child.on('error', (err: Error) => {
+        reject(err);
+      });
     });
   }
 
   /**
    * 获取对话 ID
    */
-  getConversationId(message) {
+  getConversationId(message: Message): string {
     // 简化：用发送者作为对话 ID
     // 实际可以根据群/话题等更复杂的逻辑
     return message.sender;
   }
 }
 
-module.exports = SmartConversationManager;
+export default SmartConversationManager;

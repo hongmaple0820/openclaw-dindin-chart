@@ -4,7 +4,7 @@
  * @date 2026-03-05
  */
 
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 interface Migration {
   version: string;

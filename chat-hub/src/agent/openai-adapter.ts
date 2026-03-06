@@ -8,10 +8,72 @@
  * - 错误处理
  */
 
-const EventEmitter = require('events');
+import EventEmitter from 'events';
+
+interface Agent {
+  id: string;
+  apiEndpoint?: string;
+  apiKey?: string;
+  model?: string;
+  params?: {
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+  };
+}
+
+interface ChatCompletionParams {
+  messages: ChatMessage[];
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  stream?: boolean;
+  [key: string]: any;
+}
+
+interface ChatMessage {
+  role: string;
+  content: string | any[];
+  name?: string;
+  function_call?: any;
+  tool_calls?: any[];
+}
+
+interface ModelInfo {
+  id: string;
+  object: string;
+  created: number;
+  owned_by: string;
+}
+
+interface ModelsResponse {
+  object: string;
+  data: ModelInfo[];
+}
+
+interface CompletionEvent {
+  agentId: string;
+  model: string;
+  latency: number;
+  tokens?: any;
+}
+
+interface ErrorEvent {
+  agentId: string;
+  error: Error;
+}
+
+interface HealthCheckResult {
+  healthy: boolean;
+  error?: string;
+}
 
 class OpenAIAdapter extends EventEmitter {
-  constructor(agent) {
+  private agent: Agent;
+  private abortController: AbortController | null = null;
+
+  constructor(agent: Agent) {
     super();
     this.agent = agent;
     this.abortController = null;
@@ -20,7 +82,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 获取 Models 列表
    */
-  async listModels() {
+  async listModels(): Promise<ModelsResponse> {
     const endpoint = this.agent.apiEndpoint;
     const apiKey = this.agent.apiKey;
 
@@ -40,10 +102,10 @@ class OpenAIAdapter extends EventEmitter {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as ModelsResponse;
       return data;
     } catch (error) {
-      console.error('[OpenAIAdapter] 获取模型列表失败:', error.message);
+      console.error('[OpenAIAdapter] 获取模型列表失败:', (error as Error).message);
       return this.getDefaultModels();
     }
   }
@@ -51,7 +113,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 默认模型列表
    */
-  getDefaultModels() {
+  getDefaultModels(): ModelsResponse {
     return {
       object: 'list',
       data: [
@@ -68,7 +130,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * Chat Completions
    */
-  async chatCompletion(params, options = {}) {
+  async chatCompletion(params: ChatCompletionParams, options: { timeout?: number } = {}): Promise<any> {
     const {
       messages,
       model = this.agent.model || 'gpt-3.5-turbo',
@@ -92,7 +154,7 @@ class OpenAIAdapter extends EventEmitter {
     }
 
     // 构建请求体
-    const requestBody = {
+    const requestBody: Record<string, any> = {
       model,
       messages: this.normalizeMessages(messages),
       temperature,
@@ -143,27 +205,42 @@ class OpenAIAdapter extends EventEmitter {
         model,
         latency,
         tokens: data.usage
-      });
+      } as CompletionEvent);
 
       return data;
 
     } catch (error) {
       clearTimeout(timeoutId);
 
-      if (error.name === 'AbortError') {
+      if ((error as Error).name === 'AbortError') {
         throw this.createError(499, { error: { message: 'Request cancelled' } });
       }
 
-      this.emit('error', { agentId: this.agent.id, error });
+      this.emit('error', { agentId: this.agent.id, error } as ErrorEvent);
       throw error;
+    }
+  }
+
+  /**
+   * Chat Completion Stream - 返回异步迭代器
+   */
+  async *chatCompletionStream(params: ChatCompletionParams, options: { timeout?: number } = {}): AsyncGenerator<any> {
+    const streamParams = { ...params, stream: true };
+    const stream = await this.chatCompletion(streamParams, options);
+    for await (const chunk of stream as AsyncIterable<any>) {
+      yield chunk;
     }
   }
 
   /**
    * 处理流式响应
    */
-  async *handleStreamResponse(response, model) {
-    const reader = response.body.getReader();
+  async *handleStreamResponse(response: Response, model: string): AsyncGenerator<any> {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+    
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -216,7 +293,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 标准化消息格式
    */
-  normalizeMessages(messages) {
+  normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
     return messages.map(msg => {
       // 支持多种格式
       if (typeof msg === 'string') {
@@ -224,7 +301,7 @@ class OpenAIAdapter extends EventEmitter {
       }
 
       // 确保 content 是字符串
-      let content = msg.content;
+      let content: string | any[] = msg.content;
       if (Array.isArray(content)) {
         // 多模态消息
         content = content.map(c => {
@@ -248,12 +325,12 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 创建错误
    */
-  createError(status, data) {
+  createError(status: number, data: any): Error {
     const message = data.error?.message || data.error?.error?.message || 'Unknown error';
     const type = data.error?.type || 'api_error';
     const code = data.error?.code || status;
 
-    const error = new Error(message);
+    const error = new Error(message) as Error & { status: number; type: string; code: number | string; data: any };
     error.status = status;
     error.type = type;
     error.code = code;
@@ -265,7 +342,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 取消请求
    */
-  abort() {
+  abort(): void {
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
@@ -275,7 +352,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * Embedding 向量化
    */
-  async createEmbedding(text, model = 'text-embedding-ada-002') {
+  async createEmbedding(text: string, model: string = 'text-embedding-ada-002'): Promise<number[]> {
     const endpoint = this.agent.apiEndpoint;
     const apiKey = this.agent.apiKey;
 
@@ -301,10 +378,10 @@ class OpenAIAdapter extends EventEmitter {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { data: Array<{ embedding: number[] }> };
       return data.data[0].embedding;
     } catch (error) {
-      console.error('[OpenAIAdapter] Embedding 失败:', error.message);
+      console.error('[OpenAIAdapter] Embedding 失败:', (error as Error).message);
       return this.fallbackEmbedding(text);
     }
   }
@@ -312,7 +389,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 后备 embedding（简单实现）
    */
-  fallbackEmbedding(text) {
+  fallbackEmbedding(text: string): number[] {
     // 使用简单的词频向量作为后备
     // 注意：这不是真正的语义向量，仅用于演示
     const words = text.toLowerCase().split(/\s+/);
@@ -338,7 +415,7 @@ class OpenAIAdapter extends EventEmitter {
   /**
    * 健康检查
    */
-  async healthCheck() {
+  async healthCheck(): Promise<HealthCheckResult> {
     const endpoint = this.agent.apiEndpoint;
     const apiKey = this.agent.apiKey;
 
@@ -350,8 +427,7 @@ class OpenAIAdapter extends EventEmitter {
       const response = await fetch(`${endpoint}/models`, {
         headers: {
           'Authorization': `Bearer ${apiKey}`
-        },
-        timeout: 5000
+        }
       });
 
       if (response.ok) {
@@ -360,9 +436,9 @@ class OpenAIAdapter extends EventEmitter {
 
       return { healthy: false, error: `HTTP ${response.status}` };
     } catch (error) {
-      return { healthy: false, error: error.message };
+      return { healthy: false, error: (error as Error).message };
     }
   }
 }
 
-module.exports = OpenAIAdapter;
+export default OpenAIAdapter;

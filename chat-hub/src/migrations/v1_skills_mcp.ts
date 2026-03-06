@@ -7,7 +7,7 @@
  * - 用户 Skills/MCP
  */
 
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 const MIGRATION_V1 = `
 -- ==================== Skills 系统表 ====================

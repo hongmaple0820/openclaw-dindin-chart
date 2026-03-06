@@ -6,16 +6,108 @@
  * 通过 Redis 或 API 发送消息
  */
 
-const EventEmitter = require('events');
-const path = require('path');
-const os = require('os');
-const Database = require('better-sqlite3');
-const Logger = require('../utils/logger');
+import EventEmitter from 'events';
+import path from 'path';
+import os from 'os';
+import Database from 'better-sqlite3';
+import Logger from '../utils/logger';
+
+type SqliteDatabase = ReturnType<typeof Database>;
 
 const logger = new Logger('ProactiveTrigger');
 
+// 类型定义
+interface TimeTrigger {
+  enabled: boolean;
+  timeRange: [string, string];
+  messages: string[];
+}
+
+interface RandomTrigger {
+  enabled: boolean;
+  probability: number;
+  interval: number;
+  messages: string[];
+}
+
+interface EventTriggers {
+  inactivity: {
+    enabled: boolean;
+    threshold: number;
+    messages: string[];
+  };
+  emotionSupport: {
+    enabled: boolean;
+    keywords: string[];
+    cooldown: number;
+    messages: string[];
+  };
+}
+
+interface SpecialDate {
+  date: string;
+  name: string;
+  messages: string[];
+}
+
+interface SpecialDates {
+  enabled: boolean;
+  dates: SpecialDate[];
+}
+
+interface ProactiveConfig {
+  enabled: boolean;
+  timeTriggers: Record<string, TimeTrigger>;
+  randomTrigger: RandomTrigger;
+  eventTriggers: EventTriggers;
+  specialDates: SpecialDates;
+}
+
+interface Dependencies {
+  characterManager?: unknown;
+  memoryManager?: unknown;
+  relationshipManager?: unknown;
+  redisClient?: { isConnected: boolean; publish: (channel: string, payload: unknown) => Promise<void> };
+}
+
+interface TriggerHistory {
+  id?: number;
+  trigger_type: string;
+  message?: string;
+  user_id?: string;
+  character_id?: string;
+  timestamp: number;
+}
+
+interface SendMessageOptions {
+  triggerType?: string;
+  dateInfo?: SpecialDate;
+  options?: Record<string, unknown>;
+}
+
+interface EmotionCheckResult {
+  type: string;
+  keyword: string;
+  message: string;
+}
+
+interface InactivityCheckResult {
+  type: string;
+  elapsed: number;
+  message: string;
+}
+
+interface StatusResult {
+  running: boolean;
+  enabled: boolean;
+  timeTriggers: { name: string; range: [string, string] }[];
+  randomTrigger: { probability: number; interval: number } | null;
+  lastTriggers: Record<string, number | null>;
+  activeTimers: number;
+}
+
 // 默认配置
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: ProactiveConfig = {
   enabled: true,
   timeTriggers: {
     morning: {
@@ -98,20 +190,27 @@ const DEFAULT_CONFIG = {
 };
 
 class ProactiveTrigger extends EventEmitter {
-  constructor(config = {}) {
+  private config: ProactiveConfig;
+  private running: boolean = false;
+  private timers: NodeJS.Timeout[] = [];
+  private intervalId: NodeJS.Timeout | null = null;
+  private db: SqliteDatabase;
+  private lastTriggers: Record<string, number | null>;
+  private messageSender: ((message: string, options: SendMessageOptions) => Promise<void>) | null = null;
+  private characterManager: unknown = null;
+  private memoryManager: unknown = null;
+  private relationshipManager: unknown = null;
+  private redisClient: Dependencies['redisClient'] = null;
+
+  constructor(config: Partial<ProactiveConfig> = {}) {
     super();
     
     // 合并配置
     this.config = this.mergeConfig(DEFAULT_CONFIG, config);
     
-    // 状态
-    this.running = false;
-    this.timers = [];
-    this.intervalId = null;
-    
     // 数据库 - 用于记录触发历史
     const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'messages.db');
-    this.db = new Database(dbPath);
+    this.db = Database(dbPath);
     this.initTables();
     
     // 最后一次触发的记录
@@ -124,37 +223,32 @@ class ProactiveTrigger extends EventEmitter {
       emotion: null
     };
     
-    // 消息发送回调
-    this.messageSender = null;
-    
-    // 外部依赖
-    this.characterManager = null;
-    this.memoryManager = null;
-    this.relationshipManager = null;
-    this.redisClient = null;
-    
     logger.info('ProactiveTrigger 初始化完成', { enabled: this.config.enabled });
   }
   
   /**
    * 合并配置
    */
-  mergeConfig(defaults, overrides) {
-    const result = { ...defaults };
-    for (const key of Object.keys(overrides)) {
-      if (overrides[key] && typeof overrides[key] === 'object' && !Array.isArray(overrides[key])) {
-        result[key] = this.mergeConfig(defaults[key] || {}, overrides[key]);
-      } else {
-        result[key] = overrides[key];
+  private mergeConfig(defaults: ProactiveConfig, overrides: Partial<ProactiveConfig>): ProactiveConfig {
+    const result = { ...defaults } as unknown as Record<string, unknown>;
+    for (const key of Object.keys(overrides) as (keyof ProactiveConfig)[]) {
+      const overrideValue = overrides[key];
+      if (overrideValue && typeof overrideValue === 'object' && !Array.isArray(overrideValue)) {
+        result[key] = this.mergeConfig(
+          (defaults as unknown as Record<string, unknown>)[key] as ProactiveConfig, 
+          overrideValue as Partial<ProactiveConfig>
+        );
+      } else if (overrideValue !== undefined) {
+        result[key] = overrideValue;
       }
     }
-    return result;
+    return result as unknown as ProactiveConfig;
   }
   
   /**
    * 初始化数据库表
    */
-  initTables() {
+  private initTables(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS proactive_trigger_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,24 +267,24 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 设置消息发送回调
    */
-  setMessageSender(sender) {
+  setMessageSender(sender: (message: string, options: SendMessageOptions) => Promise<void>): void {
     this.messageSender = sender;
   }
   
   /**
    * 设置外部依赖
    */
-  setDependencies({ characterManager, memoryManager, relationshipManager, redisClient }) {
-    this.characterManager = characterManager;
-    this.memoryManager = memoryManager;
-    this.relationshipManager = relationshipManager;
-    this.redisClient = redisClient;
+  setDependencies(deps: Dependencies): void {
+    this.characterManager = deps.characterManager;
+    this.memoryManager = deps.memoryManager;
+    this.relationshipManager = deps.relationshipManager;
+    this.redisClient = deps.redisClient || null;
   }
   
   /**
    * 启动触发器
    */
-  async start() {
+  async start(): Promise<void> {
     if (!this.config.enabled) {
       logger.info('ProactiveTrigger 已禁用，跳过启动');
       return;
@@ -218,14 +312,17 @@ class ProactiveTrigger extends EventEmitter {
     logger.info('ProactiveTrigger 已启动', {
       timeTriggers: Object.keys(this.config.timeTriggers).filter(k => this.config.timeTriggers[k].enabled),
       randomTrigger: this.config.randomTrigger.enabled,
-      eventTriggers: Object.keys(this.config.eventTriggers).filter(k => this.config.eventTriggers[k].enabled)
+      eventTriggers: Object.keys(this.config.eventTriggers).filter(k => {
+        const trigger = (this.config.eventTriggers as unknown as Record<string, { enabled?: boolean }>)[k];
+        return trigger && trigger.enabled;
+      })
     });
   }
   
   /**
    * 停止触发器
    */
-  async stop() {
+  async stop(): Promise<void> {
     this.running = false;
     
     // 清除所有定时器
@@ -245,7 +342,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 启动时间触发器
    */
-  startTimeTriggers() {
+  private startTimeTriggers(): void {
     const now = new Date();
     
     for (const [triggerName, trigger] of Object.entries(this.config.timeTriggers)) {
@@ -271,7 +368,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 获取下一个随机时间
    */
-  getNextRandomTime(startHour, startMin, endHour, endMin) {
+  private getNextRandomTime(startHour: number, startMin: number, endHour: number, endMin: number): Date {
     const now = new Date();
     const start = new Date(now);
     start.setHours(startHour, startMin, 0, 0);
@@ -292,7 +389,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 安排时间触发器
    */
-  scheduleTimeTrigger(triggerName, triggerTime) {
+  private scheduleTimeTrigger(triggerName: string, triggerTime: Date): void {
     const now = new Date();
     const delay = triggerTime.getTime() - now.getTime();
     
@@ -328,7 +425,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 执行时间触发
    */
-  async executeTimeTrigger(triggerName) {
+  private async executeTimeTrigger(triggerName: string): Promise<void> {
     const trigger = this.config.timeTriggers[triggerName];
     if (!trigger || !trigger.enabled) return;
     
@@ -356,7 +453,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 启动随机触发器
    */
-  startRandomTrigger() {
+  private startRandomTrigger(): void {
     if (!this.config.randomTrigger.enabled) return;
     
     const interval = this.config.randomTrigger.interval;
@@ -373,7 +470,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 随机触发检查
    */
-  async maybeTriggerRandom() {
+  private async maybeTriggerRandom(): Promise<void> {
     const probability = this.config.randomTrigger.probability;
     const messages = this.config.randomTrigger.messages;
     
@@ -409,13 +506,13 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 检查时间触发
    */
-  checkTimeTriggers() {
+  checkTimeTriggers(): { trigger: string; inRange: boolean; remaining: number }[] {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMin = now.getMinutes();
     const currentTime = currentHour * 60 + currentMin;
     
-    const result = [];
+    const result: { trigger: string; inRange: boolean; remaining: number }[] = [];
     
     for (const [triggerName, trigger] of Object.entries(this.config.timeTriggers)) {
       if (!trigger.enabled) continue;
@@ -441,8 +538,8 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 检查事件触发
    */
-  checkEventTriggers(context) {
-    const results = [];
+  checkEventTriggers(context: { message?: string; lastInteraction?: number }): (EmotionCheckResult | InactivityCheckResult)[] {
+    const results: (EmotionCheckResult | InactivityCheckResult)[] = [];
     
     // 情绪支持检查
     if (this.config.eventTriggers.emotionSupport && this.config.eventTriggers.emotionSupport.enabled) {
@@ -466,7 +563,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 检查情绪触发
    */
-  checkEmotionTrigger(context) {
+  private checkEmotionTrigger(context: { message?: string }): EmotionCheckResult | null {
     const emotionConfig = this.config.eventTriggers.emotionSupport;
     const keywords = emotionConfig.keywords;
     const cooldown = emotionConfig.cooldown;
@@ -482,7 +579,7 @@ class ProactiveTrigger extends EventEmitter {
     
     // 关键词检查
     const text = (context && context.message) ? context.message.toLowerCase() : '';
-    let matchedKeyword = null;
+    let matchedKeyword: string | null = null;
     
     for (let i = 0; i < keywords.length; i++) {
       if (text.includes(keywords[i])) {
@@ -508,7 +605,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 检查不活跃触发
    */
-  checkInactivityTrigger(context) {
+  private checkInactivityTrigger(context: { lastInteraction?: number }): InactivityCheckResult | null {
     const inactivityConfig = this.config.eventTriggers.inactivity;
     const threshold = inactivityConfig.threshold;
     const messages = inactivityConfig.messages;
@@ -532,13 +629,13 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 启动特殊日期检查
    */
-  startSpecialDateCheck() {
+  private startSpecialDateCheck(): void {
     if (!this.config.specialDates || !this.config.specialDates.enabled) return;
     
     const self = this;
     
     // 每天凌晨检查一次
-    const checkDaily = function() {
+    const checkDaily = function(): void {
       if (!self.running) return;
       
       const today = new Date();
@@ -549,7 +646,7 @@ class ProactiveTrigger extends EventEmitter {
       const dates = self.config.specialDates.dates;
       if (!dates) return;
       
-      let specialDate = null;
+      let specialDate: SpecialDate | null = null;
       for (let i = 0; i < dates.length; i++) {
         if (dates[i].date === dateStr) {
           specialDate = dates[i];
@@ -574,7 +671,7 @@ class ProactiveTrigger extends EventEmitter {
     checkDaily();
     
     // 每天凌晨检查
-    const scheduleNextCheck = function() {
+    const scheduleNextCheck = function(): void {
       const now = new Date();
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -596,7 +693,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 执行触发
    */
-  async executeTrigger(type, message, options) {
+  async executeTrigger(type: string, message: string, options?: Record<string, unknown>): Promise<void> {
     options = options || {};
     
     // 记录触发
@@ -614,9 +711,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 发送消息
    */
-  async sendMessage(message, options) {
-    options = options || {};
-    
+  async sendMessage(message: string, options: SendMessageOptions = {}): Promise<boolean> {
     try {
       // 1. 尝试使用消息发送回调
       if (this.messageSender) {
@@ -629,9 +724,9 @@ class ProactiveTrigger extends EventEmitter {
         const payload = {
           type: 'proactive',
           content: message,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          ...options
         };
-        Object.assign(payload, options);
         
         await this.redisClient.publish('chat:proactive', payload);
         logger.debug('消息已发布到 Redis', { message: message });
@@ -644,7 +739,7 @@ class ProactiveTrigger extends EventEmitter {
       return false;
       
     } catch (error) {
-      logger.error('发送消息失败', error);
+      logger.error('发送消息失败', error as Error);
       return false;
     }
   }
@@ -652,7 +747,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 记录触发历史
    */
-  recordTrigger(type, message, userId, characterId) {
+  private recordTrigger(type: string, message: string, userId?: string, characterId?: string): void {
     try {
       const stmt = this.db.prepare(
         'INSERT INTO proactive_trigger_history (trigger_type, message, user_id, character_id, timestamp) VALUES (?, ?, ?, ?, ?)'
@@ -663,14 +758,14 @@ class ProactiveTrigger extends EventEmitter {
       this.lastTriggers[type] = Date.now();
       
     } catch (error) {
-      logger.error('记录触发历史失败', error);
+      logger.error('记录触发历史失败', error as Error);
     }
   }
   
   /**
    * 检查今天是否已触发
    */
-  hasTriggeredToday(type) {
+  private hasTriggeredToday(type: string): boolean {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -686,16 +781,13 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 获取触发历史
    */
-  getTriggerHistory(options) {
-    options = options || {};
-    const type = options.type;
-    const limit = options.limit || 50;
-    const since = options.since;
+  getTriggerHistory(options: { type?: string; limit?: number; since?: number } = {}): TriggerHistory[] {
+    const { type, limit = 50, since } = options;
     
     let query = 'SELECT * FROM proactive_trigger_history';
-    const params = [];
+    const params: (string | number)[] = [];
     
-    const conditions = [];
+    const conditions: string[] = [];
     
     if (type) {
       conditions.push('trigger_type = ?');
@@ -714,13 +806,13 @@ class ProactiveTrigger extends EventEmitter {
     query += ' ORDER BY timestamp DESC LIMIT ?';
     params.push(limit);
     
-    return this.db.prepare(query).all.apply(this.db.prepare(query), params);
+    return this.db.prepare(query).all(...params) as TriggerHistory[];
   }
   
   /**
    * 手动触发（用于测试或手动调用）
    */
-  async triggerManually(type, message, options) {
+  async triggerManually(type: string, message: string, options?: Record<string, unknown>): Promise<void> {
     logger.info('手动触发', { type: type, message: message });
     return this.executeTrigger(type, message, options);
   }
@@ -728,8 +820,8 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 获取状态
    */
-  getStatus() {
-    const enabledTimeTriggers = [];
+  getStatus(): StatusResult {
+    const enabledTimeTriggers: { name: string; range: [string, string] }[] = [];
     const entries = Object.entries(this.config.timeTriggers);
     for (let i = 0; i < entries.length; i++) {
       const key = entries[i][0];
@@ -755,7 +847,7 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 更新配置
    */
-  updateConfig(newConfig) {
+  updateConfig(newConfig: Partial<ProactiveConfig>): void {
     this.config = this.mergeConfig(this.config, newConfig);
     logger.info('配置已更新', { config: this.config });
     this.emit('configUpdated', this.config);
@@ -764,13 +856,17 @@ class ProactiveTrigger extends EventEmitter {
   /**
    * 添加特殊日期
    */
-  addSpecialDate(dateConfig) {
+  addSpecialDate(dateConfig: SpecialDate): void {
     if (!this.config.specialDates.dates) {
       this.config.specialDates.dates = [];
     }
     this.config.specialDates.dates.push(dateConfig);
-    logger.info('特殊日期已添加', dateConfig);
+    logger.info('特殊日期已添加', { dateConfig });
   }
 }
 
-module.exports = ProactiveTrigger;
+export default ProactiveTrigger;
+export type { 
+  ProactiveConfig, TimeTrigger, RandomTrigger, EventTriggers, SpecialDate, SpecialDates, 
+  Dependencies, TriggerHistory, SendMessageOptions, StatusResult 
+};

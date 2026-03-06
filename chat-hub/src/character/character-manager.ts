@@ -1,29 +1,90 @@
 /**
  * 角色管理器
  */
-const Database = require('better-sqlite3');
-const path = require('path');
-const os = require('os');
+import Database from 'better-sqlite3';
+import path from 'path';
+import os from 'os';
 
-class CharacterManager {
+type SqliteDatabase = ReturnType<typeof Database>;
+
+// 类型定义
+export interface Personality {
+  traits?: string[];
+  interests?: string[];
+}
+
+export interface SpeakingStyle {
+  tone?: string;
+  particles?: string[];
+  sentenceEndings?: string[];
+  personalPronoun?: string;
+  emojiFrequency?: number;
+  emoji?: string[];
+}
+
+export interface VoiceConfig {
+  provider?: string;
+  voiceId?: string;
+  speed?: number;
+  pitch?: number;
+}
+
+export interface Character {
+  id: string;
+  name: string;
+  english_name?: string;
+  character_type?: string;
+  personality: Personality;
+  speaking_style: SpeakingStyle;
+  background?: string;
+  avatar_path?: string;
+  reference_images: string[];
+  voice_config: VoiceConfig;
+  created_at?: number;
+  updated_at?: number;
+}
+
+export interface CreateCharacterData {
+  id: string;
+  name: string;
+  englishName?: string;
+  characterType?: string;
+  personality?: Personality;
+  speakingStyle?: SpeakingStyle;
+  background?: string;
+  avatarPath?: string;
+  referenceImages?: string[];
+  voiceConfig?: VoiceConfig;
+}
+
+export interface UpdateCharacterData {
+  name?: string;
+  personality?: Personality;
+  speakingStyle?: SpeakingStyle;
+  voiceConfig?: VoiceConfig;
+}
+
+class CharacterManagerClass {
+  private db: SqliteDatabase;
+
   constructor() {
     const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'messages.db');
-    this.db = new Database(dbPath);
+    this.db = Database(dbPath);
   }
   
   /**
    * 加载角色
    */
-  loadCharacter(characterId) {
+  loadCharacter(characterId: string): Character | undefined {
     const stmt = this.db.prepare('SELECT * FROM characters WHERE id = ?');
-    const character = stmt.get(characterId);
+    const character = stmt.get(characterId) as Character | undefined;
     
     if (character) {
       // 解析 JSON 字段
-      character.personality = character.personality ? JSON.parse(character.personality) : {};
-      character.speaking_style = character.speaking_style ? JSON.parse(character.speaking_style) : {};
-      character.voice_config = character.voice_config ? JSON.parse(character.voice_config) : {};
-      character.reference_images = character.reference_images ? JSON.parse(character.reference_images) : [];
+      character.personality = character.personality ? JSON.parse(character.personality as unknown as string) : {};
+      character.speaking_style = character.speaking_style ? JSON.parse(character.speaking_style as unknown as string) : {};
+      character.voice_config = character.voice_config ? JSON.parse(character.voice_config as unknown as string) : {};
+      character.reference_images = character.reference_images ? JSON.parse(character.reference_images as unknown as string) : [];
     }
     
     return character;
@@ -32,8 +93,9 @@ class CharacterManager {
   /**
    * 获取当前角色
    */
-  getCurrentCharacter() {
+  getCurrentCharacter(): Character | undefined {
     // 从配置获取当前角色 ID，默认为 xiaolin
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const config = require('../config');
     const characterId = config.character?.currentCharacterId || 'xiaolin';
     return this.loadCharacter(characterId);
@@ -42,22 +104,22 @@ class CharacterManager {
   /**
    * 获取角色列表
    */
-  listCharacters() {
+  listCharacters(): Character[] {
     const stmt = this.db.prepare('SELECT * FROM characters ORDER BY created_at DESC');
-    const characters = stmt.all();
+    const characters = stmt.all() as Character[];
     
     return characters.map(char => ({
       ...char,
-      personality: char.personality ? JSON.parse(char.personality) : {},
-      speaking_style: char.speaking_style ? JSON.parse(char.speaking_style) : {},
-      voice_config: char.voice_config ? JSON.parse(char.voice_config) : {}
+      personality: char.personality ? JSON.parse(char.personality as unknown as string) : {},
+      speaking_style: char.speaking_style ? JSON.parse(char.speaking_style as unknown as string) : {},
+      voice_config: char.voice_config ? JSON.parse(char.voice_config as unknown as string) : {}
     }));
   }
   
   /**
    * 创建角色
    */
-  createCharacter(data) {
+  createCharacter(data: CreateCharacterData): Character {
     const {
       id,
       name,
@@ -91,15 +153,15 @@ class CharacterManager {
       JSON.stringify(voiceConfig)
     );
     
-    return this.loadCharacter(id);
+    return this.loadCharacter(id)!;
   }
   
   /**
    * 更新角色
    */
-  updateCharacter(characterId, updates) {
-    const fields = [];
-    const values = [];
+  updateCharacter(characterId: string, updates: UpdateCharacterData): Character | undefined {
+    const fields: string[] = [];
+    const values: unknown[] = [];
     
     if (updates.name) {
       fields.push('name = ?');
@@ -134,10 +196,11 @@ class CharacterManager {
   /**
    * 删除角色
    */
-  deleteCharacter(characterId) {
+  deleteCharacter(characterId: string): void {
     const stmt = this.db.prepare('DELETE FROM characters WHERE id = ?');
     stmt.run(characterId);
   }
 }
 
-module.exports = new CharacterManager();
+const CharacterManager = new CharacterManagerClass();
+export default CharacterManager;

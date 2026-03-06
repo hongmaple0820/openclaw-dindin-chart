@@ -13,6 +13,22 @@ import crypto from 'crypto';
 import WebSocket from 'ws';
 import { spawn } from 'child_process';
 
+// Helper function to check if error is an Axios error
+interface AxiosErrorLike {
+  response?: { data?: unknown; status?: number };
+  message: string;
+  isAxiosError?: boolean;
+}
+
+function isAxiosError(error: unknown): error is AxiosErrorLike {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'isAxiosError' in error &&
+    (error as AxiosErrorLike).isAxiosError === true
+  );
+}
+
 // ==================== 类型定义 ====================
 
 type ASRProvider = 'openai' | 'baidu' | 'xunfei' | 'aliyun';
@@ -70,6 +86,37 @@ interface ASRServiceConfig {
     xunfei?: Partial<ASRConfig>;
     aliyun?: Partial<ASRConfig>;
   };
+}
+
+// API Response Types
+interface OpenAIWhisperResponse {
+  text: string;
+  language?: string;
+  duration?: number;
+  segments?: Array<{
+    text: string;
+    start: number;
+    end: number;
+    avg_logprob?: number;
+  }>;
+}
+
+interface BaiduTokenResponse {
+  access_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface BaiduASRResponse {
+  err_no: number;
+  err_msg?: string;
+  result?: string[];
+}
+
+interface AliyunASRResponse {
+  status: number;
+  message?: string;
+  result?: string;
 }
 
 // ==================== 提供商配置 ====================
@@ -297,7 +344,7 @@ class ASRService {
     form.append('response_format', 'verbose_json');
 
     try {
-      const response = await axios.post(`${endpoint}/audio/transcriptions`, form, {
+      const response = await axios.post<OpenAIWhisperResponse>(`${endpoint}/audio/transcriptions`, form, {
         headers: {
           'Authorization': `Bearer ${config.apiKey}`,
           ...form.getHeaders()
@@ -307,7 +354,7 @@ class ASRService {
       });
 
       const data = response.data;
-      const segments: TranscribeSegment[] = (data.segments || []).map((s: any) => ({
+      const segments: TranscribeSegment[] = (data.segments || []).map((s) => ({
         text: s.text,
         start: s.start,
         end: s.end,
@@ -323,8 +370,8 @@ class ASRService {
         segments
       };
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const msg = error.response?.data?.error?.message || error.message;
+      if (isAxiosError(error)) {
+        const msg = (error.response?.data as { error?: { message?: string } })?.error?.message || error.message;
         throw new Error(`OpenAI API error: ${msg}`);
       }
       throw error;
@@ -345,7 +392,7 @@ class ASRService {
 
     // 获取 Access Token
     const tokenUrl = 'https://aip.baidubce.com/oauth/2.0/token';
-    const tokenResponse = await axios.get(tokenUrl, {
+    const tokenResponse = await axios.get<BaiduTokenResponse>(tokenUrl, {
       params: {
         grant_type: 'client_credentials',
         client_id: config.apiKey,
@@ -364,7 +411,7 @@ class ASRService {
     
     // 百度语音识别 API
     const apiUrl = 'https://vop.baidu.com/server_api';
-    const response = await axios.post(apiUrl, {
+    const response = await axios.post<BaiduASRResponse>(apiUrl, {
       format: this.mapFormatToBaidu(request.format),
       rate: 16000,
       channel: 1,
@@ -524,7 +571,7 @@ class ASRService {
       .digest('base64');
 
     try {
-      const response = await axios.post(`${endpoint}/stream/v1/asr`, {
+      const response = await axios.post<AliyunASRResponse>(`${endpoint}/stream/v1/asr`, {
         appkey: config.appId,
         format: this.mapFormatToAliyun(request.format),
         sample_rate: 16000,
@@ -552,8 +599,8 @@ class ASRService {
         language: request.language || 'zh-CN'
       };
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const msg = error.response?.data?.message || error.message;
+      if (isAxiosError(error)) {
+        const msg = (error.response?.data as { message?: string })?.message || error.message;
         throw new Error(`Aliyun API error: ${msg}`);
       }
       throw error;

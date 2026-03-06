@@ -11,7 +11,7 @@
  */
 
 import crypto from 'crypto';
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 // X25519 曲线名称
 const CURVE = 'x25519';

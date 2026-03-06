@@ -4,7 +4,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 interface TaskManagerConfig {
   [key: string]: unknown;

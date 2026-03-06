@@ -2,20 +2,51 @@
  * 角色记忆管理器
  */
 
-const Database = require('better-sqlite3');
-const path = require('path');
-const os = require('os');
+import Database from 'better-sqlite3';
+import path from 'path';
+import os from 'os';
 
-class MemoryManager {
-  constructor(dbPath) {
+type SqliteDatabase = ReturnType<typeof Database>;
+
+// 类型定义
+export interface MemoryData {
+  userId?: string;
+  type: string;
+  content: string;
+  importance?: number;
+  tags?: string[];
+}
+
+export interface Memory {
+  id?: number;
+  character_id: string;
+  user_id?: string;
+  memory_type: string;
+  content: string;
+  importance: number;
+  timestamp: number;
+  tags: string[];
+}
+
+export interface MemorySearchOptions {
+  userId?: string;
+  type?: string;
+  limit?: number;
+  minImportance?: number;
+}
+
+export class MemoryManager {
+  private db: SqliteDatabase;
+
+  constructor(dbPath?: string) {
     if (!dbPath) {
       dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'messages.db');
     }
-    this.db = new Database(dbPath);
+    this.db = Database(dbPath);
     this.initTables();
   }
 
-  initTables() {
+  private initTables(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS character_memories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +66,7 @@ class MemoryManager {
   }
 
   // 添加记忆
-  addMemory(characterId, data) {
+  addMemory(characterId: string, data: MemoryData): Memory {
     const { userId, type, content, importance = 5, tags = [] } = data;
     const timestamp = Date.now();
 
@@ -45,15 +76,15 @@ class MemoryManager {
     `);
 
     const result = stmt.run(characterId, userId || null, type, content, importance, timestamp, JSON.stringify(tags));
-    return { id: result.lastInsertRowid, characterId, type, content, importance, timestamp, tags };
+    return { id: result.lastInsertRowid as number, character_id: characterId, user_id: userId, memory_type: type, content, importance, timestamp, tags };
   }
 
   // 获取角色记忆
-  getMemories(characterId, options = {}) {
+  getMemories(characterId: string, options: MemorySearchOptions = {}): Memory[] {
     const { userId, type, limit = 20, minImportance } = options;
 
     let query = 'SELECT * FROM character_memories WHERE character_id = ?';
-    const params = [characterId];
+    const params: (string | number)[] = [characterId];
 
     if (userId) {
       query += ' AND user_id = ?';
@@ -73,15 +104,15 @@ class MemoryManager {
     query += ' ORDER BY importance DESC, timestamp DESC LIMIT ?';
     params.push(limit);
 
-    const memories = this.db.prepare(query).all(...params);
+    const memories = this.db.prepare(query).all(...params) as Memory[];
     return memories.map(m => ({
       ...m,
-      tags: m.tags ? JSON.parse(m.tags) : []
+      tags: m.tags ? JSON.parse(m.tags as unknown as string) : []
     }));
   }
 
   // 搜索记忆
-  searchMemories(characterId, query, options = {}) {
+  searchMemories(characterId: string, query: string, options: { limit?: number } = {}): Memory[] {
     const { limit = 10 } = options;
 
     const memories = this.db.prepare(`
@@ -89,31 +120,31 @@ class MemoryManager {
       WHERE character_id = ? AND content LIKE ?
       ORDER BY importance DESC, timestamp DESC
       LIMIT ?
-    `).all(characterId, `%${query}%`, limit);
+    `).all(characterId, `%${query}%`, limit) as Memory[];
 
     return memories.map(m => ({
       ...m,
-      tags: m.tags ? JSON.parse(m.tags) : []
+      tags: m.tags ? JSON.parse(m.tags as unknown as string) : []
     }));
   }
 
   // 更新记忆重要性
-  updateImportance(memoryId, importance) {
+  updateImportance(memoryId: number, importance: number): void {
     this.db.prepare('UPDATE character_memories SET importance = ? WHERE id = ?').run(importance, memoryId);
   }
 
   // 删除记忆
-  deleteMemory(memoryId) {
+  deleteMemory(memoryId: number): void {
     this.db.prepare('DELETE FROM character_memories WHERE id = ?').run(memoryId);
   }
 
   // 清除角色所有记忆
-  clearMemories(characterId) {
+  clearMemories(characterId: string): void {
     this.db.prepare('DELETE FROM character_memories WHERE character_id = ?').run(characterId);
   }
 
   // 获取记忆统计
-  getStats(characterId) {
+  getStats(characterId: string): { memory_type: string; count: number; avg_importance: number }[] {
     const stats = this.db.prepare(`
       SELECT 
         memory_type,
@@ -122,10 +153,10 @@ class MemoryManager {
       FROM character_memories 
       WHERE character_id = ?
       GROUP BY memory_type
-    `).all(characterId);
+    `).all(characterId) as { memory_type: string; count: number; avg_importance: number }[];
 
     return stats;
   }
 }
 
-module.exports = MemoryManager;
+export default MemoryManager;

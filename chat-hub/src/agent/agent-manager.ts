@@ -9,6 +9,9 @@ import path from 'path';
 import os from 'os';
 import { EventEmitter } from 'events';
 
+// Type alias for the database instance
+type SqliteDatabase = ReturnType<typeof Database>;
+
 interface AgentData {
   name: string;
   type?: string;
@@ -37,14 +40,14 @@ interface Message {
 }
 
 class AgentManager {
-  private db: Database.Database;
+  private db: SqliteDatabase;
   private messageStreams: Map<string, EventEmitter>;
 
   constructor(dbPath?: string) {
     if (!dbPath) {
       dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'agents.db');
     }
-    this.db = new Database(dbPath);
+    this.db = Database(dbPath);
     this.messageStreams = new Map();
     this.initTables();
   }

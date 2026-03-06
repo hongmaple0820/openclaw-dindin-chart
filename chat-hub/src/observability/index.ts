@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 import { Request, Response, NextFunction } from 'express';
 
 interface ObservabilityConfig {

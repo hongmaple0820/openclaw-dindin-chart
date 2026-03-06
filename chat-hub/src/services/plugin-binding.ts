@@ -104,7 +104,7 @@ interface PluginRow {
 // ==================== 服务类 ====================
 
 class PluginBindingService {
-  private db: Database.Database | null = null;
+  private db: Database | null = null;
   private initialized: boolean = false;
   private dingtalkApi: DingtalkApi | null = null;
 
@@ -124,12 +124,10 @@ class PluginBindingService {
     }
 
     // 连接到现有的数据库
-    this.db = new Database(dbPath, {
-      timeout: 10000
-    });
+    this.db = new (Database as any)(dbPath);
 
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('busy_timeout = 10000');
+    (this.db as any).pragma('journal_mode = WAL');
+    (this.db as any).pragma('busy_timeout = 10000');
 
     // 运行迁移
     this.runMigrations();

@@ -4,14 +4,17 @@
  */
 
 import express, { Request, Response, Router } from 'express';
-import CharacterManager from '../character/character-manager';
-import RelationshipManager from '../character/relationship-manager';
-import MemoryManager from '../character/memory-manager';
-import EmotionDetector from '../character/emotion-detector';
+
+// CommonJS module imports
+const CharacterManager = require('../character/character-manager');
+const RelationshipManager = require('../character/relationship-manager');
+const MemoryManager = require('../character/memory-manager');
+const EmotionDetector = require('../character/emotion-detector');
 
 const router: Router = express.Router();
 
 // 实例化管理器
+// CharacterManager is already a singleton instance
 const relationshipManager = new RelationshipManager();
 const memoryManager = new MemoryManager();
 const emotionDetector = new EmotionDetector({ threshold: 1, verbose: false });
@@ -85,18 +88,20 @@ function validateRequired(req: Request, fields: string[]): string | null {
 /**
  * 统一错误处理
  */
-function handleError(res: Response, error: Error, context: string = ''): Response {
+function handleError(res: Response, error: Error, context: string = ''): void {
   console.error(`[Character API] ${context}:`, error);
   
   if (error.message?.includes('not found')) {
-    return res.status(404).json({ success: false, error: error.message });
+    res.status(404).json({ success: false, error: error.message });
+    return;
   }
   
   if (error.message?.includes('required') || error.message?.includes('invalid')) {
-    return res.status(400).json({ success: false, error: error.message });
+    res.status(400).json({ success: false, error: error.message });
+    return;
   }
   
-  return res.status(500).json({ success: false, error: error.message || '服务器内部错误' });
+  res.status(500).json({ success: false, error: error.message || '服务器内部错误' });
 }
 
 // ==================== 角色管理 API ====================
@@ -105,7 +110,7 @@ function handleError(res: Response, error: Error, context: string = ''): Respons
  * 获取角色列表
  * GET /api/characters
  */
-router.get('/characters', (_req: Request, res: Response) => {
+router.get('/characters', (_req: Request, res: Response): void => {
   try {
     const characters = CharacterManager.listCharacters();
     res.json({
@@ -126,7 +131,7 @@ router.get('/characters/current', (_req: Request, res: Response) => {
   try {
     const character = CharacterManager.getCurrentCharacter();
     if (!character) {
-      return res.status(404).json({ success: false, error: '未设置当前角色' });
+      res.status(404).json({ success: false, error: '未设置当前角色' });
     }
     res.json({ success: true, character });
   } catch (error) {
@@ -144,7 +149,7 @@ router.get('/characters/:id', (req: Request, res: Response) => {
     const character = CharacterManager.loadCharacter(id);
     
     if (!character) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     res.json({ success: true, character });
@@ -164,13 +169,13 @@ router.post('/characters', (req: Request, res: Response) => {
     
     // 参数验证
     if (!id || !name) {
-      return res.status(400).json({ success: false, error: 'id 和 name 是必需参数' });
+      res.status(400).json({ success: false, error: 'id 和 name 是必需参数' });
     }
     
     // 检查角色是否已存在
     const existing = CharacterManager.loadCharacter(id);
     if (existing) {
-      return res.status(409).json({ success: false, error: '角色 ID 已存在' });
+      res.status(409).json({ success: false, error: '角色 ID 已存在' });
     }
     
     const character = CharacterManager.createCharacter(req.body);
@@ -194,7 +199,7 @@ router.put('/characters/:id', (req: Request, res: Response) => {
     // 检查角色是否存在
     const existing = CharacterManager.loadCharacter(id);
     if (!existing) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     const character = CharacterManager.updateCharacter(id, req.body);
@@ -217,7 +222,7 @@ router.delete('/characters/:id', (req: Request, res: Response) => {
     // 检查角色是否存在
     const existing = CharacterManager.loadCharacter(id);
     if (!existing) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     CharacterManager.deleteCharacter(id);
@@ -240,7 +245,7 @@ router.post('/characters/:id/switch', (req: Request, res: Response) => {
     // 检查角色是否存在
     const character = CharacterManager.loadCharacter(id);
     if (!character) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     // 更新配置中的当前角色
@@ -278,7 +283,7 @@ router.get('/relationships/:characterId', (req: Request, res: Response) => {
       // 获取特定用户与角色的关系
       const relationship = relationshipManager.getRelationship(characterId, userId as string);
       if (!relationship) {
-        return res.status(404).json({ success: false, error: '关系不存在' });
+        res.status(404).json({ success: false, error: '关系不存在' });
       }
       res.json({ success: true, relationship });
     } else {
@@ -305,13 +310,13 @@ router.post('/relationships', (req: Request, res: Response) => {
     const { characterId, userId, type = 'friend', intimacyLevel = 50 } = req.body;
     
     if (!characterId || !userId) {
-      return res.status(400).json({ success: false, error: 'characterId 和 userId 是必需参数' });
+      res.status(400).json({ success: false, error: 'characterId 和 userId 是必需参数' });
     }
     
     // 检查角色是否存在
     const character = CharacterManager.loadCharacter(characterId);
     if (!character) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     const relationship = relationshipManager.createOrUpdateRelationship(characterId, userId, {
@@ -338,13 +343,13 @@ router.put('/relationships/:characterId/intimacy', (req: Request, res: Response)
     const { userId, delta } = req.body;
     
     if (!userId || typeof delta !== 'number') {
-      return res.status(400).json({ success: false, error: 'userId 和 delta (数字) 是必需参数' });
+      res.status(400).json({ success: false, error: 'userId 和 delta (数字) 是必需参数' });
     }
     
     // 检查关系是否存在
     const existing = relationshipManager.getRelationship(characterId, userId);
     if (!existing) {
-      return res.status(404).json({ success: false, error: '关系不存在' });
+      res.status(404).json({ success: false, error: '关系不存在' });
     }
     
     const relationship = relationshipManager.updateIntimacy(characterId, userId, delta);
@@ -396,7 +401,7 @@ router.delete('/relationships/:characterId/:userId', (req: Request, res: Respons
     // 检查关系是否存在
     const existing = relationshipManager.getRelationship(characterId, userId);
     if (!existing) {
-      return res.status(404).json({ success: false, error: '关系不存在' });
+      res.status(404).json({ success: false, error: '关系不存在' });
     }
     
     relationshipManager.deleteRelationship(characterId, userId);
@@ -449,13 +454,13 @@ router.post('/memories', (req: Request, res: Response) => {
     const { characterId, type, content } = req.body;
     
     if (!characterId || !type || !content) {
-      return res.status(400).json({ success: false, error: 'characterId, type, content 是必需参数' });
+      res.status(400).json({ success: false, error: 'characterId, type, content 是必需参数' });
     }
     
     // 检查角色是否存在
     const character = CharacterManager.loadCharacter(characterId);
     if (!character) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     const memory = memoryManager.addMemory(characterId, req.body);
@@ -479,7 +484,7 @@ router.get('/memories/:characterId/search', (req: Request, res: Response) => {
     const { q, limit } = req.query;
     
     if (!q) {
-      return res.status(400).json({ success: false, error: 'q (搜索关键词) 是必需参数' });
+      res.status(400).json({ success: false, error: 'q (搜索关键词) 是必需参数' });
     }
     
     const options: { limit?: number } = {};
@@ -509,7 +514,7 @@ router.put('/memories/:memoryId/importance', (req: Request, res: Response) => {
     const { importance } = req.body;
     
     if (typeof importance !== 'number' || importance < 1 || importance > 10) {
-      return res.status(400).json({ success: false, error: 'importance 必须是 1-10 的数字' });
+      res.status(400).json({ success: false, error: 'importance 必须是 1-10 的数字' });
     }
     
     memoryManager.updateImportance(memoryId, importance);
@@ -549,7 +554,7 @@ router.delete('/memories/:characterId/all', (req: Request, res: Response) => {
     // 安全检查：需要确认参数
     const { confirm } = req.query;
     if (confirm !== 'true') {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         error: '需要确认参数: ?confirm=true' 
       });
@@ -592,7 +597,7 @@ router.post('/emotion/analyze', (req: Request, res: Response) => {
     const { text } = req.body;
     
     if (!text) {
-      return res.status(400).json({ success: false, error: 'text 是必需参数' });
+      res.status(400).json({ success: false, error: 'text 是必需参数' });
     }
     
     const result = emotionDetector.analyze(text);
@@ -615,7 +620,7 @@ router.post('/emotion/analyze-batch', (req: Request, res: Response) => {
     const { texts } = req.body;
     
     if (!texts || !Array.isArray(texts)) {
-      return res.status(400).json({ success: false, error: 'texts 数组是必需参数' });
+      res.status(400).json({ success: false, error: 'texts 数组是必需参数' });
     }
     
     const results = emotionDetector.analyzeBatch(texts);
@@ -692,7 +697,7 @@ router.post('/emotion/keywords', (req: Request, res: Response) => {
     const { emotion, keyword, weight = 1 } = req.body;
     
     if (!emotion || !keyword) {
-      return res.status(400).json({ success: false, error: 'emotion 和 keyword 是必需参数' });
+      res.status(400).json({ success: false, error: 'emotion 和 keyword 是必需参数' });
     }
     
     emotionDetector.addKeyword(emotion, keyword, weight);
@@ -715,7 +720,7 @@ router.delete('/emotion/keywords', (req: Request, res: Response) => {
     const { emotion, keyword } = req.body;
     
     if (!emotion || !keyword) {
-      return res.status(400).json({ success: false, error: 'emotion 和 keyword 是必需参数' });
+      res.status(400).json({ success: false, error: 'emotion 和 keyword 是必需参数' });
     }
     
     const removed = emotionDetector.removeKeyword(emotion, keyword);
@@ -753,13 +758,13 @@ router.post('/triggers/execute', (req: Request, res: Response) => {
     const { characterId, triggerType = 'manual', data } = req.body;
     
     if (!characterId) {
-      return res.status(400).json({ success: false, error: 'characterId 是必需参数' });
+      res.status(400).json({ success: false, error: 'characterId 是必需参数' });
     }
     
     // 检查角色是否存在
     const character = CharacterManager.loadCharacter(characterId);
     if (!character) {
-      return res.status(404).json({ success: false, error: '角色不存在' });
+      res.status(404).json({ success: false, error: '角色不存在' });
     }
     
     // TODO: 集成实际的触发器逻辑
@@ -817,7 +822,7 @@ router.put('/triggers/toggle', (req: Request, res: Response) => {
     const { enabled } = req.body;
     
     if (typeof enabled !== 'boolean') {
-      return res.status(400).json({ success: false, error: 'enabled 必须是 boolean 类型' });
+      res.status(400).json({ success: false, error: 'enabled 必须是 boolean 类型' });
     }
     
     triggerState.enabled = enabled;

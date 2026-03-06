@@ -1,35 +1,54 @@
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
-const config = require('../config');
-const redisClient = require('../redis-client');
+import { spawn } from 'child_process';
+import * as config from '../config';
+import * as redisClient from '../redis-client';
+import { Message } from './base-bot';
+
+/**
+ * OpenClaw 触发器配置选项
+ */
+export interface OpenClawTriggerOptions {
+  gatewayUrl?: string | null;
+  gatewayToken?: string | null;
+  cooldownMs?: number;
+  delayMs?: number;
+}
 
 /**
  * OpenClaw 触发器
  * 通过 openclaw system event 命令触发 OpenClaw 处理消息
  * 不是自己生成回复，而是通知真正的 OpenClaw 实例
  */
-class OpenClawTrigger {
-  constructor(name, options = {}) {
+export class OpenClawTrigger {
+  name: string;
+  gatewayUrl: string | null;
+  gatewayToken: string | null;
+  cooldownMs: number;
+  delayMs: number;
+  lastTriggerTime: number;
+  lastBotReplyTime: number;
+  recentMessages: string[];
+  processing: boolean;
+
+  constructor(name: string, options: OpenClawTriggerOptions = {}) {
     this.name = name;
-    this.gatewayUrl = options.gatewayUrl || null;  // 远程 OpenClaw 的 WebSocket URL
-    this.gatewayToken = options.gatewayToken || null;  // 远程 OpenClaw 的 token
-    this.cooldownMs = options.cooldownMs || config.bots?.cooldownMs || 3000;
-    this.delayMs = options.delayMs || config.trigger?.delayMs || 3000;  // 触发前延迟
+    this.gatewayUrl = options.gatewayUrl || null;
+    this.gatewayToken = options.gatewayToken || null;
+    this.cooldownMs = options.cooldownMs || (config as any).bots?.cooldownMs || 3000;
+    this.delayMs = options.delayMs || (config as any).trigger?.delayMs || 3000;
     this.lastTriggerTime = 0;
-    this.lastBotReplyTime = 0;  // 上次回复机器人的时间
-    this.recentMessages = [];   // 最近消息缓存（用于检测重复）
+    this.lastBotReplyTime = 0;
+    this.recentMessages = [];
     this.processing = false;
   }
 
   /**
    * 检查消息是否是重复或无意义的
    */
-  isRepetitiveOrTrivial(message) {
+  isRepetitiveOrTrivial(message: Message): boolean {
     const content = message.content || '';
     
     // 无意义短回复模式
-    const trivialPatterns = [
+    const trivialPatterns: RegExp[] = [
       /^收到[！!。.]*$/,
       /^好的[！!。.]*$/,
       /^嗯[！!。.]*$/,
@@ -68,7 +87,7 @@ class OpenClawTrigger {
   /**
    * 启动触发器
    */
-  async start() {
+  async start(): Promise<void> {
     console.log(`[${this.name}] 触发器启动中...`);
     if (this.gatewayUrl) {
       console.log(`[${this.name}] 远程 Gateway: ${this.gatewayUrl}`);
@@ -77,12 +96,12 @@ class OpenClawTrigger {
     }
 
     // 监听消息频道
-    await redisClient.subscribe(config.channels.messages, async (message) => {
+    await (redisClient as any).subscribe((config as any).channels.messages, async (message: Message) => {
       await this.handleMessage(message);
     });
 
     // 也监听回复频道（机器人回复也可能需要触发其他机器人）
-    await redisClient.subscribe(config.channels.replies, async (message) => {
+    await (redisClient as any).subscribe((config as any).channels.replies, async (message: Message) => {
       await this.handleMessage(message);
     });
 
@@ -92,7 +111,7 @@ class OpenClawTrigger {
   /**
    * 处理消息
    */
-  async handleMessage(message) {
+  async handleMessage(message: Message): Promise<void> {
     // 不响应自己触发的消息
     if (message.sender === this.name) {
       return;
@@ -145,12 +164,13 @@ class OpenClawTrigger {
       // 延迟 3 秒再触发，给 OpenClaw 处理时间
       const delayMs = this.delayMs || 3000;
       console.log(`[${this.name}] 延迟 ${delayMs}ms 后触发...`);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      await new Promise<void>(resolve => setTimeout(resolve, delayMs));
 
       console.log(`[${this.name}] 触发 OpenClaw 处理:`, message.sender, '->', message.content?.substring(0, 50));
       await this.triggerOpenClaw(message);
-    } catch (error) {
-      console.error(`[${this.name}] 触发失败:`, error.message);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error(`[${this.name}] 触发失败:`, err.message);
     } finally {
       this.processing = false;
     }
@@ -159,7 +179,7 @@ class OpenClawTrigger {
   /**
    * 判断是否应该触发
    */
-  shouldTrigger(message) {
+  shouldTrigger(message: Message): boolean {
     const content = message.content || '';
 
     // 1. 明确 @ 自己或提到自己名字时必须触发
@@ -193,16 +213,13 @@ class OpenClawTrigger {
   /**
    * 通过 openclaw system event 触发 OpenClaw
    */
-  async triggerOpenClaw(message) {
+  async triggerOpenClaw(message: Message): Promise<string> {
     // 构造事件文本，限制长度避免命令行溢出
     const content = (message.content || '').substring(0, 500);
     const eventText = `[钉钉群消息] ${message.sender}: ${content}`;
-
-    // 使用 spawn 而不是 exec，通过 stdin 传递消息，避免 shell 转义问题
-    const { spawn } = require('child_process');
     
-    return new Promise((resolve, reject) => {
-      const args = ['system', 'event', '--mode', 'now', '--timeout', '10000'];
+    return new Promise<string>((resolve, reject) => {
+      const args: string[] = ['system', 'event', '--mode', 'now', '--timeout', '10000'];
       
       // 如果是远程 Gateway
       if (this.gatewayUrl) {
@@ -216,22 +233,21 @@ class OpenClawTrigger {
       args.push('--text', eventText);
       
       const child = spawn('openclaw', args, {
-        timeout: 15000,
-        shell: false  // 不使用 shell，避免特殊字符问题
+        timeout: 15000
       });
       
       let stdout = '';
       let stderr = '';
       
-      child.stdout.on('data', (data) => {
+      child.stdout.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
       
-      child.stderr.on('data', (data) => {
+      child.stderr.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
       
-      child.on('close', (code) => {
+      child.on('close', (code: number | null) => {
         if (code === 0) {
           console.log(`[${this.name}] 成功触发 OpenClaw`);
           resolve(stdout);
@@ -241,7 +257,7 @@ class OpenClawTrigger {
         }
       });
       
-      child.on('error', (err) => {
+      child.on('error', (err: Error) => {
         console.error(`[${this.name}] 执行命令失败:`, err.message);
         reject(err);
       });
@@ -249,4 +265,4 @@ class OpenClawTrigger {
   }
 }
 
-module.exports = OpenClawTrigger;
+export default OpenClawTrigger;

@@ -10,7 +10,7 @@
 
 import crypto from 'crypto';
 import { E2EEncryptor } from '../e2ee';
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 interface CloudMarketConfig {
   cloudEndpoint?: string;

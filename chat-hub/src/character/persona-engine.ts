@@ -10,11 +10,130 @@
  * - 支持动态加载角色配置
  */
 
-const CharacterManager = require('./character-manager');
-const RelationshipManager = require('./relationship-manager');
+import CharacterManager from './character-manager';
+import RelationshipManager from './relationship-manager';
+
+// ============ 类型定义 ============
+interface TimePeriodConfig {
+  range: [number, number];
+  label: string;
+  mood: string;
+  greeting: string[];
+  traits: {
+    energy: number;
+    formality: number;
+    playfulness: number;
+    warmth: number;
+  };
+}
+
+interface ToneStyle {
+  particles: string[];
+  emojiFrequency: number;
+  emojiPool: string[];
+  sentenceEndings: string[];
+  formality: number;
+  warmth: number;
+  playfulness: number;
+  personalPronoun: string;
+  addressStyle: string;
+  energy?: number;
+}
+
+interface EmotionState {
+  energy: number;
+  positivity: number;
+  expressiveness: number;
+  emojiBoost: string[];
+}
+
+interface ReplyTemplates {
+  [key: string]: {
+    [stage: string]: string[];
+  };
+}
+
+interface Character {
+  id: string;
+  name: string;
+  english_name?: string;
+  character_type?: string;
+  personality?: {
+    traits?: string[];
+    interests?: string[];
+  };
+  speaking_style?: {
+    tone?: string;
+    particles?: string[];
+    sentenceEndings?: string[];
+    personalPronoun?: string;
+    emojiFrequency?: number;
+    emoji?: string[];
+  };
+  background?: string;
+}
+
+interface Persona {
+  characterId: string;
+  characterName: string;
+  englishName?: string;
+  characterType?: string;
+  relationship: {
+    stage: string;
+    intimacyLevel: number;
+    label: string;
+    interactions: ReturnType<RelationshipManager['checkUnlockedInteractions']> | null;
+  };
+  timeContext: {
+    period: string;
+    label: string;
+    mood: string;
+    greeting: string[];
+  };
+  emotion: {
+    current: string;
+    state: EmotionState;
+  };
+  tone: {
+    stage: string;
+    style: {
+      energy: number;
+      warmth: number;
+      playfulness: number;
+      formality: number;
+    };
+    particles: string[];
+    emojiPool: string[];
+    emojiFrequency: number;
+  };
+  speakingStyle: {
+    tone: string;
+    sentenceEndings: string[];
+    personalPronoun: string;
+    addressStyle: string;
+  };
+  background: {
+    description?: string;
+    traits: string[];
+    interests: string[];
+  };
+  templates: ReplyTemplates;
+  generatedAt: number;
+}
+
+interface PersonaOptions {
+  characterManager?: typeof CharacterManager;
+  relationshipManager?: RelationshipManager;
+  cacheTimeout?: number;
+}
+
+interface GenerateContext {
+  time?: Date | number | string;
+  emotion?: string;
+}
 
 // ============ 时间段定义 ============
-const TIME_PERIODS = {
+const TIME_PERIODS: Record<string, TimePeriodConfig> = {
   morning: {
     range: [6, 12],
     label: '早上',
@@ -66,7 +185,7 @@ const TIME_PERIODS = {
 };
 
 // ============ 语气风格定义 ============
-const TONE_STYLES = {
+const TONE_STYLES: Record<string, ToneStyle> = {
   // 陌生人 - 正式、客气
   stranger: {
     particles: ['呢', '吧', '啊'],
@@ -130,7 +249,7 @@ const TONE_STYLES = {
 };
 
 // ============ 情绪状态定义 ============
-const EMOTION_STATES = {
+const EMOTION_STATES: Record<string, EmotionState> = {
   happy: {
     energy: 1.3,
     positivity: 1.2,
@@ -182,7 +301,7 @@ const EMOTION_STATES = {
 };
 
 // ============ 回复风格模板 ============
-const REPLY_TEMPLATES = {
+const REPLY_TEMPLATES: ReplyTemplates = {
   // 问候
   greeting: {
     stranger: ['你好，有什么我可以帮忙的吗？', '您好，请问有什么需要？'],
@@ -242,7 +361,12 @@ const REPLY_TEMPLATES = {
 };
 
 class PersonaEngine {
-  constructor(options = {}) {
+  private characterManager: typeof CharacterManager;
+  private relationshipManager: RelationshipManager;
+  private cache: Map<string, { data: Persona; timestamp: number }>;
+  private cacheTimeout: number;
+
+  constructor(options: PersonaOptions = {}) {
     this.characterManager = options.characterManager || CharacterManager;
     this.relationshipManager = options.relationshipManager || new RelationshipManager();
     this.cache = new Map();
@@ -252,7 +376,7 @@ class PersonaEngine {
   /**
    * 获取当前时间段
    */
-  getCurrentTimePeriod(date = new Date()) {
+  getCurrentTimePeriod(date: Date = new Date()): TimePeriodConfig & { period: string } {
     const hour = date.getHours();
     
     for (const [period, config] of Object.entries(TIME_PERIODS)) {
@@ -276,7 +400,7 @@ class PersonaEngine {
   /**
    * 根据亲密度获取关系阶段
    */
-  getToneStage(intimacyLevel) {
+  private getToneStage(intimacyLevel: number): string {
     if (intimacyLevel >= 81) return 'intimate';
     if (intimacyLevel >= 61) return 'closeFriend';
     if (intimacyLevel >= 41) return 'friend';
@@ -286,11 +410,8 @@ class PersonaEngine {
 
   /**
    * 生成人格配置
-   * @param {string} characterId - 角色ID
-   * @param {string} userId - 用户ID（可选，用于获取亲密度）
-   * @param {object} context - 上下文信息（时间、情绪等）
    */
-  generatePersona(characterId, userId = null, context = {}) {
+  generatePersona(characterId: string, userId: string | null = null, context: GenerateContext = {}): Persona {
     // 检查缓存
     const cacheKey = `${characterId}:${userId}:${JSON.stringify(context)}`;
     const cached = this.cache.get(cacheKey);
@@ -299,7 +420,7 @@ class PersonaEngine {
     }
 
     // 1. 加载角色配置
-    const character = this.characterManager.loadCharacter(characterId);
+    const character = this.characterManager.loadCharacter(characterId) as Character | null;
     if (!character) {
       throw new Error(`Character not found: ${characterId}`);
     }
@@ -334,7 +455,7 @@ class PersonaEngine {
     const speakingStyle = character.speaking_style || {};
 
     // 7. 生成最终的人格配置
-    const persona = {
+    const persona: Persona = {
       // 基本信息
       characterId,
       characterName: character.name,
@@ -367,8 +488,6 @@ class PersonaEngine {
       tone: {
         stage: toneStage,
         style: {
-          ...toneStyle,
-          // 根据时间调整
           energy: toneStyle.warmth * timeConfig.traits.energy * emotionState.energy,
           warmth: toneStyle.warmth * (1 + timeConfig.traits.warmth),
           playfulness: toneStyle.playfulness * (1 + timeConfig.traits.playfulness),
@@ -413,7 +532,7 @@ class PersonaEngine {
   /**
    * 获取时间段配置
    */
-  getTimePeriodConfig(date) {
+  private getTimePeriodConfig(date: Date | number | string): TimePeriodConfig & { period: string } {
     if (typeof date === 'number') {
       date = new Date(date);
     } else if (typeof date === 'string') {
@@ -425,7 +544,7 @@ class PersonaEngine {
   /**
    * 合并表情池
    */
-  mergeEmojiPools(basePool, emotionBoost, customEmoji = []) {
+  private mergeEmojiPools(basePool: string[], emotionBoost: string[], customEmoji: string[] = []): string[] {
     const pool = [...new Set([...basePool, ...emotionBoost, ...customEmoji])];
     return pool;
   }
@@ -433,8 +552,8 @@ class PersonaEngine {
   /**
    * 获取阶段标签
    */
-  getStageLabel(stage) {
-    const labels = {
+  private getStageLabel(stage: string): string {
+    const labels: Record<string, string> = {
       stranger: '陌生人',
       acquaintance: '泛泛之交',
       friend: '朋友',
@@ -446,13 +565,11 @@ class PersonaEngine {
 
   /**
    * 根据人格配置生成回复提示
-   * @param {object} persona - 人格配置
-   * @param {string} context - 对话上下文
    */
-  generateReplyPrompt(persona, context = '') {
+  generateReplyPrompt(persona: Persona, context: string = ''): string {
     const { tone, speakingStyle, background, timeContext, emotion, relationship } = persona;
 
-    const promptParts = [
+    const promptParts: string[] = [
       `你是${persona.characterName}${persona.englishName ? `(${persona.englishName})` : ''}，`,
       background.description ? `${background.description}。` : '',
       background.traits.length > 0 ? `性格特点：${background.traits.join('、')}。` : '',
@@ -462,7 +579,7 @@ class PersonaEngine {
       tone.style.formality < 0.3 ? '\n- 可以很随意自然' : '',
       tone.style.playfulness > 0.5 ? '\n- 可以调皮俏皮' : '',
       tone.style.warmth > 0.7 ? '\n- 表达温暖和关心' : '',
-      `\n\n时间背景：${timeContext.label}，情绪基调：${timeConfig.mood}`,
+      `\n\n时间背景：${timeContext.label}，情绪基调：${timeContext.mood}`,
       emotion.current !== timeContext.mood ? `\n当前情绪：${emotion.current}` : '',
       `\n\n回复风格：`,
       `- 使用语气词：${tone.particles.slice(0, 5).join('、')}`,
@@ -477,8 +594,8 @@ class PersonaEngine {
   /**
    * 获取称呼方式描述
    */
-  getAddressDescription(style) {
-    const descriptions = {
+  private getAddressDescription(style: string): string {
+    const descriptions: Record<string, string> = {
       polite: '礼貌正式，使用"您"、"请"等敬语',
       friendly: '友好自然，像朋友一样交流',
       casual: '随意亲切，直接称呼',
@@ -490,10 +607,8 @@ class PersonaEngine {
 
   /**
    * 获取回复模板
-   * @param {string} type - 模板类型（greeting, farewell, thanks 等）
-   * @param {object} persona - 人格配置
    */
-  getReplyTemplate(type, persona) {
+  getReplyTemplate(type: string, persona: Persona): string[] {
     const templates = persona.templates[type] || REPLY_TEMPLATES.greeting;
     const stage = persona.relationship.stage;
     return templates[stage] || templates.friend;
@@ -501,10 +616,8 @@ class PersonaEngine {
 
   /**
    * 调整回复语气
-   * @param {string} text - 原始文本
-   * @param {object} persona - 人格配置
    */
-  adjustTone(text, persona) {
+  adjustTone(text: string, persona: Persona): string {
     const { tone, speakingStyle } = persona;
     
     // 简单的语气调整示例
@@ -536,7 +649,7 @@ class PersonaEngine {
   /**
    * 更新缓存
    */
-  clearCache(characterId = null) {
+  clearCache(characterId: string | null = null): void {
     if (characterId) {
       // 清除特定角色的缓存
       for (const key of this.cache.keys()) {
@@ -553,7 +666,32 @@ class PersonaEngine {
   /**
    * 获取角色人格摘要（用于 API 返回）
    */
-  getPersonaSummary(characterId, userId = null) {
+  getPersonaSummary(characterId: string, userId: string | null = null): {
+    characterId: string;
+    characterName: string;
+    englishName?: string;
+    relationship: {
+      stage: string;
+      label: string;
+      intimacyLevel: number;
+    };
+    timeContext: {
+      period: string;
+      label: string;
+      mood: string;
+    };
+    emotion: string;
+    tone: {
+      style: Persona['tone']['style'];
+      particles: string[];
+      emojiFrequency: number;
+    };
+    speakingStyle: Persona['speakingStyle'];
+    background: {
+      traits: string[];
+      interests: string[];
+    };
+  } {
     const persona = this.generatePersona(characterId, userId);
     
     return {
@@ -586,11 +724,12 @@ class PersonaEngine {
 
   /**
    * 根据场景推荐回复
-   * @param {string} characterId - 角色ID
-   * @param {string} scene - 场景类型
-   * @param {string} userId - 用户ID
    */
-  recommendResponse(characterId, scene, userId = null) {
+  recommendResponse(characterId: string, scene: string, userId: string | null = null): {
+    template: string;
+    toneStage: string;
+    timeContext: Persona['timeContext'];
+  } | null {
     const persona = this.generatePersona(characterId, userId);
     const templates = this.getReplyTemplate(scene, persona);
     
@@ -609,8 +748,6 @@ class PersonaEngine {
 }
 
 // ============ 导出 ============
-module.exports = PersonaEngine;
-module.exports.TIME_PERIODS = TIME_PERIODS;
-module.exports.TONE_STYLES = TONE_STYLES;
-module.exports.EMOTION_STATES = EMOTION_STATES;
-module.exports.REPLY_TEMPLATES = REPLY_TEMPLATES;
+export default PersonaEngine;
+export { TIME_PERIODS, TONE_STYLES, EMOTION_STATES, REPLY_TEMPLATES };
+export type { TimePeriodConfig, ToneStyle, EmotionState, ReplyTemplates, Character, Persona, PersonaOptions, GenerateContext };

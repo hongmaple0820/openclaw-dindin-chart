@@ -1,25 +1,42 @@
-const { v4: uuidv4 } = require('uuid');
-const config = require('../config');
-const redisClient = require('../redis-client');
+import { v4 as uuidv4 } from 'uuid';
+import * as config from '../config';
+import * as redisClient from '../redis-client';
+
+/**
+ * 消息接口
+ */
+export interface Message {
+  id: string;
+  type: 'human' | 'bot' | 'system';
+  sender: string;
+  content: string;
+  timestamp: number;
+  replyTo?: string | null;
+  forwarded?: boolean;
+}
 
 /**
  * 机器人基类
  * 所有 AI 机器人都应该继承这个类
  */
-class BaseBot {
-  constructor(name) {
+export class BaseBot {
+  name: string;
+  lastReplyTime: number;
+  cooldownMs: number;
+
+  constructor(name: string) {
     this.name = name;
     this.lastReplyTime = 0;
-    this.cooldownMs = config.bots.cooldownMs || 5000;
+    this.cooldownMs = (config as any).bots?.cooldownMs || 5000;
   }
 
   /**
    * 启动机器人，订阅消息频道
    */
-  async start() {
+  async start(): Promise<void> {
     console.log(`[${this.name}] 机器人启动中...`);
 
-    await redisClient.subscribe(config.channels.messages, async (message) => {
+    await (redisClient as any).subscribe((config as any).channels.messages, async (message: Message) => {
       // 过滤：不响应自己发的消息
       if (message.sender === this.name) {
         return;
@@ -56,30 +73,30 @@ class BaseBot {
 
   /**
    * 判断是否应该响应此消息（子类可覆盖）
-   * @param {object} message - 消息对象
-   * @returns {boolean}
+   * @param message - 消息对象
+   * @returns 是否应该响应
    */
-  async shouldRespond(message) {
+  async shouldRespond(message: Message): Promise<boolean> {
     // 默认：响应人类消息和其他机器人的消息
     return true;
   }
 
   /**
    * 处理消息并生成回复（子类必须实现）
-   * @param {object} message - 消息对象
-   * @returns {string|null} - 回复内容，返回 null 表示不回复
+   * @param message - 消息对象
+   * @returns 回复内容，返回 null 表示不回复
    */
-  async onMessage(message) {
+  async onMessage(message: Message): Promise<string | null> {
     throw new Error('子类必须实现 onMessage 方法');
   }
 
   /**
    * 发送回复到回复频道
-   * @param {string} content - 回复内容
-   * @param {string} replyTo - 回复的消息ID
+   * @param content - 回复内容
+   * @param replyTo - 回复的消息ID
    */
-  async reply(content, replyTo = null) {
-    const message = {
+  async reply(content: string, replyTo: string | null = null): Promise<void> {
+    const message: Message = {
       id: uuidv4(),
       type: 'bot',
       sender: this.name,
@@ -88,9 +105,9 @@ class BaseBot {
       replyTo
     };
 
-    await redisClient.publish(config.channels.replies, message);
+    await (redisClient as any).publish((config as any).channels.replies, message);
     console.log(`[${this.name}] 已发送回复:`, content.substring(0, 50));
   }
 }
 
-module.exports = BaseBot;
+export default BaseBot;

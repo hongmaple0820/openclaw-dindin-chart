@@ -2,16 +2,60 @@
  * 图片生成器
  * 整合 ClawMate 能力
  */
-const axios = require('axios');
-const path = require('path');
-const fs = require('fs').promises;
-const Database = require('better-sqlite3');
-const os = require('os');
+import axios from 'axios';
+import path from 'path';
+import fs from 'fs/promises';
+import Database from 'better-sqlite3';
+import os from 'os';
 
-class ImageGenerator {
+type SqliteDatabase = ReturnType<typeof Database>;
+
+// 类型定义
+export interface SelfieOptions {
+  mode?: string;
+  scene?: string;
+  emotion?: string;
+  prompt?: string;
+}
+
+export interface GeneratedImage {
+  id?: number;
+  character_id: string;
+  file_path: string;
+  file_url: string;
+  prompt: string;
+  mode: string;
+  provider: string;
+  request_id?: string;
+  metadata?: string;
+  created_at?: number;
+}
+
+export interface GenerateSelfieResult {
+  ok: boolean;
+  id?: number;
+  characterId?: string;
+  mode?: string;
+  provider?: string;
+  imageUrl?: string;
+  filePath?: string;
+  prompt?: string;
+  error?: string;
+}
+
+export interface MockSelfieResult {
+  filePath: string;
+  fileUrl: string;
+}
+
+class ImageGeneratorClass {
+  private db: SqliteDatabase;
+  private mediaRoot: string;
+  private clawmateUrl: string;
+
   constructor() {
     const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'messages.db');
-    this.db = new Database(dbPath);
+    this.db = Database(dbPath);
     this.mediaRoot = path.join(os.homedir(), '.openclaw', 'media');
     
     // ClawMate 配置
@@ -20,11 +64,8 @@ class ImageGenerator {
   
   /**
    * 生成自拍
-   * @param {string} characterId - 角色 ID
-   * @param {object} options - 生成选项
-   * @returns {Promise<object>}
    */
-  async generateSelfie(characterId, options = {}) {
+  async generateSelfie(characterId: string, options: SelfieOptions = {}): Promise<GenerateSelfieResult> {
     const { mode = 'direct', scene, emotion, prompt } = options;
     
     try {
@@ -57,7 +98,7 @@ class ImageGenerator {
       
       return {
         ok: true,
-        id: result.lastID,
+        id: result.lastInsertRowid,
         characterId,
         mode,
         provider: 'mock',
@@ -66,10 +107,10 @@ class ImageGenerator {
         prompt: prompt || `${emotion || 'happy'} selfie`
       };
     } catch (error) {
-      console.error('[ImageGenerator] 生成失败:', error.message);
+      console.error('[ImageGenerator] 生成失败:', (error as Error).message);
       return {
         ok: false,
-        error: error.message
+        error: (error as Error).message
       };
     }
   }
@@ -77,7 +118,7 @@ class ImageGenerator {
   /**
    * 生成 Mock 自拍（开发阶段）
    */
-  async generateMockSelfie(characterId, mode, emotion) {
+  private async generateMockSelfie(characterId: string, _mode: string, emotion?: string): Promise<MockSelfieResult> {
     const timestamp = Date.now();
     const filename = `selfie_${characterId}_${timestamp}.jpg`;
     const relativePath = `clawmate-generated/${new Date().toISOString().split('T')[0]}/${filename}`;
@@ -115,7 +156,7 @@ class ImageGenerator {
   /**
    * 获取最近的自拍
    */
-  async getRecentImages(characterId, limit = 20) {
+  async getRecentImages(characterId: string, limit: number = 20): Promise<GeneratedImage[]> {
     const stmt = this.db.prepare(`
       SELECT * FROM generated_images 
       WHERE character_id = ? 
@@ -123,13 +164,13 @@ class ImageGenerator {
       LIMIT ?
     `);
     
-    return stmt.all(characterId, limit);
+    return stmt.all(characterId, limit) as GeneratedImage[];
   }
   
   /**
    * 获取所有角色的最近自拍
    */
-  async getAllRecentImages(limit = 50) {
+  async getAllRecentImages(limit: number = 50): Promise<(GeneratedImage & { character_name?: string })[]> {
     const stmt = this.db.prepare(`
       SELECT gi.*, c.name as character_name 
       FROM generated_images gi
@@ -138,8 +179,9 @@ class ImageGenerator {
       LIMIT ?
     `);
     
-    return stmt.all(limit);
+    return stmt.all(limit) as (GeneratedImage & { character_name?: string })[];
   }
 }
 
-module.exports = new ImageGenerator();
+const ImageGenerator = new ImageGeneratorClass();
+export default ImageGenerator;

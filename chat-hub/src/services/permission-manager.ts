@@ -61,7 +61,7 @@ interface Stats {
 // ==================== 权限管理类 ====================
 
 class PermissionManager {
-  private db: Database.Database | null = null;
+  private db: Database | null = null;
   private initialized: boolean = false;
 
   /**
@@ -80,12 +80,10 @@ class PermissionManager {
     }
 
     // 连接到现有的数据库
-    this.db = new Database(dbPath, {
-      timeout: 10000
-    });
+    this.db = new (Database as any)(dbPath);
 
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('busy_timeout = 10000');
+    (this.db as any).pragma('journal_mode = WAL');
+    (this.db as any).pragma('busy_timeout = 10000');
 
     // 运行迁移
     this.runMigrations();

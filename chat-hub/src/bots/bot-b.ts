@@ -1,18 +1,18 @@
-const BaseBot = require('./base-bot');
+import { BaseBot, Message } from './base-bot';
 
 /**
  * 机器人B - 示例实现
  * 你可以在这里接入不同的 AI 服务
  */
-class BotB extends BaseBot {
+export class BotB extends BaseBot {
   constructor() {
-    super('小红'); // 机器人名称
+    super('小红');
   }
 
   /**
    * 判断是否应该响应
    */
-  async shouldRespond(message) {
+  async shouldRespond(message: Message): Promise<boolean> {
     // 示例：只响应人类消息或特定机器人的消息
     // 这样可以形成对话链：人类 -> 机器人A -> 机器人B -> 机器人A ...
     if (message.type === 'human') {
@@ -26,7 +26,7 @@ class BotB extends BaseBot {
    * 处理消息并生成回复
    * TODO: 接入你的 AI 服务
    */
-  async onMessage(message) {
+  async onMessage(message: Message): Promise<string | null> {
     const responses = [
       `嗯嗯，${message.sender} 的想法不错！`,
       `我有不同的看法...`,
@@ -41,9 +41,9 @@ class BotB extends BaseBot {
     return responses[Math.floor(Math.random() * responses.length)];
   }
 
-  delay(ms) {
+  delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
-module.exports = BotB;
+export default BotB;

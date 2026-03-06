@@ -3,25 +3,66 @@
  * 支持多供应商：GrokAPI, OpenAI, Stable Diffusion
  */
 
-const axios = require('axios');
+import axios from 'axios';
 
-// 供应商接口
-class IImageProvider {
-  async generate(prompt, options = {}) {
-    throw new Error('generate() must be implemented');
-  }
+// ==================== 类型定义 ====================
+
+interface ImageProviderConfig {
+  apiUrl?: string;
+  apiKey?: string;
+  model?: string;
+  negativePrompt?: string;
+  width?: number;
+  height?: number;
+  steps?: number;
+  cfgScale?: number;
+  quality?: string;
+}
+
+interface GenerateOptions {
+  n?: number;
+  size?: string;
+  quality?: string;
+  negativePrompt?: string;
+  width?: number;
+  height?: number;
+  steps?: number;
+  cfgScale?: number;
+  provider?: string;
+  scene?: string;
+  emotion?: string;
+  outfit?: string;
+}
+
+interface GenerateResult {
+  url: string;
+  revisedPrompt?: string;
+  provider: string;
+}
+
+interface Character {
+  name?: string;
+}
+
+// ==================== 供应商接口 ====================
+
+interface IImageProvider {
+  generate(prompt: string, options?: GenerateOptions): Promise<GenerateResult>;
 }
 
 // GrokAPI 供应商
-class GrokAPIProvider extends IImageProvider {
-  constructor(config) {
-    super();
+class GrokAPIProvider implements IImageProvider {
+  private apiUrl: string;
+  private apiKey?: string;
+  private model: string;
+
+  constructor(config: ImageProviderConfig) {
     this.apiUrl = config.apiUrl || 'https://api.x.ai/v1';
     this.apiKey = config.apiKey;
     this.model = config.model || 'grok-2-image';
   }
 
-  async generate(prompt, options = {}) {
+  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
     const response = await axios.post(`${this.apiUrl}/images/generations`, {
       model: this.model,
       prompt,
@@ -34,23 +75,26 @@ class GrokAPIProvider extends IImageProvider {
       }
     });
 
+    const data = response.data as { data: Array<{ url: string; revised_prompt?: string }> };
     return {
-      url: response.data.data[0].url,
-      revisedPrompt: response.data.data[0].revised_prompt,
+      url: data.data[0].url,
+      revisedPrompt: data.data[0].revised_prompt,
       provider: 'grokapi'
     };
   }
 }
 
 // OpenAI 供应商
-class OpenAIProvider extends IImageProvider {
-  constructor(config) {
-    super();
+class OpenAIProvider implements IImageProvider {
+  private apiKey?: string;
+  private model: string;
+
+  constructor(config: ImageProviderConfig) {
     this.apiKey = config.apiKey;
     this.model = config.model || 'dall-e-3';
   }
 
-  async generate(prompt, options = {}) {
+  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
     const response = await axios.post('https://api.openai.com/v1/images/generations', {
       model: this.model,
       prompt,
@@ -64,22 +108,24 @@ class OpenAIProvider extends IImageProvider {
       }
     });
 
+    const data = response.data as { data: Array<{ url: string; revised_prompt?: string }> };
     return {
-      url: response.data.data[0].url,
-      revisedPrompt: response.data.data[0].revised_prompt,
+      url: data.data[0].url,
+      revisedPrompt: data.data[0].revised_prompt,
       provider: 'openai'
     };
   }
 }
 
 // Stable Diffusion 供应商
-class StableDiffusionProvider extends IImageProvider {
-  constructor(config) {
-    super();
+class StableDiffusionProvider implements IImageProvider {
+  private apiUrl: string;
+
+  constructor(config: ImageProviderConfig) {
     this.apiUrl = config.apiUrl || 'http://localhost:7860';
   }
 
-  async generate(prompt, options = {}) {
+  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
     const response = await axios.post(`${this.apiUrl}/sdapi/v1/txt2img`, {
       prompt,
       negative_prompt: options.negativePrompt || '',
@@ -89,16 +135,17 @@ class StableDiffusionProvider extends IImageProvider {
       cfg_scale: options.cfgScale || 7
     });
 
+    const data = response.data as { images: string[] };
     return {
-      url: `data:image/png;base64,${response.data.images[0]}`,
+      url: `data:image/png;base64,${data.images[0]}`,
       provider: 'stable-diffusion'
     };
   }
 }
 
 // Mock 供应商（测试用）
-class MockProvider extends IImageProvider {
-  async generate(prompt, options = {}) {
+class MockProvider implements IImageProvider {
+  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
     return {
       url: `https://via.placeholder.com/512x768?text=${encodeURIComponent(prompt.substring(0, 20))}`,
       provider: 'mock'
@@ -106,9 +153,20 @@ class MockProvider extends IImageProvider {
   }
 }
 
-// 图片生成器
+// ==================== 图片生成器 ====================
+
+interface ImageGeneratorConfig {
+  default?: string;
+  grokapi?: ImageProviderConfig;
+  openai?: ImageProviderConfig;
+  stableDiffusion?: ImageProviderConfig;
+}
+
 class ImageGenerator {
-  constructor(config) {
+  private providers: Map<string, IImageProvider>;
+  private defaultProvider: string;
+
+  constructor(config?: ImageGeneratorConfig) {
     this.providers = new Map();
     this.defaultProvider = config?.default || 'mock';
     
@@ -126,7 +184,7 @@ class ImageGenerator {
     this.providers.set('mock', new MockProvider());
   }
 
-  async generate(prompt, options = {}) {
+  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult> {
     const providerName = options.provider || this.defaultProvider;
     const provider = this.providers.get(providerName);
     
@@ -137,14 +195,14 @@ class ImageGenerator {
     return await provider.generate(prompt, options);
   }
 
-  async generateSelfie(character, options = {}) {
+  async generateSelfie(character: Character, options: GenerateOptions = {}): Promise<GenerateResult> {
     const prompt = this.buildSelfiePrompt(character, options);
     return await this.generate(prompt, options);
   }
 
-  buildSelfiePrompt(character, options = {}) {
+  buildSelfiePrompt(character: Character, options: GenerateOptions = {}): string {
     const { scene, emotion, outfit } = options;
-    const parts = [
+    const parts: string[] = [
       character.name || 'AI assistant',
       'portrait',
       'high quality',
@@ -158,15 +216,18 @@ class ImageGenerator {
     return parts.join(', ');
   }
 
-  listProviders() {
+  listProviders(): string[] {
     return Array.from(this.providers.keys());
   }
 }
 
-module.exports = {
+export {
   ImageGenerator,
   GrokAPIProvider,
   OpenAIProvider,
   StableDiffusionProvider,
-  MockProvider
+  MockProvider,
+  ImageProviderConfig,
+  GenerateOptions,
+  GenerateResult
 };

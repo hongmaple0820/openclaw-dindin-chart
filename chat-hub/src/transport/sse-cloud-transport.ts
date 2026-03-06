@@ -1,7 +1,10 @@
 import Transport, { TransportConfig, TransportStatus } from './base';
 import { EventSource } from 'eventsource';
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+
+// AxiosInstance type
+type AxiosInstance = ReturnType<typeof axios.create>;
 
 /**
  * SSE 云端传输配置

@@ -7,17 +7,104 @@
  * - 向量存储（使用 sqlite-vss 或内存实现）
  */
 
-class MemoryVectors {
-  constructor(db, options = {}) {
+// ============ Types & Interfaces ============
+
+export interface MemoryVectorsOptions {
+  agentId: string;
+  dimension?: number;
+  embeddingModel?: string;
+}
+
+export interface VectorData {
+  vector: number[];
+  metadata: VectorMetadata;
+}
+
+export interface VectorMetadata {
+  createdAt?: number;
+  text?: string;
+  model?: string;
+  [key: string]: unknown;
+}
+
+export interface SearchResult {
+  memoryId: string;
+  similarity: number;
+  metadata: VectorMetadata;
+}
+
+export interface SearchOptions {
+  topK?: number;
+  threshold?: number;
+  metadata?: Record<string, unknown> | null;
+  adapter?: EmbeddingAdapter | null;
+}
+
+export interface StoreResult {
+  memoryId: string;
+  dimension: number;
+  model: string;
+}
+
+export interface MemoryVectorsStats {
+  totalVectors: number;
+  dimension: number;
+  model: string;
+  vssEnabled: boolean;
+}
+
+export interface EmbeddingAdapter {
+  createEmbedding(text: string, model: string): Promise<number[]>;
+}
+
+interface VSSRow {
+  memoryId: string;
+  distance: number;
+}
+
+interface VectorRow {
+  id: string;
+  embedding: Buffer | null;
+  embedding_model: string | null;
+}
+
+// Database interface for better-sqlite3 style
+interface Database {
+  prepare(sql: string): {
+    run(...params: unknown[]): void;
+    get(...params: unknown[]): VectorRow | undefined;
+    all(...params: unknown[]): VSSRow[] | VectorRow[];
+  };
+  exec(sql: string): void;
+  loadExtension(name: string): void;
+}
+
+/**
+ * MemoryVectors - 向量嵌入类
+ */
+export class MemoryVectors {
+  private db: Database;
+  private agentId: string;
+  private dimension: number;
+  private embeddingModel: string;
+  
+  // 内存向量存储
+  private vectors: Map<string, VectorData>;
+  
+  // 是否使用 sqlite-vss
+  private useVSS: boolean;
+  private vssEnabled: boolean;
+
+  constructor(db: Database, options: MemoryVectorsOptions) {
     this.db = db;
     this.agentId = options.agentId;
-    this.dimension = options.dimension || 384; // 默认向量维度
-    this.embeddingModel = options.embeddingModel || 'text-embedding-ada-002';
+    this.dimension = options.dimension ?? 384;
+    this.embeddingModel = options.embeddingModel ?? 'text-embedding-ada-002';
     
     // 内存向量存储
-    this.vectors = new Map(); // memoryId -> { vector, metadata }
+    this.vectors = new Map();
     
-    // 是否使用 sqlite-vss（如果可用）
+    // 是否使用 sqlite-vss
     this.useVSS = false;
     this.vssEnabled = false;
     
@@ -28,7 +115,7 @@ class MemoryVectors {
   /**
    * 尝试加载 sqlite-vss 扩展
    */
-  tryLoadVSS() {
+  private tryLoadVSS(): void {
     try {
       // 尝试加载 sqlite-vss
       this.db.loadExtension('vector0');
@@ -49,7 +136,7 @@ class MemoryVectors {
   /**
    * 创建 VSS 虚拟表
    */
-  createVSSTable() {
+  private createVSSTable(): void {
     if (!this.vssEnabled) return;
 
     try {
@@ -59,7 +146,7 @@ class MemoryVectors {
         );
       `);
     } catch (e) {
-      console.error('[MemoryVectors] 创建 VSS 表失败:', e.message);
+      console.error('[MemoryVectors] 创建 VSS 表失败:', (e as Error).message);
       this.useVSS = false;
     }
   }
@@ -67,14 +154,14 @@ class MemoryVectors {
   /**
    * 创建向量嵌入
    */
-  async createEmbedding(text, adapter = null) {
+  async createEmbedding(text: string, adapter: EmbeddingAdapter | null = null): Promise<number[]> {
     // 如果提供了 OpenAI 适配器，使用真实的 embedding API
     if (adapter && typeof adapter.createEmbedding === 'function') {
       try {
         const embedding = await adapter.createEmbedding(text, this.embeddingModel);
         return embedding;
       } catch (e) {
-        console.error('[MemoryVectors] API embedding 失败:', e.message);
+        console.error('[MemoryVectors] API embedding 失败:', (e as Error).message);
       }
     }
 
@@ -85,19 +172,19 @@ class MemoryVectors {
   /**
    * 本地向量嵌入（基于 TF-IDF 思想的简单实现）
    */
-  localEmbedding(text) {
+  private localEmbedding(text: string): number[] {
     const words = this.tokenize(text);
     const dimension = this.dimension;
     const vector = new Float32Array(dimension);
 
     // 词频统计
-    const wordFreq = new Map();
+    const wordFreq = new Map<string, number>();
     for (const word of words) {
-      wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
+      wordFreq.set(word, (wordFreq.get(word) ?? 0) + 1);
     }
 
     // 生成向量
-    for (const [word, freq] of wordFreq) {
+    for (const [word, freq] of Array.from(wordFreq.entries())) {
       // 使用 hash 函数确定位置
       const positions = this.hashWord(word, dimension, 3);
       for (const pos of positions) {
@@ -114,22 +201,22 @@ class MemoryVectors {
   /**
    * 分词
    */
-  tokenize(text) {
+  private tokenize(text: string): string[] {
     if (!text) return [];
     
     // 简单分词：支持中英文
-    const words = [];
+    const words: string[] = [];
     
     // 英文单词
-    const englishWords = text.toLowerCase().match(/[a-z]+/g) || [];
+    const englishWords = text.toLowerCase().match(/[a-z]+/g) ?? [];
     words.push(...englishWords);
     
     // 中文字符（按字符分割）
-    const chineseChars = text.match(/[\u4e00-\u9fa5]/g) || [];
+    const chineseChars = text.match(/[\u4e00-\u9fa5]/g) ?? [];
     words.push(...chineseChars);
     
     // 数字
-    const numbers = text.match(/\d+/g) || [];
+    const numbers = text.match(/\d+/g) ?? [];
     words.push(...numbers);
     
     return words;
@@ -138,8 +225,8 @@ class MemoryVectors {
   /**
    * 词哈希函数（用于稀疏向量）
    */
-  hashWord(word, dimension, numPositions = 3) {
-    const positions = [];
+  private hashWord(word: string, dimension: number, numPositions = 3): number[] {
+    const positions: number[] = [];
     
     // 使用多个哈希函数减少冲突
     for (let i = 0; i < numPositions; i++) {
@@ -159,7 +246,7 @@ class MemoryVectors {
   /**
    * 归一化向量
    */
-  normalizeVector(vector) {
+  private normalizeVector(vector: Float32Array): void {
     const norm = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
     if (norm > 0) {
       for (let i = 0; i < vector.length; i++) {
@@ -171,7 +258,7 @@ class MemoryVectors {
   /**
    * 存储向量
    */
-  async store(memoryId, text, metadata = {}, adapter = null) {
+  async store(memoryId: string, text: string, metadata: VectorMetadata = {}, adapter: EmbeddingAdapter | null = null): Promise<StoreResult> {
     // 创建向量
     const vector = await this.createEmbedding(text, adapter);
 
@@ -203,7 +290,7 @@ class MemoryVectors {
   /**
    * 存储向量到数据库
    */
-  storeVectorDB(memoryId, vector, metadata) {
+  private storeVectorDB(memoryId: string, vector: number[], metadata: VectorMetadata): void {
     // 将向量转换为 BLOB
     const buffer = Buffer.alloc(vector.length * 4);
     for (let i = 0; i < vector.length; i++) {
@@ -221,7 +308,7 @@ class MemoryVectors {
   /**
    * 存储向量到 VSS 表
    */
-  storeVectorVSS(memoryId, vector) {
+  private storeVectorVSS(memoryId: string, vector: number[]): void {
     if (!this.useVSS) return;
 
     try {
@@ -232,14 +319,14 @@ class MemoryVectors {
         ON CONFLICT(rowid) DO UPDATE SET vector = excluded.vector
       `).run(memoryId, vectorJSON);
     } catch (e) {
-      console.error('[MemoryVectors] VSS 存储失败:', e.message);
+      console.error('[MemoryVectors] VSS 存储失败:', (e as Error).message);
     }
   }
 
   /**
    * 相似度搜索
    */
-  async search(query, options = {}) {
+  async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
     const {
       topK = 10,
       threshold = 0.5,
@@ -251,7 +338,7 @@ class MemoryVectors {
     const queryVector = await this.createEmbedding(query, adapter);
 
     // 结果数组
-    const results = [];
+    const results: SearchResult[] = [];
 
     // 如果使用 VSS，用 VSS 搜索
     if (this.useVSS) {
@@ -259,7 +346,7 @@ class MemoryVectors {
     }
 
     // 否则使用内存搜索
-    for (const [memoryId, data] of this.vectors) {
+    for (const [memoryId, data] of Array.from(this.vectors.entries())) {
       // 元数据过滤
       if (metadata) {
         let match = true;
@@ -293,7 +380,7 @@ class MemoryVectors {
   /**
    * VSS 相似度搜索
    */
-  searchVSS(queryVector, topK, threshold) {
+  private searchVSS(queryVector: number[], topK: number, threshold: number): SearchResult[] {
     if (!this.useVSS) return [];
 
     try {
@@ -304,19 +391,19 @@ class MemoryVectors {
         WHERE vss_search(vector, ?)
         ORDER BY distance
         LIMIT ?
-      `).all(vectorJSON, topK * 2);
+      `).all(vectorJSON, topK * 2) as VSSRow[];
 
       // VSS 的 distance 是距离，需要转换为相似度
       return rows
         .map(row => ({
           memoryId: row.memoryId,
           similarity: 1 / (1 + row.distance), // 距离转相似度
-          metadata: this.vectors.get(row.memoryId)?.metadata || {}
+          metadata: this.vectors.get(row.memoryId)?.metadata ?? {}
         }))
         .filter(r => r.similarity >= threshold)
         .slice(0, topK);
     } catch (e) {
-      console.error('[MemoryVectors] VSS 搜索失败:', e.message);
+      console.error('[MemoryVectors] VSS 搜索失败:', (e as Error).message);
       return [];
     }
   }
@@ -324,7 +411,7 @@ class MemoryVectors {
   /**
    * 计算余弦相似度
    */
-  cosineSimilarity(vec1, vec2) {
+  cosineSimilarity(vec1: number[], vec2: number[]): number {
     if (vec1.length !== vec2.length) {
       throw new Error('Vector dimensions do not match');
     }
@@ -346,7 +433,7 @@ class MemoryVectors {
   /**
    * 批量计算相似度
    */
-  batchSimilarity(queryVector, vectors) {
+  batchSimilarity(queryVector: number[], vectors: Array<{ id: string; vector: number[] }>): Array<{ id: string; similarity: number }> {
     return vectors.map(v => ({
       id: v.id,
       similarity: this.cosineSimilarity(queryVector, v.vector)
@@ -356,7 +443,7 @@ class MemoryVectors {
   /**
    * 删除向量
    */
-  delete(memoryId) {
+  delete(memoryId: string): void {
     // 从内存删除
     this.vectors.delete(memoryId);
 
@@ -364,7 +451,7 @@ class MemoryVectors {
     if (this.useVSS) {
       try {
         this.db.prepare('DELETE FROM memory_vectors_vss WHERE rowid = ?').run(memoryId);
-      } catch (e) {
+      } catch {
         // 忽略错误
       }
     }
@@ -375,12 +462,12 @@ class MemoryVectors {
   /**
    * 加载所有向量到内存
    */
-  loadAll() {
+  loadAll(): number {
     const rows = this.db.prepare(`
       SELECT id, embedding, embedding_model 
       FROM agent_memories 
       WHERE agent_id = ? AND embedding IS NOT NULL
-    `).all(this.agentId);
+    `).all(this.agentId) as VectorRow[];
 
     for (const row of rows) {
       if (row.embedding) {
@@ -388,7 +475,7 @@ class MemoryVectors {
         if (vector) {
           this.vectors.set(row.id, {
             vector,
-            metadata: { model: row.embedding_model }
+            metadata: { model: row.embedding_model ?? undefined }
           });
         }
       }
@@ -401,7 +488,7 @@ class MemoryVectors {
   /**
    * 解析向量 BLOB
    */
-  parseVectorBlob(blob) {
+  private parseVectorBlob(blob: Buffer): number[] | null {
     try {
       if (!blob || blob.length === 0) return null;
 
@@ -413,7 +500,7 @@ class MemoryVectors {
       }
 
       return Array.from(vector);
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -421,7 +508,7 @@ class MemoryVectors {
   /**
    * 获取统计信息
    */
-  getStats() {
+  getStats(): MemoryVectorsStats {
     return {
       totalVectors: this.vectors.size,
       dimension: this.dimension,
@@ -433,17 +520,17 @@ class MemoryVectors {
   /**
    * 清空所有向量
    */
-  clear() {
+  clear(): void {
     this.vectors.clear();
     
     if (this.useVSS) {
       try {
         this.db.exec('DELETE FROM memory_vectors_vss');
-      } catch (e) {
+      } catch {
         // 忽略
       }
     }
   }
 }
 
-module.exports = MemoryVectors;
+export default MemoryVectors;

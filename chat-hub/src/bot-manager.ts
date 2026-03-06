@@ -9,6 +9,39 @@ const os = require('os');
 const crypto = require('crypto');
 const axios = require('axios');
 
+// 过滤器类型
+interface BotFilters {
+  enabled?: boolean;
+}
+
+// Bot 类型
+interface Bot {
+  id: string;
+  username: string;
+  displayName: string;
+  type: string;
+  webhookBase: string;
+  webhookSecret: string;
+  webhookToken: string;
+  webhookEnabled: boolean;
+  isDefault: boolean;
+  replyEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// 解析上下文类型
+interface ResolveContext {
+  lastBotId?: string;
+}
+
+// 解析结果类型
+interface ResolveResult {
+  bot: Bot;
+  reason: string;
+  confidence: number;
+}
+
 const dbPath = path.join(os.homedir(), '.openclaw', 'chat-data', 'users.db');
 const db = new Database(dbPath);
 
@@ -176,9 +209,9 @@ class BotManager {
     return this.mapBot(row);
   }
   
-  listBots(filters = {}) {
+  listBots(filters: BotFilters = {}) {
     let sql = 'SELECT * FROM users WHERE type = ?';
-    const params = ['bot'];
+    const params: (string | number)[] = ['bot'];
     
     if (filters.enabled !== undefined) {
       sql += ' AND webhook_enabled = ?';
@@ -188,7 +221,7 @@ class BotManager {
     sql += ' ORDER BY is_default DESC, created_at DESC';
     
     const rows = db.prepare(sql).all(...params);
-    return rows.map(row => this.mapBot(row));
+    return rows.map((row: any) => this.mapBot(row));
   }
   
   getDefaultBot() {
@@ -217,7 +250,7 @@ class BotManager {
     };
   }
   
-  resolveBot(message, context = {}) {
+  resolveBot(message: any, context: ResolveContext = {}): ResolveResult | null {
     const content = message.content || '';
     
     const atMatch = content.match(/@(\S+)/);
@@ -251,7 +284,7 @@ class BotManager {
     return null;
   }
   
-  isContinuation(content) {
+  isContinuation(content: string): boolean {
     return /^(对|是的|好的|继续|然后|还有)/.test(content) || 
            /[?？!！]$/.test(content) ||
            /问一下|请问|帮忙/.test(content);

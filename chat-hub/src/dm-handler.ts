@@ -40,11 +40,17 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_pm_sender ON private_messages(sender_id)
 db.exec(`CREATE INDEX IF NOT EXISTS idx_pm_receiver ON private_messages(receiver_id)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_pm_created ON private_messages(created_at)`);
 
+// 查询选项类型
+interface DMOptions {
+  limit?: number;
+  offset?: number;
+}
+
 class DMHandler {
   /**
    * 判断消息是否为私聊
    */
-  isDM(message) {
+  isDM(message: any): boolean {
     // 钉钉私聊通常有以下特征之一：
     // 1. conversationType === '1' (单聊)
     // 2. chatType === 'singleChat'
@@ -140,7 +146,7 @@ class DMHandler {
   /**
    * 获取用户的私聊会话列表
    */
-  async getUserConversations(userId, options = {}) {
+  async getUserConversations(userId: string, options: DMOptions = {}): Promise<any[]> {
     try {
       // 查找该用户参与的所有会话
       const sql = `
@@ -161,7 +167,7 @@ class DMHandler {
         ${options.limit ? `LIMIT ?` : ''}
       `;
       
-      const params = [userId, userId, userId, userId];
+      const params: (string | number)[] = [userId, userId, userId, userId];
       if (options.limit) {
         params.push(options.limit);
       }
@@ -177,10 +183,10 @@ class DMHandler {
   /**
    * 获取私聊会话消息
    */
-  async getConversationMessages(conversationId, options = {}) {
+  async getConversationMessages(conversationId: string, options: DMOptions = {}): Promise<any[]> {
     try {
       let sql = `SELECT * FROM private_messages WHERE conversation_id = ?`;
-      const params = [conversationId];
+      const params: (string | number)[] = [conversationId];
       
       if (options.limit) {
         sql += ` ORDER BY created_at DESC LIMIT ?`;

@@ -13,6 +13,9 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
+// Type alias for the database instance
+type SqliteDatabase = ReturnType<typeof Database>;
+
 interface AgentData {
   nickname: string;
   avatar?: string;
@@ -64,7 +67,7 @@ interface ListOptions {
 
 class AgentRegistry {
   private dbPath: string;
-  private db: Database.Database | null = null;
+  private db: SqliteDatabase | null = null;
   private agents: Map<string, Agent> = new Map();
   private initialized: boolean = false;
 
@@ -81,8 +84,8 @@ class AgentRegistry {
     const dataDir = path.dirname(this.dbPath);
     fs.mkdirSync(dataDir, { recursive: true });
     
-    this.db = new Database(this.dbPath);
-    this.db.pragma('journal_mode = WAL');
+    this.db = new (Database as any)(this.dbPath) as SqliteDatabase;
+    (this.db as any).pragma('journal_mode = WAL');
     this.initialized = true;
     
     console.log('[AgentRegistry] 初始化完成');

@@ -5,9 +5,21 @@ import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import config from '../config-jwt';
 import path from 'path';
 import fs from 'fs';
+
+// 配置类型定义
+interface AppConfig {
+  database: { path: string };
+  password: { minLength: number; saltRounds: number };
+  verification: { codeLength: number; expiresIn: number };
+  jwt: { secret: string; expiresIn: string; refreshExpiresIn: string };
+  server: { port: number };
+  email: { host: string; port: number; secure: boolean; auth: { user: string; pass: string }; from: string };
+}
+
+// 动态导入配置
+const config: AppConfig = require('../config-jwt');
 
 let db: Database | null = null;
 

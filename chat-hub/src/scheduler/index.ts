@@ -5,7 +5,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import cron from 'node-cron';
-import { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 interface SchedulerConfig {
   maxConcurrent?: number;

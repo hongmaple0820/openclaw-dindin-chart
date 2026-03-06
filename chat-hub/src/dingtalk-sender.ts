@@ -116,7 +116,12 @@ function checkRateLimit(key) {
 /**
  * 带重试的 HTTP 请求
  */
-async function requestWithRetry(url, data, options = {}) {
+interface RequestOptions {
+  retries?: number;
+  headers?: Record<string, string>;
+}
+
+async function requestWithRetry(url: string, data: unknown, options: RequestOptions = {}) {
   const { retries = 0, headers = {} } = options;
   
   try {
@@ -172,9 +177,15 @@ function generateSign(secret, timestamp) {
 /**
  * 解析 @ 目标
  */
-function parseAtTargets(atTargets) {
+interface AtResult {
+  atMobiles: string[];
+  isAtAll: boolean;
+  atText: string;
+}
+
+function parseAtTargets(atTargets: string | string[] | null): AtResult {
   const USER_PHONES = getUserPhoneMap();
-  const result = { atMobiles: [], isAtAll: false, atText: '' };
+  const result: AtResult = { atMobiles: [], isAtAll: false, atText: '' };
   
   if (!atTargets) return result;
   
@@ -201,7 +212,15 @@ function parseAtTargets(atTargets) {
 /**
  * 通过 Webhook 发送群聊消息
  */
-async function sendViaWebhook(groupName, content, options = {}) {
+interface SendOptions {
+  sender?: string;
+  atTargets?: string | string[];
+  mode?: string;
+  accountId?: string;
+  messageType?: string;
+}
+
+async function sendViaWebhook(groupName: string, content: string, options: SendOptions = {}): Promise<unknown> {
   const groupConfig = getGroupConfig(groupName);
   if (!groupConfig) {
     throw new Error(`群聊配置不存在: ${groupName}`);
@@ -266,7 +285,11 @@ const tokenCache = new Map();
 /**
  * 获取钉钉 Access Token
  */
-async function getAccessToken(options = {}) {
+interface AccessTokenOptions {
+  accountId?: string;
+}
+
+async function getAccessToken(options: AccessTokenOptions = {}): Promise<string> {
   const accountId = options.accountId || 'default';
   const pluginConfig = config.dingtalk?.plugin || {};
   const accountConfig = pluginConfig.accounts?.[accountId] || {};
@@ -315,7 +338,15 @@ async function getAccessToken(options = {}) {
  * - 群聊: conversationId = openConversationId (cidxxx)
  * - 私聊: conversationId = userId
  */
-async function sendViaPlugin(conversationId, content, options = {}) {
+interface PluginPayload {
+  robotCode: string;
+  msgKey: string;
+  msgParam: string;
+  openConversationId?: string;
+  userIds?: string[];
+}
+
+async function sendViaPlugin(conversationId: string, content: string, options: SendOptions = {}): Promise<unknown> {
   const accountId = options.accountId || 'default';
   
   // 获取配置
@@ -366,7 +397,7 @@ async function sendViaPlugin(conversationId, content, options = {}) {
       ? JSON.stringify({ title: '消息', text: fullContent })
       : JSON.stringify({ content: fullContent });
     
-    const payload = {
+    const payload: PluginPayload = {
       robotCode,
       msgKey,
       msgParam
@@ -424,7 +455,7 @@ async function sendViaPlugin(conversationId, content, options = {}) {
  * @param {string[]} options.atTargets - @ 目标
  * @param {string} options.mode - 强制指定模式 ('webhook' | 'plugin')
  */
-async function sendToGroup(groupName, content, options = {}) {
+async function sendToGroup(groupName: string, content: string, options: SendOptions = {}): Promise<unknown> {
   const mode = options.mode || getSendingMode();
   const groupConfig = getGroupConfig(groupName);
   
@@ -456,7 +487,7 @@ async function sendToGroup(groupName, content, options = {}) {
  * @param {string} content - 消息内容
  * @param {object} options - 选项
  */
-async function sendToUser(userId, content, options = {}) {
+async function sendToUser(userId: string, content: string, options: SendOptions = {}): Promise<unknown> {
   const mode = options.mode || getSendingMode();
   
   if (mode === 'webhook') {

@@ -2,30 +2,45 @@
  * 语音生成器
  * 使用 OpenClaw 内置 TTS
  */
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
-const path = require('path');
-const fs = require('fs').promises;
-const os = require('os');
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
+import fs from 'fs/promises';
+import os from 'os';
 
-class VoiceGenerator {
+const execAsync = promisify(exec);
+
+// 类型定义
+export interface VoiceConfig {
+  voice?: string;
+  speed?: number;
+  pitch?: number;
+}
+
+export interface VoiceResult {
+  filePath: string;
+  fileUrl: string;
+  duration: number;
+  size?: number;
+}
+
+class VoiceGeneratorClass {
+  private mediaRoot: string;
+  private voiceDir: string;
+
   constructor() {
     this.mediaRoot = process.env.OPENCLAW_HOME || path.join(os.homedir(), '.openclaw');
     this.voiceDir = path.join(this.mediaRoot, 'media', 'voice');
   }
   
-  async ensureVoiceDir() {
+  private async ensureVoiceDir(): Promise<void> {
     await fs.mkdir(this.voiceDir, { recursive: true });
   }
   
   /**
    * 生成语音文件
-   * @param {string} text - 要转换的文本
-   * @param {object} voiceConfig - 语音配置
-   * @returns {Promise<{filePath: string, fileUrl: string, duration: number}>}
    */
-  async generateVoice(text, voiceConfig = {}) {
+  async generateVoice(text: string, voiceConfig: VoiceConfig = {}): Promise<VoiceResult | null> {
     await this.ensureVoiceDir();
     
     const timestamp = Date.now();
@@ -54,7 +69,7 @@ class VoiceGenerator {
         size: stats.size
       };
     } catch (error) {
-      console.error('[VoiceGenerator] 生成失败:', error.message);
+      console.error('[VoiceGenerator] 生成失败:', (error as Error).message);
       
       // 如果 TTS 失败，返回 null（不阻塞主流程）
       return null;
@@ -64,7 +79,7 @@ class VoiceGenerator {
   /**
    * 清理旧的语音文件（保留最近100个）
    */
-  async cleanup() {
+  async cleanup(): Promise<void> {
     try {
       const files = await fs.readdir(this.voiceDir);
       const voiceFiles = files
@@ -84,9 +99,10 @@ class VoiceGenerator {
         }
       }
     } catch (error) {
-      console.error('[VoiceGenerator] 清理失败:', error.message);
+      console.error('[VoiceGenerator] 清理失败:', (error as Error).message);
     }
   }
 }
 
-module.exports = new VoiceGenerator();
+const VoiceGenerator = new VoiceGeneratorClass();
+export default VoiceGenerator;

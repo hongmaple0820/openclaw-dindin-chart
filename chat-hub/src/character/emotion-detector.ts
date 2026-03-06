@@ -8,8 +8,105 @@
  * @date 2026-03-04
  */
 
-const Logger = require('../utils/logger');
-const logger = new Logger('EmotionDetector');
+import Logger from '../utils/logger';
+
+// ==================== 类型定义 ====================
+
+interface EmotionWeights {
+  [keyword: string]: number;
+}
+
+interface EmotionDictionary {
+  happy: EmotionWeights;
+  sad: EmotionWeights;
+  angry: EmotionWeights;
+  anxious: EmotionWeights;
+  neutral: EmotionWeights;
+}
+
+interface KeywordItem {
+  keyword: string;
+  weight: number;
+  emotion: string;
+}
+
+interface KeywordIndex {
+  all: KeywordItem[];
+  byEmotion: { [emotion: string]: KeywordItem[] };
+}
+
+interface IntensifierWords {
+  [word: string]: number;
+}
+
+interface MatchedKeyword {
+  keyword: string;
+  emotion: string;
+  baseWeight: number;
+  multiplier: number;
+  negated: boolean;
+  finalScore: number;
+}
+
+interface Scores {
+  happy: number;
+  sad: number;
+  angry: number;
+  anxious: number;
+  neutral: number;
+}
+
+interface ReplySuggestion {
+  type: string;
+  description: string;
+  templates: string[];
+}
+
+interface ReplySuggestionResult {
+  type: string;
+  description: string;
+  template: string;
+  intensity: string;
+}
+
+interface Trigger {
+  type: string;
+  emotion?: string;
+  score?: number;
+  keyword?: string;
+  priority?: string;
+  message: string;
+}
+
+interface EmotionResult {
+  emotion: string;
+  emotionName: string;
+  score: number;
+  confidence: number;
+  scores: Scores;
+  replySuggestion: ReplySuggestionResult | null;
+  triggers: Trigger[];
+  matchedKeywords: MatchedKeyword[];
+  timestamp: number;
+}
+
+interface EmotionStats {
+  totalAnalyses: number;
+  emotionCounts: {
+    happy: number;
+    sad: number;
+    angry: number;
+    anxious: number;
+    neutral: number;
+  };
+  emotionDistribution?: { [emotion: string]: { count: number; percentage: string } };
+}
+
+interface EmotionDetectorOptions {
+  threshold?: number;
+  verbose?: boolean;
+  customDictionary?: EmotionDictionary | null;
+}
 
 // ==================== 情绪词典 ====================
 
@@ -17,7 +114,7 @@ const logger = new Logger('EmotionDetector');
  * 情绪关键词词典
  * 格式: { 情绪类型: { 关键词: 权重 } }
  */
-const EMOTION_DICTIONARY = {
+const EMOTION_DICTIONARY: EmotionDictionary = {
   happy: {
     // 高兴类
     '高兴': 3, '开心': 3, '快乐': 3, '棒': 2, '好': 1, '太好了': 3, '好开心': 3,
@@ -86,13 +183,13 @@ const EMOTION_DICTIONARY = {
  * 否定词词典
  * 出现这些词时，后续情绪词的含义会反转
  */
-const NEGATION_WORDS = ['不', '没', '无', '别', '莫', '非', '未', '没有', '不是'];
+const NEGATION_WORDS: string[] = ['不', '没', '无', '别', '莫', '非', '未', '没有', '不是'];
 
 /**
  * 程度副词词典
  * 用于调整情绪强度
  */
-const INTENSIFIER_WORDS = {
+const INTENSIFIER_WORDS: IntensifierWords = {
   '很': 1.5, '太': 2, '好': 1.5, '真': 1.5, '特别': 1.8, '非常': 1.8,
   '超级': 2, '超': 1.8, '极其': 2, '相当': 1.5, '十分': 1.5,
   '有点': 0.6, '稍微': 0.5, '略微': 0.5, '一点': 0.6
@@ -101,7 +198,7 @@ const INTENSIFIER_WORDS = {
 /**
  * 情绪类型的中文名称映射
  */
-const EMOTION_NAMES = {
+const EMOTION_NAMES: { [emotion: string]: string } = {
   happy: '开心',
   sad: '难过',
   angry: '愤怒',
@@ -113,7 +210,7 @@ const EMOTION_NAMES = {
  * 回复类型建议
  * 根据情绪类型提供合适的回复风格
  */
-const REPLY_SUGGESTIONS = {
+const REPLY_SUGGESTIONS: { [emotion: string]: ReplySuggestion } = {
   happy: {
     type: 'share_joy',
     description: '分享快乐，表达祝福',
@@ -169,7 +266,14 @@ const REPLY_SUGGESTIONS = {
 // ==================== 情绪检测类 ====================
 
 class EmotionDetector {
-  constructor(options = {}) {
+  private options: { threshold: number; verbose: boolean; customDictionary: EmotionDictionary | null };
+  private dictionary: EmotionDictionary;
+  private keywordIndex: KeywordIndex;
+  private stats: EmotionStats;
+  private logger: Logger;
+
+  constructor(options: EmotionDetectorOptions = {}) {
+    this.logger = new Logger('EmotionDetector');
     this.options = {
       // 情绪得分阈值
       threshold: options.threshold || 1,
@@ -200,7 +304,7 @@ class EmotionDetector {
       }
     };
     
-    logger.info('EmotionDetector 初始化完成', {
+    this.logger.info('EmotionDetector 初始化完成', {
       threshold: this.options.threshold,
       emotions: Object.keys(this.dictionary),
       totalKeywords: this.keywordIndex.all.length
@@ -210,14 +314,14 @@ class EmotionDetector {
   /**
    * 构建关键词索引
    */
-  buildKeywordIndex() {
-    const all = [];
-    const byEmotion = {};
+  private buildKeywordIndex(): KeywordIndex {
+    const all: KeywordItem[] = [];
+    const byEmotion: { [emotion: string]: KeywordItem[] } = {};
     
     for (const emotion of Object.keys(this.dictionary)) {
       byEmotion[emotion] = [];
-      for (const [keyword, weight] of Object.entries(this.dictionary[emotion])) {
-        const item = { keyword, weight, emotion };
+      for (const [keyword, weight] of Object.entries(this.dictionary[emotion]) as [string, number][]) {
+        const item: KeywordItem = { keyword, weight, emotion };
         all.push(item);
         byEmotion[emotion].push(item);
       }
@@ -234,7 +338,7 @@ class EmotionDetector {
   /**
    * 合并自定义词典
    */
-  mergeDictionary(customDict) {
+  mergeDictionary(customDict: EmotionDictionary): void {
     for (const emotion of Object.keys(customDict)) {
       if (!this.dictionary[emotion]) {
         this.dictionary[emotion] = {};
@@ -243,17 +347,17 @@ class EmotionDetector {
     }
     // 重新构建索引
     this.keywordIndex = this.buildKeywordIndex();
-    logger.debug('自定义词典已合并', { emotions: Object.keys(customDict) });
+    this.logger.debug('自定义词典已合并', { emotions: Object.keys(customDict) });
   }
   
   /**
    * 分析文本情绪
-   * @param {string} text - 待分析的文本
-   * @returns {Object} 情绪分析结果
+   * @param text - 待分析的文本
+   * @returns 情绪分析结果
    */
-  analyze(text) {
+  analyze(text: string): EmotionResult {
     if (!text || typeof text !== 'string') {
-      return this.createResult('neutral', 0, {});
+      return this.createResult('neutral', 0, {} as Scores);
     }
     
     this.stats.totalAnalyses++;
@@ -276,7 +380,7 @@ class EmotionDetector {
     const result = this.createResult(dominantEmotion, dominantScore, scores, replySuggestion, triggers, matchedKeywords);
     
     if (this.options.verbose) {
-      logger.debug('情绪分析完成', {
+      this.logger.debug('情绪分析完成', {
         text: text.substring(0, 50),
         dominantEmotion,
         dominantScore,
@@ -291,8 +395,8 @@ class EmotionDetector {
   /**
    * 计算各情绪得分
    */
-  calculateScores(text) {
-    const scores = {
+  private calculateScores(text: string): { scores: Scores; matchedKeywords: MatchedKeyword[] } {
+    const scores: Scores = {
       happy: 0,
       sad: 0,
       angry: 0,
@@ -300,8 +404,8 @@ class EmotionDetector {
       neutral: 0
     };
     
-    const matchedKeywords = [];
-    const matched = new Set(); // 记录已匹配的位置，避免重复
+    const matchedKeywords: MatchedKeyword[] = [];
+    const matched = new Set<number>(); // 记录已匹配的位置，避免重复
     
     // 遍历所有关键词（已按长度降序排序）
     for (const item of this.keywordIndex.all) {
@@ -352,7 +456,7 @@ class EmotionDetector {
             score = -score * 0.8;
           }
           
-          scores[item.emotion] += score;
+          scores[item.emotion as keyof Scores] += score;
           
           matchedKeywords.push({
             keyword: item.keyword,
@@ -364,7 +468,7 @@ class EmotionDetector {
           });
           
           if (this.options.verbose) {
-            logger.debug('匹配关键词', {
+            this.logger.debug('匹配关键词', {
               keyword: item.keyword,
               emotion: item.emotion,
               score,
@@ -379,7 +483,7 @@ class EmotionDetector {
     
     // 确保得分为非负
     for (const emotion of Object.keys(scores)) {
-      scores[emotion] = Math.max(0, scores[emotion]);
+      scores[emotion as keyof Scores] = Math.max(0, scores[emotion as keyof Scores]);
     }
     
     return { scores, matchedKeywords };
@@ -388,7 +492,7 @@ class EmotionDetector {
   /**
    * 确定主导情绪
    */
-  determineDominant(scores) {
+  private determineDominant(scores: Scores): { dominantEmotion: string; dominantScore: number } {
     let dominantEmotion = 'neutral';
     let dominantScore = 0;
     
@@ -413,7 +517,7 @@ class EmotionDetector {
   /**
    * 生成回复建议
    */
-  generateReplySuggestion(emotion, score) {
+  private generateReplySuggestion(emotion: string, score: number): ReplySuggestionResult {
     const suggestion = REPLY_SUGGESTIONS[emotion] || REPLY_SUGGESTIONS.neutral;
     
     // 选择一个回复模板
@@ -439,11 +543,11 @@ class EmotionDetector {
   /**
    * 检测关键词触发
    */
-  detectTriggers(text, emotion, score) {
-    const triggers = [];
+  private detectTriggers(text: string, emotion: string, score: number): Trigger[] {
+    const triggers: Trigger[] = [];
     
     // 情绪触发阈值
-    const EMOTION_THRESHOLDS = {
+    const EMOTION_THRESHOLDS: { [emotion: string]: number } = {
       sad: 2,
       anxious: 2,
       angry: 3
@@ -460,7 +564,7 @@ class EmotionDetector {
     }
     
     // 特殊关键词触发
-    const SPECIAL_TRIGGERS = [
+    const SPECIAL_TRIGGERS: { keywords: string[]; type: string; priority: string }[] = [
       { keywords: ['救命', '紧急', 'sos'], type: 'emergency', priority: 'high' },
       { keywords: ['自杀', '不想活', '活着没意思'], type: 'crisis', priority: 'critical' },
       { keywords: ['生日快乐', '生日'], type: 'birthday', priority: 'medium' },
@@ -488,7 +592,14 @@ class EmotionDetector {
   /**
    * 创建结果对象
    */
-  createResult(emotion, score, scores, replySuggestion = null, triggers = [], matchedKeywords = []) {
+  private createResult(
+    emotion: string, 
+    score: number, 
+    scores: Scores, 
+    replySuggestion: ReplySuggestionResult | null = null, 
+    triggers: Trigger[] = [], 
+    matchedKeywords: MatchedKeyword[] = []
+  ): EmotionResult {
     return {
       emotion,
       emotionName: EMOTION_NAMES[emotion],
@@ -505,7 +616,7 @@ class EmotionDetector {
   /**
    * 计算置信度
    */
-  calculateConfidence(dominantEmotion, dominantScore, scores) {
+  private calculateConfidence(dominantEmotion: string, dominantScore: number, scores: Scores): number {
     if (dominantEmotion === 'neutral') {
       return 0.5; // 中性情绪的置信度默认为中等
     }
@@ -528,14 +639,14 @@ class EmotionDetector {
   /**
    * 批量分析
    */
-  analyzeBatch(texts) {
+  analyzeBatch(texts: string[]): EmotionResult[] {
     return texts.map(text => this.analyze(text));
   }
   
   /**
    * 获取统计信息
    */
-  getStats() {
+  getStats(): EmotionStats & { emotionDistribution: { [emotion: string]: { count: number; percentage: string } } } {
     return {
       ...this.stats,
       emotionDistribution: this.calculateDistribution()
@@ -545,11 +656,11 @@ class EmotionDetector {
   /**
    * 计算情绪分布
    */
-  calculateDistribution() {
+  private calculateDistribution(): { [emotion: string]: { count: number; percentage: string } } {
     const total = this.stats.totalAnalyses;
     if (total === 0) return {};
     
-    const distribution = {};
+    const distribution: { [emotion: string]: { count: number; percentage: string } } = {};
     for (const [emotion, count] of Object.entries(this.stats.emotionCounts)) {
       distribution[emotion] = {
         count,
@@ -563,7 +674,7 @@ class EmotionDetector {
   /**
    * 重置统计
    */
-  resetStats() {
+  resetStats(): void {
     this.stats = {
       totalAnalyses: 0,
       emotionCounts: {
@@ -574,33 +685,33 @@ class EmotionDetector {
         neutral: 0
       }
     };
-    logger.info('统计信息已重置');
+    this.logger.info('统计信息已重置');
   }
   
   /**
    * 添加自定义关键词
    */
-  addKeyword(emotion, keyword, weight = 1) {
+  addKeyword(emotion: string, keyword: string, weight: number = 1): void {
     if (!this.dictionary[emotion]) {
       this.dictionary[emotion] = {};
-      logger.warn('创建新情绪类型: ' + emotion);
+      this.logger.warn('创建新情绪类型: ' + emotion);
     }
     
     this.dictionary[emotion][keyword] = weight;
     // 重建索引
     this.keywordIndex = this.buildKeywordIndex();
-    logger.debug('添加关键词', { emotion, keyword, weight });
+    this.logger.debug('添加关键词', { emotion, keyword, weight });
   }
   
   /**
    * 移除关键词
    */
-  removeKeyword(emotion, keyword) {
+  removeKeyword(emotion: string, keyword: string): boolean {
     if (this.dictionary[emotion] && this.dictionary[emotion][keyword]) {
       delete this.dictionary[emotion][keyword];
       // 重建索引
       this.keywordIndex = this.buildKeywordIndex();
-      logger.debug('移除关键词', { emotion, keyword });
+      this.logger.debug('移除关键词', { emotion, keyword });
       return true;
     }
     return false;
@@ -609,12 +720,12 @@ class EmotionDetector {
   /**
    * 获取所有关键词
    */
-  getKeywords(emotion = null) {
+  getKeywords(emotion: string | null = null): { [emotion: string]: EmotionWeights } {
     if (emotion) {
       return { [emotion]: { ...this.dictionary[emotion] } };
     }
     
-    const result = {};
+    const result: { [emotion: string]: EmotionWeights } = {};
     for (const [e, words] of Object.entries(this.dictionary)) {
       result[e] = { ...words };
     }
@@ -624,10 +735,10 @@ class EmotionDetector {
 
 // ==================== 导出 ====================
 
-module.exports = EmotionDetector;
+export default EmotionDetector;
 
 // 同时导出常量供外部使用
-module.exports.EMOTION_NAMES = EMOTION_NAMES;
-module.exports.EMOTION_DICTIONARY = EMOTION_DICTIONARY;
-module.exports.NEGATION_WORDS = NEGATION_WORDS;
-module.exports.INTENSIFIER_WORDS = INTENSIFIER_WORDS;
+export const EMOTION_NAMES_EXPORT = EMOTION_NAMES;
+export const EMOTION_DICTIONARY_EXPORT = EMOTION_DICTIONARY;
+export const NEGATION_WORDS_EXPORT = NEGATION_WORDS;
+export const INTENSIFIER_WORDS_EXPORT = INTENSIFIER_WORDS;
