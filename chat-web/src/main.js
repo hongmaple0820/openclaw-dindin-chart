@@ -4,8 +4,18 @@
  * @date 2026-02-06
  */
 import { createApp } from 'vue';
-import * as ElementPlusIconsVue from '@element-plus/icons-vue';
-import 'element-plus/dist/index.css';
+// 只导入实际使用的图标，而非全量导入
+import {
+  Plus, Loading, Setting, ChatDotRound, UserFilled, User, Refresh,
+  Document, More, MagicStick, List, Delete, Connection, Clock,
+  Link, Check, ArrowLeft, Tools, SwitchButton, Monitor, FolderOpened,
+  Download, DataBoard, CopyDocument, View, Upload, Star, Menu,
+  HomeFilled, Folder, Edit, Close, ChatLineSquare, Bell, ArrowDown,
+  WarningFilled, Warning, UploadFilled, Search, QuestionFilled,
+  PictureFilled, Picture, Paperclip, Mute, MoreFilled, Microphone,
+  Lock, Grid, DataAnalysis, Cpu, Collection, ChatLineRound, Calendar,
+  Box, ArrowRight, VideoPlay, VideoPause, Tickets
+} from '@element-plus/icons-vue';
 
 import App from './App.vue';
 import router from './router';
@@ -16,9 +26,21 @@ import './styles/mobile.css';
 
 const app = createApp(App);
 
-// 注册 Element Plus 图标 (按需)
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component);
+// 只注册实际使用的图标组件
+const icons = {
+  Plus, Loading, Setting, ChatDotRound, UserFilled, User, Refresh,
+  Document, More, MagicStick, List, Delete, Connection, Clock,
+  Link, Check, ArrowLeft, Tools, SwitchButton, Monitor, FolderOpened,
+  Download, DataBoard, CopyDocument, View, Upload, Star, Menu,
+  HomeFilled, Folder, Edit, Close, ChatLineSquare, Bell, ArrowDown,
+  WarningFilled, Warning, UploadFilled, Search, QuestionFilled,
+  PictureFilled, Picture, Paperclip, Mute, MoreFilled, Microphone,
+  Lock, Grid, DataAnalysis, Cpu, Collection, ChatLineRound, Calendar,
+  Box, ArrowRight, VideoPlay, VideoPause, Tickets
+};
+
+for (const [name, component] of Object.entries(icons)) {
+  app.component(name, component);
 }
 
 app.use(pinia);

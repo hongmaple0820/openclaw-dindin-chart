@@ -157,6 +157,57 @@ export interface DbWrapper {
   exec(sql: string): void;
 }
 
+// ==================== ASR 语音识别类型 ====================
+
+export type ASRProvider = 'openai' | 'baidu' | 'xunfei' | 'aliyun';
+
+export interface ASRConfig {
+  provider: ASRProvider;
+  enabled: boolean;
+  apiKey?: string;
+  apiSecret?: string;
+  appId?: string;
+  endpoint?: string;
+  model?: string;
+  language?: string;
+  options?: Record<string, unknown>;
+}
+
+export interface ASRTranscribeRequest {
+  audio: string | Buffer;  // Base64 编码的音频数据或 Buffer
+  format: 'wav' | 'mp3' | 'm4a' | 'ogg' | 'webm' | 'amr' | 'pcm';
+  language?: string;       // 语言代码，如 'zh-CN', 'en-US'
+  provider?: ASRProvider;  // 指定提供商，不指定则使用默认
+  options?: Record<string, unknown>;  // 额外选项
+}
+
+export interface ASRTranscribeResult {
+  success: boolean;
+  text: string;
+  provider: ASRProvider;
+  language?: string;
+  duration?: number;       // 音频时长（秒）
+  confidence?: number;     // 置信度 0-1
+  segments?: ASRSegment[]; // 分段结果
+  error?: string;
+}
+
+export interface ASRSegment {
+  text: string;
+  start: number;  // 开始时间（秒）
+  end: number;    // 结束时间（秒）
+  confidence?: number;
+}
+
+export interface ASRProviderInfo {
+  name: ASRProvider;
+  displayName: string;
+  enabled: boolean;
+  language: string[];
+  features: string[];
+  pricing?: string;
+}
+
 // ==================== 工具类型 ====================
 
 /** 将 unknown 转换为 Record<string, unknown> */

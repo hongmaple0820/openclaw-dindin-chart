@@ -7,11 +7,22 @@
  * 3. 消息路由 - 将消息路由到正确的处理程序
  * 4. 会话管理 - 维护用户会话状态
  * 
+ * 支持平台：
+ * - DingTalk (钉钉)
+ * - WeCom (企业微信)
+ * - Feishu (飞书)
+ * - Slack
+ * - Discord
+ * - WebChat
+ * 
  * @author 小琳
  * @date 2026-03-05
  */
 
 import { EventEmitter } from 'events';
+import { DingTalkConnection, DingTalkConfig } from './dingtalk-connection';
+import { WeComConnection, WeComConfig } from './wecom-connection';
+import { FeishuConnection, FeishuConfig } from './feishu-connection';
 
 // ============================================================
 // 类型定义
@@ -65,6 +76,9 @@ export interface ConnectionConfig {
   credentials: Record<string, string>;
   options?: Record<string, unknown>;
 }
+
+/** 连接配置联合类型 */
+export type PlatformConfig = DingTalkConfig | WeComConfig | FeishuConfig | ConnectionConfig;
 
 /** 连接接口 */
 export interface IConnection {
@@ -185,7 +199,7 @@ export class Gateway extends EventEmitter {
     console.log('[Gateway] 启动网关...');
     
     // 连接所有已启用的平台
-    for (const [platform, connection] of this.connections) {
+    for (const [platform, connection] of Array.from(this.connections)) {
       try {
         await connection.connect();
         console.log(`[Gateway] ${platform} 连接成功`);
@@ -207,7 +221,7 @@ export class Gateway extends EventEmitter {
 
     console.log('[Gateway] 停止网关...');
 
-    for (const [platform, connection] of this.connections) {
+    for (const [platform, connection] of Array.from(this.connections)) {
       try {
         await connection.disconnect();
         console.log(`[Gateway] ${platform} 已断开`);
@@ -278,7 +292,7 @@ export class Gateway extends EventEmitter {
   getStatus(): Record<Platform, ConnectionStatus> {
     const status: Partial<Record<Platform, ConnectionStatus>> = {};
     
-    for (const [platform, connection] of this.connections) {
+    for (const [platform, connection] of Array.from(this.connections)) {
       status[platform] = connection.status;
     }
 
@@ -290,6 +304,38 @@ export class Gateway extends EventEmitter {
    */
   getQueueLength(): number {
     return this.messageQueue.length;
+  }
+
+  /**
+   * 创建平台连接（工厂方法）
+   */
+  static createConnection(config: PlatformConfig): IConnection {
+    switch (config.platform) {
+      case 'dingtalk':
+        return new DingTalkConnection(config as DingTalkConfig);
+      case 'wecom':
+        return new WeComConnection(config as WeComConfig);
+      case 'feishu':
+        return new FeishuConnection(config as FeishuConfig);
+      default:
+        throw new Error(`不支持的平台: ${config.platform}`);
+    }
+  }
+
+  /**
+   * 从配置创建并注册连接
+   */
+  createAndRegisterConnection(config: PlatformConfig): IConnection {
+    const connection = Gateway.createConnection(config);
+    this.registerConnection(connection);
+    return connection;
+  }
+
+  /**
+   * 批量创建并注册连接
+   */
+  createAndRegisterConnections(configs: PlatformConfig[]): IConnection[] {
+    return configs.map(config => this.createAndRegisterConnection(config));
   }
 }
 
@@ -327,7 +373,7 @@ export class MessageRouter {
    */
   async route(message: UnifiedMessage): Promise<void> {
     // 遍历所有处理器查找匹配
-    for (const [pattern, handler] of this.handlers) {
+    for (const [pattern, handler] of Array.from(this.handlers)) {
       if (this.matchPattern(pattern, message)) {
         await handler(message);
         return;
@@ -359,5 +405,10 @@ export class MessageRouter {
 // ============================================================
 // 导出
 // ============================================================
+
+export { DingTalkConnection, DingTalkConfig } from './dingtalk-connection';
+export { WeComConnection, WeComConfig } from './wecom-connection';
+export { FeishuConnection, FeishuConfig } from './feishu-connection';
+export { MessageConverter, convertMessage, convertMessages, PLATFORM_FEATURES, PlatformFeatures, ConversionOptions } from './message-converter';
 
 export default Gateway;

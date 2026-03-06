@@ -8,34 +8,9 @@
  * - POST /api/sse/broadcast - 广播消息给所有用户
  */
 
-import express, { type Request, type Response } from 'express';
-import sseManager from '../sse-manager';
-
+const express = require('express');
 const router = express.Router();
-
-interface ConnectQuery {
-  userId?: string;
-}
-
-interface SendBody {
-  targetUserId?: string;
-  event?: string;
-  data?: unknown;
-}
-
-interface BroadcastBody {
-  event?: string;
-  data?: unknown;
-  excludeUsers?: string[];
-}
-
-interface UserDetails {
-  userId: string;
-  connectedAt: number;
-  lastHeartbeat: number;
-  metadata: Record<string, unknown>;
-  ip?: string;
-}
+const sseManager = require('../sse-manager');
 
 /**
  * SSE 连接端点
@@ -49,15 +24,14 @@ interface UserDetails {
  * - event: user-online - 用户上线
  * - event: user-offline - 用户下线
  */
-router.get('/connect', (req: Request<object, object, object, ConnectQuery>, res: Response): void => {
+router.get('/connect', (req, res) => {
   const { userId } = req.query;
   
   if (!userId) {
-    res.status(400).json({ 
+    return res.status(400).json({ 
       success: false, 
       error: 'userId is required' 
     });
-    return;
   }
 
   console.log(`[SSE Routes] 收到连接请求: ${userId}`);
@@ -79,9 +53,9 @@ router.get('/connect', (req: Request<object, object, object, ConnectQuery>, res:
  *   ]
  * }
  */
-router.get('/online', (req: Request, res: Response): void => {
+router.get('/online', (req, res) => {
   try {
-    const users = sseManager.getOnlineUsersDetails() as UserDetails[];
+    const users = sseManager.getOnlineUsersDetails();
     const count = sseManager.getOnlineCount();
     
     res.json({
@@ -102,7 +76,7 @@ router.get('/online', (req: Request, res: Response): void => {
  * 检查用户是否在线
  * GET /api/sse/status/:userId
  */
-router.get('/status/:userId', (req: Request<{ userId: string }>, res: Response): void => {
+router.get('/status/:userId', (req, res) => {
   try {
     const { userId } = req.params;
     const isOnline = sseManager.isOnline(userId);
@@ -133,34 +107,31 @@ router.get('/status/:userId', (req: Request<{ userId: string }>, res: Response):
  *   "data": { ... }
  * }
  */
-router.post('/send', (req: Request<object, object, SendBody>, res: Response): void => {
+router.post('/send', (req, res) => {
   try {
     const { targetUserId, event = 'message', data } = req.body;
     
     if (!targetUserId) {
-      res.status(400).json({ 
+      return res.status(400).json({ 
         success: false, 
         error: 'targetUserId is required' 
       });
-      return;
     }
     
     if (!data) {
-      res.status(400).json({ 
+      return res.status(400).json({ 
         success: false, 
         error: 'data is required' 
       });
-      return;
     }
     
     // 检查目标用户是否在线
     if (!sseManager.isOnline(targetUserId)) {
-      res.status(404).json({ 
+      return res.status(404).json({ 
         success: false, 
         error: 'User is not online',
         userId: targetUserId
       });
-      return;
     }
     
     // 发送消息
@@ -199,16 +170,15 @@ router.post('/send', (req: Request<object, object, SendBody>, res: Response): vo
  *   "excludeUsers": ["user1"]  // 可选，排除的用户列表
  * }
  */
-router.post('/broadcast', (req: Request<object, object, BroadcastBody>, res: Response): void => {
+router.post('/broadcast', (req, res) => {
   try {
     const { event = 'message', data, excludeUsers = [] } = req.body;
     
     if (!data) {
-      res.status(400).json({ 
+      return res.status(400).json({ 
         success: false, 
         error: 'data is required' 
       });
-      return;
     }
     
     const onlineCount = sseManager.getOnlineCount();
@@ -240,17 +210,16 @@ router.post('/broadcast', (req: Request<object, object, BroadcastBody>, res: Res
  * 断开指定用户的连接
  * DELETE /api/sse/disconnect/:userId
  */
-router.delete('/disconnect/:userId', (req: Request<{ userId: string }>, res: Response): void => {
+router.delete('/disconnect/:userId', (req, res) => {
   try {
     const { userId } = req.params;
     
     if (!sseManager.isOnline(userId)) {
-      res.status(404).json({ 
+      return res.status(404).json({ 
         success: false, 
         error: 'User is not online',
         userId 
       });
-      return;
     }
     
     sseManager.disconnect(userId);
@@ -273,7 +242,7 @@ router.delete('/disconnect/:userId', (req: Request<{ userId: string }>, res: Res
  * 获取 SSE 服务统计信息
  * GET /api/sse/stats
  */
-router.get('/stats', (req: Request, res: Response): void => {
+router.get('/stats', (req, res) => {
   try {
     const stats = sseManager.getStats();
     res.json({
@@ -288,4 +257,7 @@ router.get('/stats', (req: Request, res: Response): void => {
   }
 });
 
-export = router;
+module.exports = router;
+
+// Make this a module
+export {};

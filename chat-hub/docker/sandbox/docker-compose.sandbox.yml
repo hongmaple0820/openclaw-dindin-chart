@@ -1,0 +1,19 @@
+# Sandbox Image Build
+# 用于构建沙箱镜像的 Docker Compose 配置
+
+version: '3.8'
+
+services:
+  sandbox-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw/sandbox:latest
+    container_name: sandbox-builder
+    command: echo "Sandbox image built successfully"
+    
+# 构建命令:
+# docker-compose -f docker-compose.sandbox.yml build
+
+# 使用沙箱镜像:
+# 在 SandboxManager 中设置 sandboxImage: 'openclaw/sandbox:latest'

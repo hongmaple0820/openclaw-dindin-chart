@@ -1,8 +1,9 @@
 -- Migration 019: Sandbox & Workspace System (沙箱与工作区系统)
 -- Phase 16: 虚拟沙箱环境，.fengLin 工作区管理
+-- Updated: 添加安全配置字段
 
 -- 沙箱表
-CREATE TABLE sandboxes (
+CREATE TABLE IF NOT EXISTS sandboxes (
   id TEXT PRIMARY KEY,
   name TEXT,
   session_id TEXT,
@@ -21,6 +22,7 @@ CREATE TABLE sandboxes (
   disk_limit INTEGER DEFAULT 1024,  -- MB
   gpu_enabled INTEGER DEFAULT 0,
   gpu_memory_limit INTEGER,  -- MB
+  timeout INTEGER DEFAULT 60,  -- 超时时间（秒）
   
   -- 资源使用
   cpu_usage REAL,
@@ -29,12 +31,18 @@ CREATE TABLE sandboxes (
   gpu_usage REAL,
   
   -- 网络配置
-  network_enabled INTEGER DEFAULT 1,
+  network_enabled INTEGER DEFAULT 0,  -- 默认禁用网络
   allowed_hosts TEXT,  -- JSON array
-  environment_vars TEXT,  -- JSON object
   
-  -- 挂载
+  -- 环境与挂载
+  environment_vars TEXT,  -- JSON object
   mounts TEXT,  -- JSON array: [{source, target, mode}]
+  
+  -- 安全配置 (新增)
+  workdir TEXT DEFAULT '/workspace',
+  user TEXT DEFAULT 'sandbox',
+  read_only_root INTEGER DEFAULT 1,  -- 只读根文件系统
+  no_new_privileges INTEGER DEFAULT 1,  -- 禁止提权
   
   -- 时间
   created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
@@ -45,7 +53,7 @@ CREATE TABLE sandboxes (
 );
 
 -- 沙箱日志表
-CREATE TABLE sandbox_logs (
+CREATE TABLE IF NOT EXISTS sandbox_logs (
   id TEXT PRIMARY KEY,
   sandbox_id TEXT NOT NULL,
   level TEXT DEFAULT 'info',  -- debug/info/warn/error
@@ -56,7 +64,7 @@ CREATE TABLE sandbox_logs (
 );
 
 -- 沙箱文件表
-CREATE TABLE sandbox_files (
+CREATE TABLE IF NOT EXISTS sandbox_files (
   id TEXT PRIMARY KEY,
   sandbox_id TEXT NOT NULL,
   path TEXT NOT NULL,
@@ -70,7 +78,7 @@ CREATE TABLE sandbox_files (
 );
 
 -- 工作区表
-CREATE TABLE workspaces (
+CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   name TEXT,
   path TEXT NOT NULL UNIQUE,
@@ -96,7 +104,7 @@ CREATE TABLE workspaces (
 );
 
 -- 工作区文件索引表
-CREATE TABLE workspace_files (
+CREATE TABLE IF NOT EXISTS workspace_files (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
   relative_path TEXT NOT NULL,
@@ -112,12 +120,12 @@ CREATE TABLE workspace_files (
 );
 
 -- 索引
-CREATE INDEX idx_sandboxes_status ON sandboxes(status);
-CREATE INDEX idx_sandboxes_session ON sandboxes(session_id);
-CREATE INDEX idx_sandboxes_task ON sandboxes(task_id);
-CREATE INDEX idx_sandbox_logs_sandbox ON sandbox_logs(sandbox_id);
-CREATE INDEX idx_sandbox_files_sandbox ON sandbox_files(sandbox_id);
-CREATE INDEX idx_workspaces_owner ON workspaces(owner_id);
-CREATE INDEX idx_workspaces_group ON workspaces(group_id);
-CREATE INDEX idx_workspaces_type ON workspaces(type);
-CREATE INDEX idx_workspace_files_workspace ON workspace_files(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_sandboxes_status ON sandboxes(status);
+CREATE INDEX IF NOT EXISTS idx_sandboxes_session ON sandboxes(session_id);
+CREATE INDEX IF NOT EXISTS idx_sandboxes_task ON sandboxes(task_id);
+CREATE INDEX IF NOT EXISTS idx_sandbox_logs_sandbox ON sandbox_logs(sandbox_id);
+CREATE INDEX IF NOT EXISTS idx_sandbox_files_sandbox ON sandbox_files(sandbox_id);
+CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces(owner_id);
+CREATE INDEX IF NOT EXISTS idx_workspaces_group ON workspaces(group_id);
+CREATE INDEX IF NOT EXISTS idx_workspaces_type ON workspaces(type);
+CREATE INDEX IF NOT EXISTS idx_workspace_files_workspace ON workspace_files(workspace_id);

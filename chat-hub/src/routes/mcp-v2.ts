@@ -8,85 +8,38 @@
  * - 外部市场: /api/mcp/external
  */
 
-import express, { type Request, type Response, type NextFunction } from 'express';
-
+const express = require('express');
 const router = express.Router();
 
-interface MCPServer {
-  id: string;
-  name: string;
-  display_name?: string;
-  description?: string;
-  [key: string]: unknown;
-}
+let mcpService = null;
 
-interface UserMCPServer {
-  id: string;
-  user_id: string;
-  mcp_id: string;
-  [key: string]: unknown;
-}
-
-interface CustomMCPServer extends MCPServer {
-  user_id: string;
-}
-
-interface ExternalMarket {
-  id: string;
-  name: string;
-  [key: string]: unknown;
-}
-
-interface MCPService {
-  getBuiltinMCPServers(): Promise<MCPServer[]>;
-  getBuiltinMCP(id: string): Promise<MCPServer | null>;
-  getMarketplaceMCPServers(options?: { search?: string; limit?: number }): Promise<MCPServer[]>;
-  getMarketplaceMCP(id: string): Promise<MCPServer | null>;
-  installMCP(userId: string, mcpId: string): Promise<{ success: boolean; error?: string }>;
-  submitToMarketplace(userId: string, data: unknown): Promise<{ success: boolean; error?: string }>;
-  getUserMCPServers(userId: string): Promise<UserMCPServer[]>;
-  getCustomMCPServers(userId: string): Promise<CustomMCPServer[]>;
-  createCustomMCP(userId: string, data: unknown): Promise<CustomMCPServer>;
-  deleteCustomMCP(id: string, userId: string): Promise<boolean>;
-  getExternalMarkets(): Promise<ExternalMarket[]>;
-}
-
-let mcpService: MCPService | null = null;
-
-function setMCPService(service: MCPService): void {
+function setMCPService(service) {
   mcpService = service;
 }
 
-function ensureService(req: Request, res: Response, next: NextFunction): void {
+function ensureService(req, res, next) {
   if (!mcpService) {
-    res.status(500).json({ success: false, error: 'MCP service not initialized' });
-    return;
+    return res.status(500).json({ success: false, error: 'MCP service not initialized' });
   }
   next();
 }
 
-interface MarketQuery {
-  search?: string;
-  limit?: string;
-}
-
 // ==================== 内置 MCP ====================
 
-router.get('/builtin', ensureService, async (req: Request, res: Response): Promise<void> => {
+router.get('/builtin', ensureService, async (req, res) => {
   try {
-    const mcps = await mcpService!.getBuiltinMCPServers();
+    const mcps = await mcpService.getBuiltinMCPServers();
     res.json({ success: true, data: mcps });
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-router.get('/builtin/:id', ensureService, async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.get('/builtin/:id', ensureService, async (req, res) => {
   try {
-    const mcp = await mcpService!.getBuiltinMCP(req.params.id);
+    const mcp = await mcpService.getBuiltinMCP(req.params.id);
     if (!mcp) {
-      res.status(404).json({ success: false, error: 'MCP not found' });
-      return;
+      return res.status(404).json({ success: false, error: 'MCP not found' });
     }
     res.json({ success: true, data: mcp });
   } catch (error) {
@@ -96,25 +49,21 @@ router.get('/builtin/:id', ensureService, async (req: Request<{ id: string }>, r
 
 // ==================== 云市场 ====================
 
-router.get('/market', ensureService, async (req: Request<object, object, object, MarketQuery>, res: Response): Promise<void> => {
+router.get('/market', ensureService, async (req, res) => {
   try {
     const { search, limit } = req.query;
-    const mcps = await mcpService!.getMarketplaceMCPServers({
-      search,
-      limit: limit ? parseInt(limit) : undefined
-    });
+    const mcps = await mcpService.getMarketplaceMCPServers({ search, limit: limit ? parseInt(limit) : undefined });
     res.json({ success: true, data: mcps });
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-router.get('/market/:id', ensureService, async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.get('/market/:id', ensureService, async (req, res) => {
   try {
-    const mcp = await mcpService!.getMarketplaceMCP(req.params.id);
+    const mcp = await mcpService.getMarketplaceMCP(req.params.id);
     if (!mcp) {
-      res.status(404).json({ success: false, error: 'MCP not found' });
-      return;
+      return res.status(404).json({ success: false, error: 'MCP not found' });
     }
     res.json({ success: true, data: mcp });
   } catch (error) {
@@ -122,20 +71,20 @@ router.get('/market/:id', ensureService, async (req: Request<{ id: string }>, re
   }
 });
 
-router.post('/market/:id/install', ensureService, async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.post('/market/:id/install', ensureService, async (req, res) => {
   try {
-    const userId = (req as Request & { user?: { id?: string } }).user?.id || 'anonymous';
-    const result = await mcpService!.installMCP(userId, req.params.id);
+    const userId = req.user?.id || 'anonymous';
+    const result = await mcpService.installMCP(userId, req.params.id);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-router.post('/market/submit', ensureService, async (req: Request, res: Response): Promise<void> => {
+router.post('/market/submit', ensureService, async (req, res) => {
   try {
-    const userId = (req as Request & { user?: { id?: string } }).user?.id || 'anonymous';
-    const result = await mcpService!.submitToMarketplace(userId, req.body);
+    const userId = req.user?.id || 'anonymous';
+    const result = await mcpService.submitToMarketplace(userId, req.body);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
@@ -144,12 +93,12 @@ router.post('/market/submit', ensureService, async (req: Request, res: Response)
 
 // ==================== 我的 MCP ====================
 
-router.get('/mine', ensureService, async (req: Request, res: Response): Promise<void> => {
+router.get('/mine', ensureService, async (req, res) => {
   try {
-    const userId = (req as Request & { user?: { id?: string } }).user?.id || 'anonymous';
+    const userId = req.user?.id || 'anonymous';
     const [installed, custom] = await Promise.all([
-      mcpService!.getUserMCPServers(userId),
-      mcpService!.getCustomMCPServers(userId)
+      mcpService.getUserMCPServers(userId),
+      mcpService.getCustomMCPServers(userId)
     ]);
     res.json({ success: true, data: { installed, custom } });
   } catch (error) {
@@ -157,20 +106,20 @@ router.get('/mine', ensureService, async (req: Request, res: Response): Promise<
   }
 });
 
-router.post('/mine', ensureService, async (req: Request, res: Response): Promise<void> => {
+router.post('/mine', ensureService, async (req, res) => {
   try {
-    const userId = (req as Request & { user?: { id?: string } }).user?.id || 'anonymous';
-    const mcp = await mcpService!.createCustomMCP(userId, req.body);
+    const userId = req.user?.id || 'anonymous';
+    const mcp = await mcpService.createCustomMCP(userId, req.body);
     res.json({ success: true, data: mcp });
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-router.delete('/mine/:id', ensureService, async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+router.delete('/mine/:id', ensureService, async (req, res) => {
   try {
-    const userId = (req as Request & { user?: { id?: string } }).user?.id || 'anonymous';
-    const deleted = await mcpService!.deleteCustomMCP(req.params.id, userId);
+    const userId = req.user?.id || 'anonymous';
+    const deleted = await mcpService.deleteCustomMCP(req.params.id, userId);
     res.json({ success: deleted });
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
@@ -179,13 +128,15 @@ router.delete('/mine/:id', ensureService, async (req: Request<{ id: string }>, r
 
 // ==================== 外部市场 ====================
 
-router.get('/external', ensureService, async (req: Request, res: Response): Promise<void> => {
+router.get('/external', ensureService, async (req, res) => {
   try {
-    const markets = await mcpService!.getExternalMarkets();
+    const markets = await mcpService.getExternalMarkets();
     res.json({ success: true, data: markets });
   } catch (error) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
-export { router, setMCPService };
+module.exports = { router, setMCPService };
+// Make this a module
+export {};

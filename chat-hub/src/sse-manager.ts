@@ -1,35 +1,4 @@
-import EventEmitter from 'events';
-import type { Response, Request } from 'express';
-
-/**
- * SSE 配置选项
- */
-interface SSEConfig {
-  heartbeatInterval?: number;
-  maxConnections?: number;
-  timeout?: number;
-}
-
-/**
- * 客户端数据
- */
-interface ClientData {
-  response: Response;
-  connectedAt: number;
-  lastHeartbeat: number;
-  metadata: Record<string, unknown>;
-  ip?: string;
-}
-
-/**
- * 统计信息
- */
-interface SSEStats {
-  totalConnections: number;
-  totalDisconnections: number;
-  messagesSent: number;
-  messagesFailed: number;
-}
+const EventEmitter = require('events');
 
 /**
  * SSE 服务端推送管理器
@@ -41,12 +10,12 @@ interface SSEStats {
  * - 用户上线/下线通知
  */
 class SSEManager extends EventEmitter {
-  private config: Required<SSEConfig>;
-  private clients: Map<string, ClientData>;
-  private heartbeatTimer: NodeJS.Timeout | null;
-  private stats: SSEStats;
+  config: any;
+  clients: Map<string, any>;
+  heartbeatTimer: NodeJS.Timeout | null;
+  stats: { totalConnections: number; totalDisconnections: number; messagesSent: number; messagesFailed: number };
 
-  constructor(options: SSEConfig = {}) {
+  constructor(options = {}) {
     super();
     
     // 配置
@@ -54,6 +23,7 @@ class SSEManager extends EventEmitter {
       heartbeatInterval: options.heartbeatInterval || 30000, // 30s
       maxConnections: options.maxConnections || 1000,
       timeout: options.timeout || 300000, // 5 分钟无响应断开
+      ...options
     };
     
     // 在线客户端：userId -> { response, connectedAt, lastHeartbeat, metadata }
@@ -78,8 +48,11 @@ class SSEManager extends EventEmitter {
 
   /**
    * 客户端连接
+   * @param {string} userId 用户 ID
+   * @param {Response} res Express response 对象
+   * @param {Object} metadata 可选的元数据
    */
-  connect(userId: string, res: Response, metadata: Record<string, unknown> = {}): boolean {
+  connect(userId, res, metadata = {}) {
     // 检查最大连接数
     if (this.clients.size >= this.config.maxConnections) {
       console.warn('[SSE Manager] 已达最大连接数，拒绝连接:', userId);
@@ -106,12 +79,12 @@ class SSEManager extends EventEmitter {
     });
 
     // 创建客户端记录
-    const clientData: ClientData = {
+    const clientData = {
       response: res,
       connectedAt: Date.now(),
       lastHeartbeat: Date.now(),
       metadata,
-      ip: (res.req as Request)?.ip || (res.req as Request)?.connection?.remoteAddress
+      ip: res.req?.ip || res.req?.connection?.remoteAddress
     };
     
     this.clients.set(userId, clientData);
@@ -142,7 +115,7 @@ class SSEManager extends EventEmitter {
       this._disconnectClient(userId, 'client-close');
     });
     
-    res.on('error', (error: Error) => {
+    res.on('error', (error) => {
       console.error(`[SSE Manager] 客户端连接错误: ${userId}`, error.message);
       this._disconnectClient(userId, 'error');
     });
@@ -153,17 +126,17 @@ class SSEManager extends EventEmitter {
   /**
    * 内部断开客户端连接
    */
-  private _disconnectClient(userId: string, reason: string = 'unknown'): void {
+  _disconnectClient(userId, reason = 'unknown') {
     if (!this.clients.has(userId)) return;
     
-    const clientData = this.clients.get(userId)!;
+    const clientData = this.clients.get(userId);
     
     try {
       // 尝试结束响应
       if (clientData.response && !clientData.response.writableEnded) {
         clientData.response.end();
       }
-    } catch (error) {
+    } catch (error: any) {
       // 忽略已关闭的响应
     }
     
@@ -186,14 +159,14 @@ class SSEManager extends EventEmitter {
   /**
    * 主动断开客户端连接
    */
-  disconnect(userId: string): void {
+  disconnect(userId) {
     this._disconnectClient(userId, 'server-disconnect');
   }
 
   /**
    * 内部发送 SSE 消息
    */
-  private _send(res: Response, event: string, data: unknown): boolean {
+  _send(res, event, data) {
     try {
       if (res.writableEnded) {
         return false;
@@ -202,16 +175,19 @@ class SSEManager extends EventEmitter {
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
       return true;
-    } catch (error) {
-      console.error('[SSE Manager] 发送失败:', (error as Error).message);
+    } catch (error: any) {
+      console.error('[SSE Manager] 发送失败:', error.message);
       return false;
     }
   }
 
   /**
    * 发送消息到指定客户端
+   * @param {string} userId 用户 ID
+   * @param {string} event 事件名称
+   * @param {any} data 数据
    */
-  sendToUser(userId: string, event: string, data: unknown): boolean {
+  sendToUser(userId, event, data) {
     const clientData = this.clients.get(userId);
     if (!clientData) {
       return false;
@@ -233,21 +209,24 @@ class SSEManager extends EventEmitter {
   /**
    * 推送新消息（简化接口）
    */
-  pushMessage(userId: string, message: unknown): boolean {
+  pushMessage(userId, message) {
     return this.sendToUser(userId, 'message', message);
   }
 
   /**
    * 发送通知
    */
-  sendNotification(userId: string, notification: unknown): boolean {
+  sendNotification(userId, notification) {
     return this.sendToUser(userId, 'notification', notification);
   }
 
   /**
    * 广播消息到所有客户端
+   * @param {string} event 事件名称
+   * @param {any} data 数据
+   * @param {string|string[]} excludeUsers 排除的用户
    */
-  broadcast(event: string, data: unknown, excludeUsers: string | string[] = []): number {
+  broadcast(event, data, excludeUsers = []) {
     const excludeSet = new Set(Array.isArray(excludeUsers) ? excludeUsers : [excludeUsers]);
     let sentCount = 0;
     
@@ -269,7 +248,7 @@ class SSEManager extends EventEmitter {
   /**
    * 启动心跳检测
    */
-  startHeartbeat(): void {
+  startHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
     }
@@ -298,8 +277,8 @@ class SSEManager extends EventEmitter {
             // 发送失败，断开连接
             this._disconnectClient(userId, 'heartbeat-failed');
           }
-        } catch (error) {
-          console.error(`[SSE Manager] 心跳发送失败: ${userId}`, (error as Error).message);
+        } catch (error: any) {
+          console.error(`[SSE Manager] 心跳发送失败: ${userId}`, error.message);
           this._disconnectClient(userId, 'heartbeat-error');
         }
       }
@@ -314,7 +293,7 @@ class SSEManager extends EventEmitter {
   /**
    * 停止心跳检测
    */
-  stopHeartbeat(): void {
+  stopHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -324,7 +303,7 @@ class SSEManager extends EventEmitter {
   /**
    * 更新客户端心跳时间（客户端收到心跳后可调用）
    */
-  updateHeartbeat(userId: string): boolean {
+  updateHeartbeat(userId) {
     const clientData = this.clients.get(userId);
     if (clientData) {
       clientData.lastHeartbeat = Date.now();
@@ -336,15 +315,15 @@ class SSEManager extends EventEmitter {
   /**
    * 获取在线用户列表（仅用户 ID）
    */
-  getOnlineUsers(): string[] {
+  getOnlineUsers() {
     return Array.from(this.clients.keys());
   }
 
   /**
-   * 在线用户详情（不包含 response 对象）
+   * 获取在线用户详情
    */
-  getOnlineUsersDetails(): Array<{ userId: string; connectedAt: number; lastHeartbeat: number; metadata: Record<string, unknown>; ip?: string }> {
-    const users: Array<{ userId: string; connectedAt: number; lastHeartbeat: number; metadata: Record<string, unknown>; ip?: string }> = [];
+  getOnlineUsersDetails() {
+    const users = [];
     for (const [userId, data] of this.clients.entries()) {
       users.push({
         userId,
@@ -360,7 +339,7 @@ class SSEManager extends EventEmitter {
   /**
    * 获取单个用户详情
    */
-  getUserDetails(userId: string): { userId: string; connectedAt: number; lastHeartbeat: number; metadata: Record<string, unknown>; ip?: string } | null {
+  getUserDetails(userId) {
     const data = this.clients.get(userId);
     if (!data) return null;
     
@@ -376,25 +355,21 @@ class SSEManager extends EventEmitter {
   /**
    * 检查用户是否在线
    */
-  isOnline(userId: string): boolean {
+  isOnline(userId) {
     return this.clients.has(userId);
   }
 
   /**
    * 获取在线人数
    */
-  getOnlineCount(): number {
+  getOnlineCount() {
     return this.clients.size;
   }
 
   /**
    * 获取统计信息
    */
-  getStats(): SSEStats & { 
-    online: number; 
-    maxConnections: number;
-    config: Required<SSEConfig>;
-  } {
+  getStats() {
     return {
       online: this.clients.size,
       maxConnections: this.config.maxConnections,
@@ -404,8 +379,7 @@ class SSEManager extends EventEmitter {
       messagesFailed: this.stats.messagesFailed,
       config: {
         heartbeatInterval: this.config.heartbeatInterval,
-        timeout: this.config.timeout,
-        maxConnections: this.config.maxConnections
+        timeout: this.config.timeout
       }
     };
   }
@@ -413,7 +387,7 @@ class SSEManager extends EventEmitter {
   /**
    * 更新配置
    */
-  updateConfig(newConfig: SSEConfig): void {
+  updateConfig(newConfig) {
     this.config = {
       ...this.config,
       ...newConfig
@@ -430,7 +404,7 @@ class SSEManager extends EventEmitter {
   /**
    * 关闭所有连接
    */
-  closeAll(): void {
+  closeAll() {
     console.log('[SSE Manager] 关闭所有连接...');
     
     for (const userId of this.clients.keys()) {
@@ -444,6 +418,6 @@ class SSEManager extends EventEmitter {
 // 单例导出
 const sseManager = new SSEManager();
 
-export default sseManager;
-export { SSEManager };
-export type { SSEConfig, ClientData, SSEStats };
+module.exports = sseManager;
+module.exports.SSEManager = SSEManager; // 也导出类，支持测试
+export {};

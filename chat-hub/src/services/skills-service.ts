@@ -1,23 +1,82 @@
 /**
- * Skills Service - 技能服务 (TypeScript)
+ * Skills Service - 技能服务
  * 
  * 管理内置技能、云市场技能、用户技能
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import type { 
-  Skill, 
-  MarketplaceSkill, 
-  UserSkill, 
-  CustomSkill,
-  ApiResponse,
-  DbWrapper 
-} from '../types/skills';
 
-export class SkillsService {
-  private db: DbWrapper;
+// ==================== 类型定义 ====================
 
-  constructor(db: DbWrapper) {
+interface Skill {
+  id: string;
+  name: string;
+  display_name?: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  category?: string;
+  tags?: string[];
+  skill_content?: string;
+  config_schema?: Record<string, any>;
+  default_config?: Record<string, any>;
+  enabled?: number;
+  order_index?: number;
+  icon?: string;
+  created_at?: number;
+  updated_at?: number;
+  status?: string;
+  author_id?: string;
+  author_name?: string;
+  publish_status?: string;
+  reviewed_by?: string;
+  reviewed_at?: number;
+  review_note?: string;
+  downloads?: number;
+  rating?: number;
+  installs?: number;
+  user_id?: string;
+  skill_id?: string;
+  skill_type?: string;
+  skill_name?: string;
+  installed_at?: number;
+}
+
+interface SkillFilters {
+  category?: string;
+  search?: string;
+  limit?: number;
+}
+
+interface CreateSkillData {
+  id?: string;
+  name: string;
+  display_name?: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  category?: string;
+  tags?: string[];
+  skill_content?: string;
+  config_schema?: Record<string, any>;
+  default_config?: Record<string, any>;
+  enabled?: boolean;
+  order_index?: number;
+  icon?: string;
+}
+
+interface Database {
+  run(sql: string, params?: any[]): Promise<{ changes: number }>;
+  get(sql: string, params?: any[]): Promise<any>;
+  all(sql: string, params?: any[]): Promise<any[]>;
+}
+
+// ==================== 技能服务类 ====================
+
+class SkillsService {
+  private db: Database;
+
+  constructor(db: Database) {
     this.db = db;
   }
 
@@ -26,9 +85,9 @@ export class SkillsService {
   /**
    * 获取内置技能列表
    */
-  async getBuiltinSkills(filters: { category?: string } = {}): Promise<Skill[]> {
+  async getBuiltinSkills(filters: SkillFilters = {}): Promise<Skill[]> {
     let sql = 'SELECT * FROM builtin_skills WHERE enabled = 1';
-    const params: string[] = [];
+    const params: any[] = [];
 
     if (filters.category) {
       sql += ' AND category = ?';
@@ -38,7 +97,7 @@ export class SkillsService {
     sql += ' ORDER BY order_index ASC, name ASC';
 
     const rows = await this.db.all(sql, params);
-    return rows.map(row => this.formatSkill(row as Record<string, unknown>));
+    return rows.map(this.formatSkill);
   }
 
   /**
@@ -46,13 +105,13 @@ export class SkillsService {
    */
   async getBuiltinSkill(id: string): Promise<Skill | null> {
     const row = await this.db.get('SELECT * FROM builtin_skills WHERE id = ?', [id]);
-    return row ? this.formatSkill(row as Record<string, unknown>) : null;
+    return row ? this.formatSkill(row) : null;
   }
 
   /**
    * 添加内置技能（管理员）
    */
-  async addBuiltinSkill(skill: Partial<Skill>): Promise<Skill | null> {
+  async addBuiltinSkill(skill: CreateSkillData): Promise<Skill | null> {
     const id = skill.id || uuidv4();
     const now = Date.now();
 
@@ -63,22 +122,13 @@ export class SkillsService {
         enabled, order_index, icon, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      id, 
-      skill.name || '', 
-      skill.display_name || skill.name || '',
-      skill.description || '', 
-      skill.version || '1.0.0', 
-      skill.author || 'system',
-      skill.category || 'general', 
-      JSON.stringify(skill.tags || []),
-      skill.skill_content || '', 
-      JSON.stringify(skill.config_schema || {}),
+      id, skill.name, skill.display_name || skill.name,
+      skill.description || '', skill.version || '1.0.0', skill.author || 'system',
+      skill.category || 'general', JSON.stringify(skill.tags || []),
+      skill.skill_content || '', JSON.stringify(skill.config_schema || {}),
       JSON.stringify(skill.default_config || {}),
-      skill.enabled !== false ? 1 : 0, 
-      skill.order_index || 0,
-      skill.icon || '', 
-      now, 
-      now
+      skill.enabled !== false ? 1 : 0, skill.order_index || 0,
+      skill.icon || '', now, now
     ]);
 
     return this.getBuiltinSkill(id);
@@ -89,13 +139,9 @@ export class SkillsService {
   /**
    * 获取云市场技能列表
    */
-  async getMarketplaceSkills(filters: { 
-    category?: string; 
-    search?: string; 
-    limit?: number 
-  } = {}): Promise<MarketplaceSkill[]> {
+  async getMarketplaceSkills(filters: SkillFilters = {}): Promise<Skill[]> {
     let sql = "SELECT * FROM marketplace_skills WHERE status = 'approved'";
-    const params: (string | number)[] = [];
+    const params: any[] = [];
 
     if (filters.category) {
       sql += ' AND category = ?';
@@ -115,24 +161,24 @@ export class SkillsService {
     }
 
     const rows = await this.db.all(sql, params);
-    return rows.map(row => this.formatSkill(row as Record<string, unknown>) as MarketplaceSkill);
+    return rows.map(this.formatSkill);
   }
 
   /**
    * 获取云市场技能详情
    */
-  async getMarketplaceSkill(id: string): Promise<MarketplaceSkill | null> {
+  async getMarketplaceSkill(id: string): Promise<Skill | null> {
     const row = await this.db.get(
       "SELECT * FROM marketplace_skills WHERE id = ? AND status = 'approved'",
       [id]
     );
-    return row ? this.formatSkill(row as Record<string, unknown>) as MarketplaceSkill : null;
+    return row ? this.formatSkill(row) : null;
   }
 
   /**
    * 安装云市场技能
    */
-  async installSkill(userId: string, skillId: string): Promise<ApiResponse<Skill>> {
+  async installSkill(userId: string, skillId: string): Promise<{ success: boolean; error?: string; skill?: Skill }> {
     // 检查是否已安装
     const existing = await this.db.get(
       'SELECT * FROM user_skills WHERE user_id = ? AND skill_id = ?',
@@ -162,16 +208,13 @@ export class SkillsService {
       [skillId]
     );
 
-    return { success: true, data: skill };
+    return { success: true, skill };
   }
 
   /**
    * 提交技能到云市场
    */
-  async submitToMarketplace(
-    userId: string, 
-    skillData: Partial<MarketplaceSkill>
-  ): Promise<ApiResponse<{ id: string; status: string }>> {
+  async submitToMarketplace(userId: string, skillData: CreateSkillData): Promise<{ success: boolean; id?: string; status?: string }> {
     const id = uuidv4();
     const now = Date.now();
 
@@ -182,24 +225,17 @@ export class SkillsService {
         config_schema, default_config, status, icon, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `, [
-      id, 
-      skillData.name || '', 
-      skillData.display_name || skillData.name || '',
-      skillData.description || '', 
-      skillData.version || '1.0.0',
-      userId, 
-      skillData.author_name || '',
-      skillData.category || 'general', 
-      JSON.stringify(skillData.tags || []),
+      id, skillData.name, skillData.display_name || skillData.name,
+      skillData.description || '', skillData.version || '1.0.0',
+      userId, skillData.author || '',
+      skillData.category || 'general', JSON.stringify(skillData.tags || []),
       skillData.skill_content || '',
       JSON.stringify(skillData.config_schema || {}),
       JSON.stringify(skillData.default_config || {}),
-      skillData.icon || '', 
-      now, 
-      now
+      skillData.icon || '', now, now
     ]);
 
-    return { success: true, data: { id, status: 'pending' } };
+    return { success: true, id, status: 'pending' };
   }
 
   // ==================== 用户技能 ====================
@@ -207,7 +243,7 @@ export class SkillsService {
   /**
    * 获取用户安装的技能
    */
-  async getUserSkills(userId: string): Promise<UserSkill[]> {
+  async getUserSkills(userId: string): Promise<Skill[]> {
     const rows = await this.db.all(`
       SELECT us.*, 
         CASE 
@@ -220,27 +256,24 @@ export class SkillsService {
       ORDER BY us.installed_at DESC
     `, [userId]);
 
-    return rows as UserSkill[];
+    return rows;
   }
 
   /**
    * 获取用户自建技能
    */
-  async getCustomSkills(userId: string): Promise<CustomSkill[]> {
+  async getCustomSkills(userId: string): Promise<Skill[]> {
     const rows = await this.db.all(
       'SELECT * FROM custom_skills WHERE user_id = ? ORDER BY created_at DESC',
       [userId]
     );
-    return rows.map(row => this.formatSkill(row as Record<string, unknown>) as CustomSkill);
+    return rows.map(this.formatSkill);
   }
 
   /**
    * 创建自建技能
    */
-  async createCustomSkill(
-    userId: string, 
-    skillData: Partial<CustomSkill>
-  ): Promise<CustomSkill | null> {
+  async createCustomSkill(userId: string, skillData: CreateSkillData): Promise<Skill | null> {
     const id = uuidv4();
     const now = Date.now();
 
@@ -251,19 +284,13 @@ export class SkillsService {
         publish_status, icon, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', ?, ?, ?)
     `, [
-      id, userId, 
-      skillData.name || '', 
-      skillData.display_name || skillData.name || '',
-      skillData.description || '', 
-      skillData.version || '1.0.0',
-      skillData.category || 'general', 
-      JSON.stringify(skillData.tags || []),
+      id, userId, skillData.name, skillData.display_name || skillData.name,
+      skillData.description || '', skillData.version || '1.0.0',
+      skillData.category || 'general', JSON.stringify(skillData.tags || []),
       skillData.skill_content || '',
       JSON.stringify(skillData.config_schema || {}),
       JSON.stringify(skillData.default_config || {}),
-      skillData.icon || '', 
-      now, 
-      now
+      skillData.icon || '', now, now
     ]);
 
     return this.getCustomSkill(id);
@@ -272,19 +299,15 @@ export class SkillsService {
   /**
    * 获取自建技能详情
    */
-  async getCustomSkill(id: string): Promise<CustomSkill | null> {
+  async getCustomSkill(id: string): Promise<Skill | null> {
     const row = await this.db.get('SELECT * FROM custom_skills WHERE id = ?', [id]);
-    return row ? this.formatSkill(row as Record<string, unknown>) as CustomSkill : null;
+    return row ? this.formatSkill(row) : null;
   }
 
   /**
    * 更新自建技能
    */
-  async updateCustomSkill(
-    id: string, 
-    userId: string, 
-    skillData: Partial<CustomSkill>
-  ): Promise<CustomSkill | null> {
+  async updateCustomSkill(id: string, userId: string, skillData: Partial<CreateSkillData>): Promise<Skill | null> {
     const now = Date.now();
     
     await this.db.run(`
@@ -302,19 +325,13 @@ export class SkillsService {
         updated_at = ?
       WHERE id = ? AND user_id = ?
     `, [
-      skillData.name || null, 
-      skillData.display_name || null, 
-      skillData.description || null,
-      skillData.version || null, 
-      skillData.category || null,
+      skillData.name, skillData.display_name, skillData.description,
+      skillData.version, skillData.category,
       skillData.tags ? JSON.stringify(skillData.tags) : null,
-      skillData.skill_content || null,
+      skillData.skill_content,
       skillData.config_schema ? JSON.stringify(skillData.config_schema) : null,
       skillData.default_config ? JSON.stringify(skillData.default_config) : null,
-      skillData.icon || null, 
-      now, 
-      id, 
-      userId
+      skillData.icon, now, id, userId
     ]);
 
     return this.getCustomSkill(id);
@@ -336,21 +353,17 @@ export class SkillsService {
   /**
    * 获取待审核技能
    */
-  async getPendingSkills(): Promise<MarketplaceSkill[]> {
+  async getPendingSkills(): Promise<Skill[]> {
     const rows = await this.db.all(
       "SELECT * FROM marketplace_skills WHERE status = 'pending' ORDER BY created_at ASC"
     );
-    return rows.map(row => this.formatSkill(row as Record<string, unknown>) as MarketplaceSkill);
+    return rows.map(this.formatSkill);
   }
 
   /**
    * 批准技能
    */
-  async approveSkill(
-    skillId: string, 
-    reviewerId: string, 
-    note: string = ''
-  ): Promise<ApiResponse> {
+  async approveSkill(skillId: string, reviewerId: string, note: string = ''): Promise<{ success: boolean }> {
     const now = Date.now();
     
     await this.db.run(`
@@ -369,11 +382,7 @@ export class SkillsService {
   /**
    * 拒绝技能
    */
-  async rejectSkill(
-    skillId: string, 
-    reviewerId: string, 
-    note: string = ''
-  ): Promise<ApiResponse> {
+  async rejectSkill(skillId: string, reviewerId: string, note: string = ''): Promise<{ success: boolean }> {
     const now = Date.now();
     
     await this.db.run(`
@@ -391,18 +400,17 @@ export class SkillsService {
 
   // ==================== 工具方法 ====================
 
-  private formatSkill(row: Record<string, unknown>): Skill {
-    if (!row) return null as unknown as Skill;
+  private formatSkill(row: any): Skill {
+    if (!row) return null;
     
     return {
       ...row,
-      tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string) : row.tags,
-      config_schema: typeof row.config_schema === 'string' 
-        ? JSON.parse(row.config_schema as string) 
-        : row.config_schema,
-      default_config: typeof row.default_config === 'string' 
-        ? JSON.parse(row.default_config as string) 
-        : row.default_config
-    } as Skill;
+      tags: typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags,
+      config_schema: typeof row.config_schema === 'string' ? JSON.parse(row.config_schema) : row.config_schema,
+      default_config: typeof row.default_config === 'string' ? JSON.parse(row.default_config) : row.default_config
+    };
   }
 }
+
+export { SkillsService };
+export type { Skill, SkillFilters, CreateSkillData, Database };
