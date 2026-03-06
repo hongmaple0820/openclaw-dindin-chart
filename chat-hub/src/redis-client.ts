@@ -207,13 +207,13 @@ class RedisClient {
   /**
    * 代理方法：KEYS
    */
-  async keys(pattern) {
+  async keys(pattern: string) {
     if (this.resilientClient.client && !this.resilientClient.isDegraded) {
       return this.resilientClient.client.keys(pattern);
     }
     // 降级模式：从本地缓存匹配
     const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-    return Array.from(this.resilientClient.cache.keys()).filter(k => regex.test(k));
+    return (Array.from(this.resilientClient.cache.keys()) as string[]).filter(k => regex.test(k));
   }
 
   /**

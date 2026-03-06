@@ -14,6 +14,8 @@ import fs from 'fs/promises';
 import os from 'os';
 import Database from 'better-sqlite3';
 
+const DB = Database as unknown as { new (path: string): any };
+
 interface MediaGeneratorConfig {
   defaultProviders?: { image?: string; video?: string };
   providers?: Record<string, { type: string; url?: string; projectRoot?: string; apiKey?: string }>;
@@ -65,7 +67,7 @@ class MediaGenerator extends EventEmitter {
       fallback: { image: ['mock'], video: ['mock'], ...config.fallback }
     };
     
-    this.db = new Database(path.join(os.homedir(), '.openclaw/chat-data/messages.db'));
+    this.db = new DB(path.join(os.homedir(), '.openclaw/chat-data/messages.db'));
     this.mediaRoot = path.join(os.homedir(), '.openclaw/media');
   }
   

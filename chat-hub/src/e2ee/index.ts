@@ -236,13 +236,13 @@ export class E2EEncryptor {
       type: 'pkcs8'
     });
     
-    const sharedSecret = crypto.diffieHellman({
+    const sharedSecret = (crypto as any).diffieHellman({
       privateKey: myPrivateKey,
       publicKey: peerPublicKey
     });
     
     // 派生会话密钥
-    const sessionKey = crypto.createHash('sha256')
+    const sessionKey = (crypto.createHash as any)('sha256')
       .update(sharedSecret)
       .update(userId)
       .update(peerId)

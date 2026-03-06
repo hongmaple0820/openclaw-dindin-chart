@@ -56,7 +56,7 @@ function persistConfig() {
     const configPath = path.join(__dirname, '../config/local.json');
     
     // 读取现有配置
-    let existingConfig = {};
+    let existingConfig: Record<string, any> = {};
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, 'utf-8');
       existingConfig = JSON.parse(content);
@@ -1730,8 +1730,8 @@ app.post('/api/dingtalk/user', async (req, res) => {
 app.get('/api/dingtalk/config', (req, res) => {
   try {
     const mode = dingtalk.getSendingMode();
-    const groups = config.groups || {};
-    const users = config.users || {};
+    const groups = (config.groups || {}) as Record<string, any>;
+    const users = (config.users || {}) as Record<string, any>;
     
     res.json({
       success: true,

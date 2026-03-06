@@ -150,7 +150,7 @@ class TTSService {
     const voice = config.voice || 'nova';
     const model = 'tts-1'; // 或 tts-1-hd
 
-    const response = await axios({
+    const response = await (axios as any)({
       method: 'POST',
       url: 'https://api.openai.com/v1/audio/speech',
       headers: {
@@ -190,7 +190,7 @@ class TTSService {
 
     const voiceId = config.voice || '21m00Tcm4TlvDq8ikWAM'; // Rachel
 
-    const response = await axios({
+    const response = await (axios as any)({
       method: 'POST',
       url: `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       headers: {

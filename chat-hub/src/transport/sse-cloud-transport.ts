@@ -175,10 +175,10 @@ class SSECloudTransport extends Transport {
         message
       });
 
-      if (response.data.success) {
+      if ((response.data as any).success) {
         console.log(`[SSECloudTransport] 消息已发送`);
       } else {
-        throw new Error(response.data.error || '发送失败');
+        throw new Error((response.data as any).error || '发送失败');
       }
     } catch (error) {
       console.error('[SSECloudTransport] 发送消息失败:', (error as Error).message);
@@ -273,12 +273,12 @@ class SSECloudTransport extends Transport {
         conversationId
       });
 
-      if (response.data.success) {
+      if ((response.data as any).success) {
         this.subscriptions.add(conversationId);
         console.log(`[SSECloudTransport] 已订阅会话: ${conversationId}`);
         return true;
       } else {
-        throw new Error(response.data.error || '订阅失败');
+        throw new Error((response.data as any).error || '订阅失败');
       }
     } catch (error) {
       console.error('[SSECloudTransport] 订阅会话失败:', (error as Error).message);
@@ -300,7 +300,7 @@ class SSECloudTransport extends Transport {
         conversationId
       });
 
-      if (response.data.success) {
+      if ((response.data as any).success) {
         this.subscriptions.delete(conversationId);
         console.log(`[SSECloudTransport] 已取消订阅会话: ${conversationId}`);
         return true;
@@ -327,11 +327,11 @@ class SSECloudTransport extends Transport {
         message
       });
 
-      if (response.data.success) {
+      if ((response.data as any).success) {
         console.log(`[SSECloudTransport] 消息已发送到会话: ${conversationId}`);
         return true;
       } else {
-        throw new Error(response.data.error || '发送失败');
+        throw new Error((response.data as any).error || '发送失败');
       }
     } catch (error) {
       console.error('[SSECloudTransport] 发送消息到会话失败:', (error as Error).message);
@@ -376,7 +376,7 @@ class SSECloudTransport extends Transport {
         endpoint
       });
 
-      if (response.data.success) {
+      if ((response.data as any).success) {
         console.log(`[SSECloudTransport] 实例已注册: ${this.instanceId}`);
         return true;
       }

@@ -34,10 +34,12 @@ export interface PermissionRequest extends Request {
  * 从请求中获取 Agent ID
  */
 export function getAgentId(req: PermissionRequest): string | null {
+  const headerAgentId = req.headers['x-agent-id'];
+  const paramsAgentId = req.params.agentId;
   return req.user?.id || 
          req.agent?.id || 
-         (req.headers['x-agent-id'] as string) ||
-         req.params.agentId ||
+         (typeof headerAgentId === 'string' ? headerAgentId : headerAgentId?.[0]) ||
+         (typeof paramsAgentId === 'string' ? paramsAgentId : null) ||
          null;
 }
 

@@ -60,7 +60,7 @@ class MessageExportService {
    * 导出为 Markdown
    */
   exportMarkdown(messages, options = {}) {
-    const { title = '聊天记录', includeReactions = false } = options;
+    const { title = '聊天记录', includeReactions = false } = options as { title?: string; includeReactions?: boolean };
     
     let md = `# ${title}\n\n`;
     md += `> 导出时间：${new Date().toISOString()}\n`;
@@ -94,7 +94,7 @@ class MessageExportService {
    * 导出为 HTML
    */
   exportHTML(messages, options = {}) {
-    const { title = '聊天记录', includeReactions = false } = options;
+    const { title = '聊天记录', includeReactions = false } = options as { title?: string; includeReactions?: boolean };
     
     let html = `<!DOCTYPE html>
 <html lang="zh-CN">

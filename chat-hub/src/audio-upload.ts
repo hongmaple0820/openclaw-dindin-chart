@@ -21,6 +21,7 @@ class AudioUploadService {
   allowedMimeTypes: string[];
   allowedExtensions: string[];
   maxFileSize: number;
+  conversionConfig: { amrToMp3: { bitrate: string; sampleRate: number; channels: number } };
 
   constructor() {
     // 从配置文件获取存储路径

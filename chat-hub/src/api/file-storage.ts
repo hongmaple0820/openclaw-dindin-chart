@@ -214,7 +214,7 @@ class LocalStorage extends BaseStorage {
     const chunkSize = end - start + 1;
     
     return {
-      stream: await fs.readFile(filePath, { start, end } as fs.BaseEncodingOptions & { start?: number; end?: number }),
+      stream: await fs.readFile(filePath, { start, end } as any),
       size: chunkSize,
       headers: {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -425,7 +425,7 @@ class StorageFactory {
     // ftp: FTPStorage
   };
 
-  static create(type: string, config: StorageProviderConfig = {}): BaseStorage {
+  static create(type: string, config: StorageProviderConfig = {} as StorageProviderConfig): BaseStorage {
     const ProviderClass = this.providers[type.toLowerCase()];
     
     if (!ProviderClass) {

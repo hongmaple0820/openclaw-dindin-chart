@@ -284,7 +284,7 @@ export class VectorMemoryStore extends EventEmitter {
   private async generateEmbedding(text: string): Promise<number[]> {
     // 简单的模拟实现：使用文本哈希生成伪向量
     // 实际项目中应调用 OpenAI text-embedding-3-small 或其他嵌入模型
-    const hash = crypto.createHash('sha256').update(text).digest();
+    const hash = (crypto.createHash as any)('sha256').update(text).digest() as Buffer;
     const embedding: number[] = [];
     
     for (let i = 0; i < this.config.embeddingDimension; i++) {

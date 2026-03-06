@@ -565,7 +565,7 @@ export class FeishuConnection extends BaseConnection {
    * 飞书使用 AES-256-CBC 加密
    */
   static decryptEvent(encryptKey: string, encryptedData: string): string {
-    const key = crypto.createHash('sha256').update(encryptKey).digest();
+    const key = (crypto.createHash as any)('sha256').update(encryptKey).digest();
     const iv = Buffer.from(encryptedData.slice(0, 16), 'base64');
     const encryptedBuffer = Buffer.from(encryptedData.slice(16), 'base64');
     

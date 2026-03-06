@@ -173,9 +173,9 @@ class CloudMarketService {
     
     // 检查去重
     const existing = this.db.prepare(`
-      SELECT id FROM cloud_skills 
+      SELECT id, author FROM cloud_skills 
       WHERE name = ? AND version = ? AND author = ?
-    `).get(name, version, author) as { id: string } | undefined;
+    `).get(name, version, author) as { id: string; author: string } | undefined;
     
     if (existing && existing.author !== userId) {
       // 别人已发布相同名称+版本的 Skill
