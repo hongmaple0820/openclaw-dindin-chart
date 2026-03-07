@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AgentCard: typeof import('./components/AgentCard.vue')['default']
     AgentConfig: typeof import('./components/AgentConfig.vue')['default']
+    ChatInput: typeof import('./components/ChatInput.vue')['default']
     CodeEditor: typeof import('./components/CodeEditor.vue')['default']
     CreateTask: typeof import('./components/CreateTask.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
@@ -49,6 +50,7 @@ declare module 'vue' {
     ElMenu: typeof import('element-plus/es')['ElMenu']
     ElMenuItem: typeof import('element-plus/es')['ElMenuItem']
     ElOption: typeof import('element-plus/es')['ElOption']
+    ElOptionGroup: typeof import('element-plus/es')['ElOptionGroup']
     ElPagination: typeof import('element-plus/es')['ElPagination']
     ElPopconfirm: typeof import('element-plus/es')['ElPopconfirm']
     ElPopover: typeof import('element-plus/es')['ElPopover']
@@ -63,7 +65,6 @@ declare module 'vue' {
     ElSlider: typeof import('element-plus/es')['ElSlider']
     ElStep: typeof import('element-plus/es')['ElStep']
     ElSteps: typeof import('element-plus/es')['ElSteps']
-    ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTable: typeof import('element-plus/es')['ElTable']
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']

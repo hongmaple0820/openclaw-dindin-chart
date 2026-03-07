@@ -2,7 +2,7 @@
  * 主动触发器初始化
  * 用于集成 ProactiveTrigger 到 server.js
  */
-const ProactiveTrigger = require('./character/proactive-trigger');
+const ProactiveTrigger = require('./character/proactive-trigger').default;
 
 // 创建触发器实例
 const proactiveTrigger = new ProactiveTrigger({

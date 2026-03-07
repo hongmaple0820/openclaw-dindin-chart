@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
-const TransportManager = require('./transport');
+const TransportManager = require('./transport').default;
 const messageStore = require('./message-store');
 const dingtalk = require('./dingtalk');
 const dmHandler = require('./dm-handler');
@@ -27,7 +27,7 @@ const transportManager = new TransportManager(config);
 messageRouter.setTransportManager(transportManager);
 
 // 主动触发器 - 早安/晚安/随机消息
-const ProactiveTrigger = require('./character/proactive-trigger');
+const ProactiveTrigger = require('./character/proactive-trigger').default;
 const proactiveTrigger = new ProactiveTrigger({
   enabled: true,
   timeTriggers: {

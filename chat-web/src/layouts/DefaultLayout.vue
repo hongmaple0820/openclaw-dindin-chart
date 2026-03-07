@@ -1,8 +1,8 @@
 <!--
-  默认布局组件 - 重构版
-  左边栏 + 顶部栏 + 内容区域 + 底部聊天框
+  默认布局组件 - 简洁版
+  左边栏 + 顶部栏 + 内容区域
   @author 小琳
-  @date 2026-03-05
+  @date 2026-03-07
 -->
 <template>
   <div class="layout" :class="{ 'sidebar-collapsed': settingsStore.sidebarCollapsed }">
@@ -88,39 +88,38 @@
             <el-icon><Setting /></el-icon>
             <template #title>设置</template>
           </el-menu-item>
-          
-          <!-- 管理员菜单 -->
-          <el-sub-menu index="admin" v-if="userStore.isLoggedIn && userStore.isAdmin">
-            <template #title>
-              <el-icon><DataBoard /></el-icon>
-              <span>管理</span>
-            </template>
-            <el-menu-item index="/observability">
-              <el-icon><DataAnalysis /></el-icon>
-              <template #title>可观测性</template>
-            </el-menu-item>
-            <el-menu-item index="/admin">
-              <el-icon><DataBoard /></el-icon>
-              <template #title>数据仪表盘</template>
-            </el-menu-item>
-            <el-menu-item index="/admin/users">
-              <el-icon><UserFilled /></el-icon>
-              <template #title>用户管理</template>
-            </el-menu-item>
-          </el-sub-menu>
         </el-menu>
       </el-scrollbar>
 
       <!-- 底部用户信息 -->
       <div class="sidebar-footer" v-if="userStore.isLoggedIn">
+        <!-- 管理员快捷入口 -->
+        <div class="admin-quick-entry" v-if="userStore.isAdmin && !settingsStore.sidebarCollapsed">
+          <el-button 
+            text 
+            class="admin-btn"
+            @click="router.push('/admin')"
+          >
+            <el-icon><DataBoard /></el-icon>
+            <span>管理后台</span>
+          </el-button>
+        </div>
+
+        <!-- 用户卡片 -->
         <el-dropdown trigger="click" placement="right-start">
           <div class="user-card" :class="{ collapsed: settingsStore.sidebarCollapsed }">
-            <el-avatar :size="36" :src="userStore.user?.avatar">
-              {{ userStore.nickname.charAt(0) }}
-            </el-avatar>
+            <div class="user-avatar-wrapper">
+              <el-avatar :size="36" :src="userStore.user?.avatar">
+                {{ userStore.nickname.charAt(0) }}
+              </el-avatar>
+              <span class="status-dot online"></span>
+            </div>
             <div class="user-info" v-show="!settingsStore.sidebarCollapsed || isMobile">
               <span class="username">{{ userStore.nickname }}</span>
-              <span class="user-status">在线</span>
+              <span class="user-status">
+                <span class="status-text">在线</span>
+                <el-tag v-if="userStore.isAdmin" size="small" type="danger" class="admin-tag">管理员</el-tag>
+              </span>
             </div>
           </div>
           <template #dropdown>
@@ -161,9 +160,6 @@
             <el-icon><ChatDotRound /></el-icon>
             <span>枫琳</span>
           </router-link>
-          
-          <!-- 当前页面标题 -->
-          <h2 class="page-title">{{ pageTitle }}</h2>
         </div>
 
         <div class="header-right">
@@ -175,13 +171,6 @@
           
           <!-- 已登录 -->
           <template v-else>
-            <!-- 设置按钮 -->
-            <el-tooltip content="设置" placement="bottom">
-              <el-button text @click="showSettingsPanel = true">
-                <el-icon :size="20"><Setting /></el-icon>
-              </el-button>
-            </el-tooltip>
-            
             <!-- 用户头像（桌面端） -->
             <el-dropdown trigger="click" class="user-dropdown">
               <div class="header-user">
@@ -224,49 +213,7 @@
           </transition>
         </router-view>
       </main>
-
-      </div>
-
-    <!-- 设置面板 -->
-    <el-drawer
-      v-model="showSettingsPanel"
-      title="设置"
-      direction="rtl"
-      size="360px"
-    >
-      <el-form label-position="top">
-        <el-form-item label="主题">
-          <el-radio-group v-model="themeSetting" @change="handleThemeChange">
-            <el-radio-button value="light">亮色</el-radio-button>
-            <el-radio-button value="dark">暗色</el-radio-button>
-            <el-radio-button value="system">跟随系统</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        
-        <el-form-item label="字体">
-          <el-select v-model="fontSetting" @change="handleFontChange" style="width: 100%">
-            <el-option
-              v-for="font in AVAILABLE_FONTS"
-              :key="font.value"
-              :label="font.label"
-              :value="font.value"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="字体大小">
-          <el-radio-group v-model="fontSizeSetting" @change="handleFontSizeChange">
-            <el-radio-button v-for="size in FONT_SIZES" :key="size.value" :value="size.value">
-              {{ size.label }}
-            </el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <el-button @click="showSettingsPanel = false">关闭</el-button>
-      </template>
-    </el-drawer>
+    </div>
   </div>
 </template>
 
@@ -276,12 +223,12 @@ import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useFriendStore } from '@/stores/friends';
 import { useGroupStore } from '@/stores/groups';
-import { useSettingsStore, AVAILABLE_FONTS, FONT_SIZES } from '@/stores/settings';
+import { useSettingsStore } from '@/stores/settings';
 import { ElMessage } from 'element-plus';
 import { 
   Menu, ChatDotRound, ArrowDown, User, UserFilled, 
   ChatLineSquare, SwitchButton, MagicStick, List, 
-  Setting, DataAnalysis, DataBoard, HomeFilled,
+  Setting, DataBoard, HomeFilled,
   Monitor, FolderOpened, DArrowLeft, DArrowRight
 } from '@element-plus/icons-vue';
 
@@ -295,23 +242,12 @@ const settingsStore = useSettingsStore();
 // 响应式状态
 const isMobile = ref(window.innerWidth < 768);
 const showMobileSidebar = ref(false);
-const showSettingsPanel = ref(false);
-
-// 设置本地状态
-const themeSetting = ref(settingsStore.theme);
-const fontSetting = ref(settingsStore.fontFamily);
-const fontSizeSetting = ref(settingsStore.fontSize);
 
 // 好友申请数量
 const pendingFriendRequests = computed(() => friendStore.pendingRequestCount);
 
 // 群聊未读数
 const groupUnreadCount = computed(() => groupStore.totalUnread);
-
-// 页面标题
-const pageTitle = computed(() => {
-  return route.meta.title || '枫琳';
-});
 
 // 监听窗口大小变化
 const handleResize = () => {
@@ -327,21 +263,6 @@ const handleMenuSelect = () => {
     showMobileSidebar.value = false;
   }
 };
-
-// 设置变更
-const handleThemeChange = (value) => {
-  settingsStore.setTheme(value);
-};
-
-const handleFontChange = (value) => {
-  settingsStore.setFontFamily(value);
-};
-
-const handleFontSizeChange = (value) => {
-  settingsStore.setFontSize(value);
-};
-
-
 
 // 退出登录
 const handleLogout = async () => {
@@ -465,33 +386,79 @@ watch(() => route.path, () => {
 }
 
 .sidebar-footer {
-  padding: 16px;
+  padding: 12px;
   border-top: 1px solid var(--fenlin-border, #E0E0E0);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* 管理员快捷入口 */
+.admin-quick-entry {
+  background: rgba(196, 30, 58, 0.05);
+  border-radius: var(--fenlin-radius-md, 12px);
+  overflow: hidden;
+}
+
+.admin-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--fenlin-primary, #C41E3A);
+  font-weight: 500;
+  justify-content: flex-start;
+}
+
+/* 用户卡片 */
 .user-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: var(--fenlin-radius-md, 12px);
   cursor: pointer;
   transition: var(--fenlin-transition, all 0.3s ease);
-}
-
-.user-card:hover {
   background: var(--fenlin-bg, #FAFAFA);
 }
 
+.user-card:hover {
+  background: rgba(196, 30, 58, 0.05);
+}
+
 .user-card.collapsed {
-  padding: 8px;
+  padding: 10px;
   justify-content: center;
+  background: transparent;
+}
+
+.user-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: var(--fenlin-text-tertiary, #9E9E9E);
+}
+
+.status-dot.online {
+  background: var(--fenlin-accent, #228B22);
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .username {
@@ -504,8 +471,21 @@ watch(() => route.path, () => {
 }
 
 .user-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
+}
+
+.status-text {
   color: var(--fenlin-accent, #228B22);
+}
+
+.admin-tag {
+  font-size: 10px;
+  padding: 0 4px;
+  height: 16px;
+  line-height: 16px;
 }
 
 /* 主容器 */
@@ -550,13 +530,6 @@ watch(() => route.path, () => {
   text-decoration: none;
 }
 
-.page-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--fenlin-text-primary, #2C3E50);
-  margin: 0;
-}
-
 .header-right {
   display: flex;
   align-items: center;
@@ -585,7 +558,7 @@ watch(() => route.path, () => {
 .content {
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: 0;
 }
 
 /* 页面切换动画 */
@@ -646,16 +619,12 @@ watch(() => route.path, () => {
     display: flex;
   }
   
-  .page-title {
-    display: none;
-  }
-  
   .header-user .username {
     display: none;
   }
   
   .content {
-    padding: 16px;
+    padding: 0;
   }
 }
 
@@ -683,5 +652,23 @@ watch(() => route.path, () => {
 :root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item:hover),
 :root[data-theme="dark"] .sidebar-menu :deep(.el-menu-item.is-active) {
   background: rgba(196, 30, 58, 0.2);
+}
+
+/* 暗色主题 - 管理员菜单 */
+:root[data-theme="dark"] .admin-quick-entry {
+  background: rgba(196, 30, 58, 0.1);
+}
+
+/* 暗色主题 - 用户卡片 */
+:root[data-theme="dark"] .user-card {
+  background: var(--fenlin-surface, #242424);
+}
+
+:root[data-theme="dark"] .user-card:hover {
+  background: rgba(196, 30, 58, 0.1);
+}
+
+:root[data-theme="dark"] .status-dot {
+  border-color: var(--fenlin-surface, #242424);
 }
 </style>

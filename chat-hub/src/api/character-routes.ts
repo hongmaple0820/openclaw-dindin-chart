@@ -6,10 +6,10 @@
 import express, { Request, Response, Router } from 'express';
 
 // CommonJS module imports
-const CharacterManager = require('../character/character-manager');
-const RelationshipManager = require('../character/relationship-manager');
-const MemoryManager = require('../character/memory-manager');
-const EmotionDetector = require('../character/emotion-detector');
+const CharacterManager = require('../character/character-manager').default;
+const RelationshipManager = require('../character/relationship-manager').RelationshipManager;
+const MemoryManager = require('../character/memory-manager').default;
+const EmotionDetector = require('../character/emotion-detector').default;
 
 const router: Router = express.Router();
 
@@ -839,4 +839,6 @@ router.put('/triggers/toggle', (req: Request, res: Response) => {
   }
 });
 
-export default router;
+module.exports = router;
+
+export {};

@@ -56,9 +56,15 @@
         <el-icon><Star /></el-icon>
         {{ formatNumber(agent.starCount || 0) }}
       </span>
-      <span class="stat-item" v-if="agent.model">
+      <span class="stat-item" v-if="agent.provider">
+        <span class="provider-tag" :class="agent.provider">
+          {{ getProviderIcon(agent.provider) }}
+        </span>
+        {{ getProviderShortName(agent.provider) }}
+      </span>
+      <span class="stat-item" v-else-if="agent.model">
         <el-icon><Cpu /></el-icon>
-        {{ agent.model }}
+        {{ formatModel(agent.model) }}
       </span>
     </div>
     
@@ -167,6 +173,36 @@ function formatNumber(num) {
     return (num / 1000).toFixed(1) + 'k';
   }
   return num;
+}
+
+// 供应商信息
+const providerInfo = {
+  openai: { name: 'OpenAI', shortName: 'OpenAI', icon: '🟢' },
+  anthropic: { name: 'Anthropic', shortName: 'Claude', icon: '🟠' },
+  google: { name: 'Google', shortName: 'Gemini', icon: '🔵' },
+  alibaba: { name: '阿里云', shortName: '通义', icon: '🟣' },
+  zhipu: { name: '智谱 AI', shortName: 'GLM', icon: '🔴' },
+  deepseek: { name: 'DeepSeek', shortName: 'DeepSeek', icon: '🟡' },
+  baichuan: { name: '百川', shortName: '百川', icon: '⚪' },
+  moonshot: { name: '月之暗面', shortName: 'Kimi', icon: '🌙' },
+  local: { name: '本地模型', shortName: '本地', icon: '💻' },
+  custom: { name: '自定义', shortName: '自定义', icon: '⚙️' }
+};
+
+function getProviderIcon(provider) {
+  return providerInfo[provider]?.icon || '❓';
+}
+
+function getProviderShortName(provider) {
+  return providerInfo[provider]?.shortName || provider;
+}
+
+function formatModel(model) {
+  // 截断过长的模型名称
+  if (model && model.length > 15) {
+    return model.substring(0, 12) + '...';
+  }
+  return model;
 }
 
 // 处理命令
@@ -305,6 +341,18 @@ function handleCommand(cmd) {
   align-items: center;
   gap: 4px;
 }
+
+.provider-tag {
+  font-size: 10px;
+}
+
+.provider-tag.openai { color: #10a37f; }
+.provider-tag.anthropic { color: #d97706; }
+.provider-tag.google { color: #4285f4; }
+.provider-tag.alibaba { color: #ff6a00; }
+.provider-tag.zhipu { color: #e53935; }
+.provider-tag.deepseek { color: #f59e0b; }
+.provider-tag.local { color: #6366f1; }
 
 .card-actions {
   display: flex;

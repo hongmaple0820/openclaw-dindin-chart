@@ -2,6 +2,7 @@
   任务详情页面
   @author 小琳
   @date 2026-03-04
+  @update 移除优先级，添加标题编辑功能，实时状态显示
 -->
 <template>
   <div class="task-detail" v-loading="loading">
@@ -19,8 +20,7 @@
             <el-button :icon="More">更多</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="edit" :icon="Edit">编辑</el-dropdown-item>
-                <el-dropdown-item command="delete" :icon="Delete" divided>删除</el-dropdown-item>
+                <el-dropdown-item command="delete" :icon="Delete">删除</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -31,16 +31,62 @@
       <div class="detail-content">
         <!-- 标题和状态 -->
         <div class="title-section">
-          <h2>{{ task.title }}</h2>
+          <div class="title-row">
+            <template v-if="isEditingTitle">
+              <el-input
+                ref="titleInputRef"
+                v-model="editingTitle"
+                placeholder="输入任务标题"
+                class="title-input"
+                @blur="handleSaveTitle"
+                @keyup.enter="handleSaveTitle"
+                @keyup.escape="cancelEditTitle"
+              />
+            </template>
+            <template v-else>
+              <h2 class="task-title">{{ task.title }}</h2>
+              <el-button text :icon="Edit" @click="startEditTitle" size="small">编辑</el-button>
+            </template>
+          </div>
+          
           <div class="status-actions">
-            <el-select v-model="currentStatus" @change="handleStatusChange" size="small">
-              <el-option label="待处理" value="pending" />
-              <el-option label="进行中" value="in_progress" />
-              <el-option label="已完成" value="completed" />
-            </el-select>
-            <el-tag :type="priorityMap[task.priority]?.type" size="small">
-              {{ priorityMap[task.priority]?.label }}
-            </el-tag>
+            <!-- 实时状态选择 -->
+            <div class="status-selector">
+              <span class="status-label">状态：</span>
+              <el-select 
+                v-model="currentStatus" 
+                @change="handleStatusChange" 
+                size="small"
+                :class="'status-' + currentStatus"
+              >
+                <el-option label="待处理" value="pending">
+                  <div class="status-option">
+                    <span class="status-dot pending"></span>
+                    待处理
+                  </div>
+                </el-option>
+                <el-option label="进行中" value="in_progress">
+                  <div class="status-option">
+                    <span class="status-dot in_progress"></span>
+                    进行中
+                  </div>
+                </el-option>
+                <el-option label="已完成" value="completed">
+                  <div class="status-option">
+                    <span class="status-dot completed"></span>
+                    已完成
+                  </div>
+                </el-option>
+              </el-select>
+              
+              <!-- 状态变更提示 -->
+              <transition name="fade">
+                <span v-if="statusChanged" class="status-changed-hint">
+                  <el-icon><Check /></el-icon>
+                  已更新
+                </span>
+              </transition>
+            </div>
           </div>
         </div>
         
@@ -228,11 +274,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   ArrowLeft, Star, More, Edit, Delete, User, Clock, Document,
-  List, ChatDotRound, Plus, Close
+  List, ChatDotRound, Plus, Close, Check
 } from '@element-plus/icons-vue';
 import { useTaskStore } from '@/stores/tasks';
 import { useFriendStore } from '@/stores/friends';
@@ -259,11 +305,13 @@ const newComment = ref('');
 const showAssigneeDialog = ref(false);
 const selectedAssignees = ref([]);
 
-const priorityMap = {
-  high: { label: '高优先级', type: 'danger' },
-  medium: { label: '中优先级', type: 'warning' },
-  low: { label: '低优先级', type: 'info' }
-};
+// 标题编辑相关
+const isEditingTitle = ref(false);
+const editingTitle = ref('');
+const titleInputRef = ref(null);
+
+// 状态变更提示
+const statusChanged = ref(false);
 
 const task = computed(() => taskStore.currentTask);
 const currentUserId = computed(() => userStore.user?.id);
@@ -292,6 +340,42 @@ async function loadTask() {
   }
 }
 
+// 开始编辑标题
+function startEditTitle() {
+  editingTitle.value = task.value?.title || '';
+  isEditingTitle.value = true;
+  nextTick(() => {
+    titleInputRef.value?.focus();
+  });
+}
+
+// 保存标题
+async function handleSaveTitle() {
+  const newTitle = editingTitle.value.trim();
+  if (!newTitle) {
+    ElMessage.warning('标题不能为空');
+    return;
+  }
+  
+  if (newTitle === task.value?.title) {
+    isEditingTitle.value = false;
+    return;
+  }
+  
+  const success = await taskStore.updateTask(props.taskId, { title: newTitle });
+  if (success) {
+    ElMessage.success('标题已更新');
+    emit('updated');
+  }
+  isEditingTitle.value = false;
+}
+
+// 取消编辑标题
+function cancelEditTitle() {
+  isEditingTitle.value = false;
+  editingTitle.value = '';
+}
+
 // 切换置顶
 async function handleTogglePin() {
   const success = await taskStore.togglePin(props.taskId);
@@ -305,7 +389,11 @@ async function handleTogglePin() {
 async function handleStatusChange(status) {
   const success = await taskStore.updateStatus(props.taskId, status);
   if (success) {
-    ElMessage.success('状态已更新');
+    // 显示更新提示
+    statusChanged.value = true;
+    setTimeout(() => {
+      statusChanged.value = false;
+    }, 2000);
     emit('updated');
   } else {
     currentStatus.value = task.value.status;
@@ -393,9 +481,7 @@ async function handleAddAssignees() {
 
 // 更多操作
 async function handleCommand(command) {
-  if (command === 'edit') {
-    ElMessage.info('编辑功能开发中');
-  } else if (command === 'delete') {
+  if (command === 'delete') {
     try {
       await ElMessageBox.confirm('确定要删除这个任务吗？', '删除任务', {
         type: 'warning'
@@ -440,6 +526,7 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--fenlin-surface, #fff);
 }
 
 .detail-container {
@@ -454,7 +541,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--fenlin-border, #f0f0f0);
 }
 
 .header-right {
@@ -472,16 +559,81 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.title-section h2 {
-  margin: 0 0 12px;
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.task-title {
+  margin: 0;
   font-size: 24px;
-  color: #303133;
+  color: var(--fenlin-text-primary, #303133);
+  flex: 1;
+}
+
+.title-input {
+  flex: 1;
 }
 
 .status-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.status-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-size: 14px;
+  color: var(--fenlin-text-secondary, #606266);
+}
+
+.status-changed-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #67c23a;
+}
+
+.status-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.pending {
+  background: #e6a23c;
+}
+
+.status-dot.in_progress {
+  background: #409eff;
+}
+
+.status-dot.completed {
+  background: #67c23a;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .info-section {
@@ -494,14 +646,14 @@ onMounted(() => {
   gap: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #606266;
+  color: var(--fenlin-text-secondary, #606266);
   margin-bottom: 12px;
 }
 
 .description {
   margin: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--fenlin-text-secondary, #606266);
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -517,7 +669,7 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 8px;
-  background: #f5f7fa;
+  background: var(--fenlin-bg-secondary, #f5f7fa);
   border-radius: 6px;
 }
 
@@ -531,12 +683,12 @@ onMounted(() => {
 .assignee-info .name {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: var(--fenlin-text-primary, #303133);
 }
 
 .assignee-info .role {
   font-size: 12px;
-  color: #909399;
+  color: var(--fenlin-text-tertiary, #909399);
 }
 
 .add-assignee-btn {
@@ -551,11 +703,11 @@ onMounted(() => {
 
 .time-item {
   font-size: 14px;
-  color: #606266;
+  color: var(--fenlin-text-secondary, #606266);
 }
 
 .time-item .label {
-  color: #909399;
+  color: var(--fenlin-text-tertiary, #909399);
 }
 
 .time-item .overdue {
@@ -573,27 +725,27 @@ onMounted(() => {
 .log-item {
   padding: 8px;
   border-left: 2px solid #409eff;
-  background: #f5f7fa;
+  background: var(--fenlin-bg-secondary, #f5f7fa);
   margin-bottom: 8px;
   border-radius: 4px;
 }
 
 .log-time {
   font-size: 12px;
-  color: #909399;
+  color: var(--fenlin-text-tertiary, #909399);
   margin-bottom: 4px;
 }
 
 .log-content {
   font-size: 14px;
-  color: #606266;
+  color: var(--fenlin-text-secondary, #606266);
 }
 
 .comment-item {
   display: flex;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--fenlin-border, #f0f0f0);
 }
 
 .comment-content {
@@ -610,18 +762,18 @@ onMounted(() => {
 .comment-header .author {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: var(--fenlin-text-primary, #303133);
 }
 
 .comment-header .time {
   font-size: 12px;
-  color: #909399;
+  color: var(--fenlin-text-tertiary, #909399);
 }
 
 .comment-content p {
   margin: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--fenlin-text-secondary, #606266);
   line-height: 1.5;
 }
 
@@ -646,7 +798,7 @@ onMounted(() => {
     padding: 12px;
   }
   
-  .title-section h2 {
+  .task-title {
     font-size: 20px;
   }
 }

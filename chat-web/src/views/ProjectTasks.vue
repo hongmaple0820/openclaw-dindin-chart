@@ -2,6 +2,7 @@
   项目群任务看板页面
   @author 小琳
   @date 2026-03-03
+  @update 移除优先级筛选，添加底部快速添加任务输入框
 -->
 <template>
   <div class="project-tasks">
@@ -15,10 +16,10 @@
           clearable
           style="width: 200px"
         />
-        <el-select v-model="priorityFilter" placeholder="优先级" clearable size="small" style="width: 100px">
-          <el-option label="高" value="high" />
-          <el-option label="中" value="medium" />
-          <el-option label="低" value="low" />
+        <el-select v-model="statusFilter" placeholder="状态" clearable size="small" style="width: 120px">
+          <el-option label="待处理" value="pending" />
+          <el-option label="进行中" value="in_progress" />
+          <el-option label="已完成" value="completed" />
         </el-select>
       </div>
       <div class="toolbar-right">
@@ -38,8 +39,11 @@
         @dragover.prevent
         @drop="handleDrop($event, board.id)"
       >
-        <div class="column-header">
-          <h4>{{ board.name }}</h4>
+        <div class="column-header" :style="{ borderTopColor: board.color || '#409eff' }">
+          <div class="header-left">
+            <span class="column-dot" :style="{ background: board.color || '#409eff' }"></span>
+            <h4>{{ board.name }}</h4>
+          </div>
           <span class="task-count">{{ getTasksByBoard(board.id).length }}</span>
         </div>
         <div class="column-content">
@@ -55,85 +59,62 @@
       </div>
     </div>
 
+    <!-- 底部快速添加任务 -->
+    <div class="quick-add-task">
+      <el-input
+        v-model="quickTaskTitle"
+        placeholder="输入任务标题，按 Enter 快速创建..."
+        @keyup.enter="handleQuickAddTask"
+        clearable
+      >
+        <template #prepend>
+          <el-select v-model="quickTaskBoard" style="width: 120px" size="small">
+            <el-option
+              v-for="board in boards"
+              :key="board.id"
+              :label="board.name"
+              :value="board.id"
+            />
+          </el-select>
+        </template>
+        <template #append>
+          <el-button type="primary" @click="handleQuickAddTask" :loading="quickAdding">
+            添加
+          </el-button>
+        </template>
+      </el-input>
+    </div>
+
     <!-- 创建任务弹窗 -->
     <CreateTask
       v-model="showCreateTask"
       :project-id="projectId"
       :boards="boards"
+      :members="members"
       @created="handleTaskCreated"
     />
 
     <!-- 任务详情抽屉 -->
-    <el-drawer v-model="showTaskDetail" title="任务详情" size="400px">
-      <div class="task-detail" v-if="currentTask">
-        <div class="detail-section">
-          <h3>{{ currentTask.title }}</h3>
-          <el-tag :type="priorityMap[currentTask.priority]?.type" size="small">
-            {{ priorityMap[currentTask.priority]?.label }}
-          </el-tag>
-        </div>
-
-        <div class="detail-section">
-          <label>描述</label>
-          <p>{{ currentTask.description || '暂无描述' }}</p>
-        </div>
-
-        <div class="detail-section">
-          <label>负责人</label>
-          <div class="assignee">
-            <el-avatar :size="24" :src="currentTask.assignee?.avatar">
-              {{ currentTask.assignee?.nickname?.[0] }}
-            </el-avatar>
-            <span>{{ currentTask.assignee?.nickname || '未分配' }}</span>
-          </div>
-        </div>
-
-        <div class="detail-section">
-          <label>截止日期</label>
-          <p>{{ currentTask.dueDate ? formatDate(currentTask.dueDate) : '未设置' }}</p>
-        </div>
-
-        <div class="detail-section">
-          <label>评论</label>
-          <div class="comments">
-            <div v-for="comment in currentTask.comments" :key="comment.id" class="comment">
-              <el-avatar :size="24" :src="comment.user?.avatar">
-                {{ comment.user?.nickname?.[0] }}
-              </el-avatar>
-              <div class="comment-content">
-                <span class="author">{{ comment.user?.nickname }}</span>
-                <span class="time">{{ formatDate(comment.createdAt) }}</span>
-                <p>{{ comment.content }}</p>
-              </div>
-            </div>
-          </div>
-          <el-input
-            v-model="newComment"
-            placeholder="添加评论"
-            @keyup.enter="handleAddComment"
-          >
-            <template #append>
-              <el-button @click="handleAddComment">发送</el-button>
-            </template>
-          </el-input>
-        </div>
-
-        <div class="detail-actions">
-          <el-button @click="handleEditTask">编辑</el-button>
-          <el-button type="danger" @click="handleDeleteTask">删除</el-button>
-        </div>
-      </div>
+    <el-drawer v-model="showTaskDetail" title="任务详情" size="450px">
+      <TaskDetail
+        v-if="currentTask"
+        :task-id="currentTask.id"
+        @close="showTaskDetail = false"
+        @updated="handleTaskUpdated"
+        @deleted="handleTaskDeleted"
+      />
     </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { Plus, Search } from '@element-plus/icons-vue';
 import { useProjectStore } from '@/stores/projects';
 import TaskCard from '@/components/TaskCard.vue';
 import CreateTask from '@/components/CreateTask.vue';
+import TaskDetail from './TaskDetail.vue';
 
 const props = defineProps({
   projectId: {
@@ -145,22 +126,21 @@ const props = defineProps({
 const projectStore = useProjectStore();
 
 const searchQuery = ref('');
-const priorityFilter = ref('');
+const statusFilter = ref('');
 const showCreateTask = ref(false);
 const showTaskDetail = ref(false);
 const currentTask = ref(null);
-const newComment = ref('');
 const draggedTask = ref(null);
+
+// 快速添加任务相关
+const quickTaskTitle = ref('');
+const quickTaskBoard = ref('');
+const quickAdding = ref(false);
 
 const boards = computed(() => projectStore.currentBoards);
 const tasks = computed(() => projectStore.currentTasks);
+const members = computed(() => projectStore.currentMembers);
 const loading = computed(() => projectStore.loading);
-
-const priorityMap = {
-  high: { label: '高优先级', type: 'danger' },
-  medium: { label: '中优先级', type: 'warning' },
-  low: { label: '低优先级', type: 'info' }
-};
 
 function getTasksByBoard(boardId) {
   let result = tasks.value.filter(t => t.boardId === boardId);
@@ -170,16 +150,11 @@ function getTasksByBoard(boardId) {
     result = result.filter(t => t.title.toLowerCase().includes(query));
   }
   
-  if (priorityFilter.value) {
-    result = result.filter(t => t.priority === priorityFilter.value);
+  if (statusFilter.value) {
+    result = result.filter(t => t.status === statusFilter.value);
   }
   
   return result;
-}
-
-function formatDate(date) {
-  if (!date) return '';
-  return new Date(date).toLocaleDateString('zh-CN');
 }
 
 function openTaskDetail(task) {
@@ -189,6 +164,17 @@ function openTaskDetail(task) {
 
 function handleTaskCreated() {
   showCreateTask.value = false;
+}
+
+function handleTaskUpdated() {
+  // 刷新任务列表
+  projectStore.fetchTasks(props.projectId);
+}
+
+function handleTaskDeleted() {
+  showTaskDetail.value = false;
+  currentTask.value = null;
+  projectStore.fetchTasks(props.projectId);
 }
 
 async function handleDragStart(event, task) {
@@ -212,37 +198,45 @@ async function handleDrop(event, boardId) {
   draggedTask.value = null;
 }
 
-function handleEditTask() {
-  // TODO: 打开编辑任务弹窗
-}
-
-async function handleDeleteTask() {
-  try {
-    await ElMessageBox.confirm('确定要删除这个任务吗？', '删除任务', { type: 'warning' });
-    const success = await projectStore.deleteTask(props.projectId, currentTask.value.id);
-    if (success) {
-      ElMessage.success('任务已删除');
-      showTaskDetail.value = false;
-    }
-  } catch {
-    // 取消
+// 快速添加任务
+async function handleQuickAddTask() {
+  if (!quickTaskTitle.value.trim()) {
+    ElMessage.warning('请输入任务标题');
+    return;
   }
-}
-
-async function handleAddComment() {
-  if (!newComment.value.trim()) return;
   
-  const comment = await projectStore.addComment(props.projectId, currentTask.value.id, newComment.value);
-  if (comment) {
-    newComment.value = '';
+  if (!quickTaskBoard.value && boards.value.length > 0) {
+    quickTaskBoard.value = boards.value[0].id;
+  }
+  
+  quickAdding.value = true;
+  
+  try {
+    const task = await projectStore.createTask(props.projectId, {
+      title: quickTaskTitle.value.trim(),
+      boardId: quickTaskBoard.value
+    });
+    
+    if (task) {
+      ElMessage.success('任务创建成功');
+      quickTaskTitle.value = '';
+    }
+  } finally {
+    quickAdding.value = false;
   }
 }
 
 async function loadData() {
   await Promise.all([
     projectStore.fetchBoards(props.projectId),
-    projectStore.fetchTasks(props.projectId)
+    projectStore.fetchTasks(props.projectId),
+    projectStore.fetchMembers(props.projectId)
   ]);
+  
+  // 设置默认看板
+  if (boards.value.length > 0 && !quickTaskBoard.value) {
+    quickTaskBoard.value = boards.value[0].id;
+  }
 }
 
 watch(() => props.projectId, loadData, { immediate: true });
@@ -253,11 +247,13 @@ watch(() => props.projectId, loadData, { immediate: true });
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--fenlin-bg, #f5f7fa);
 }
 
 .tasks-toolbar {
   padding: 12px 16px;
-  border-bottom: 1px solid #e4e7ed;
+  background: var(--fenlin-surface, #fff);
+  border-bottom: 1px solid var(--fenlin-border, #e4e7ed);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -274,37 +270,55 @@ watch(() => props.projectId, loadData, { immediate: true });
   gap: 16px;
   padding: 16px;
   overflow-x: auto;
+  overflow-y: auto;
 }
 
 .board-column {
   flex: 0 0 280px;
-  background: #f5f7fa;
+  background: var(--fenlin-surface, #fff);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   max-height: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .column-header {
-  padding: 12px;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e4e7ed;
+  border-top: 3px solid #409eff;
+  border-radius: 8px 8px 0 0;
+  background: var(--fenlin-surface, #fff);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 .column-header h4 {
   margin: 0;
   font-size: 14px;
-  color: #303133;
+  font-weight: 600;
+  color: var(--fenlin-text-primary, #303133);
 }
 
 .task-count {
-  background: #e4e7ed;
+  background: var(--fenlin-bg-secondary, #e4e7ed);
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 12px;
-  color: #606266;
+  color: var(--fenlin-text-secondary, #606266);
+  font-weight: 500;
 }
 
 .column-content {
@@ -314,78 +328,36 @@ watch(() => props.projectId, loadData, { immediate: true });
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 100px;
 }
 
-.task-detail {
-  padding: 0 16px;
+/* 底部快速添加任务 */
+.quick-add-task {
+  padding: 12px 16px;
+  background: var(--fenlin-surface, #fff);
+  border-top: 1px solid var(--fenlin-border, #e4e7ed);
 }
 
-.detail-section {
-  margin-bottom: 20px;
+.quick-add-task :deep(.el-input-group__prepend) {
+  background: var(--fenlin-bg-secondary, #f5f7fa);
 }
 
-.detail-section h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  color: #303133;
+.quick-add-task :deep(.el-input__wrapper) {
+  background: var(--fenlin-bg, #f5f7fa);
 }
 
-.detail-section label {
-  display: block;
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 8px;
+/* 暗黑模式 */
+[data-theme="dark"] .project-tasks {
+  background: var(--fenlin-bg);
 }
 
-.detail-section p {
-  margin: 0;
-  font-size: 14px;
-  color: #303133;
+[data-theme="dark"] .tasks-toolbar,
+[data-theme="dark"] .quick-add-task {
+  background: var(--fenlin-surface);
+  border-color: var(--fenlin-border);
 }
 
-.assignee {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.comments {
-  max-height: 200px;
-  overflow-y: auto;
-  margin-bottom: 12px;
-}
-
-.comment {
-  display: flex;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.comment-content {
-  flex: 1;
-}
-
-.comment-content .author {
-  font-weight: 500;
-  color: #303133;
-}
-
-.comment-content .time {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-}
-
-.comment-content p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #606266;
-}
-
-.detail-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 20px;
+[data-theme="dark"] .board-column {
+  background: var(--fenlin-surface);
 }
 </style>

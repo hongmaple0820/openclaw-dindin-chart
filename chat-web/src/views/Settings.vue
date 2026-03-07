@@ -72,7 +72,7 @@ onUnmounted(() => {
 .settings-page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 16px;
 }
 
 .settings-card {
@@ -84,7 +84,7 @@ onUnmounted(() => {
 .settings-card :deep(.el-card__header) {
   background: linear-gradient(135deg, rgba(196, 30, 58, 0.05) 0%, rgba(212, 160, 23, 0.05) 100%);
   border-bottom: 2px solid rgba(196, 30, 58, 0.1);
-  padding: 20px 24px;
+  padding: 16px 20px;
 }
 
 .card-header {
@@ -99,7 +99,7 @@ onUnmounted(() => {
   gap: 8px;
   font-weight: 600;
   color: var(--fenlin-text-primary, #2C3E50);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .card-header .title .el-icon {
@@ -146,15 +146,15 @@ onUnmounted(() => {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .settings-page {
-    padding: 16px;
+    padding: 12px;
   }
 
   .settings-card :deep(.el-card__header) {
-    padding: 16px;
+    padding: 12px 16px;
   }
 
   .card-header .title {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .settings-tabs :deep(.el-tabs__item) {

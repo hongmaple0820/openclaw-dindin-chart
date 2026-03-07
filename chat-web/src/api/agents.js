@@ -2,6 +2,7 @@
  * Agent 管理 API
  * @author 小琳
  * @date 2026-03-04
+ * @updated 2026-03-07 - 添加供应商字段支持、自动接入功能
  */
 import api from './index';
 
@@ -76,7 +77,28 @@ export const agentsApi = {
   test: (id, input) => api.post(`/agents/${id}/test`, { input }),
   
   // 获取 Agent 统计
-  getStats: (id) => api.get(`/agents/${id}/stats`)
+  getStats: (id) => api.get(`/agents/${id}/stats`),
+  
+  // ====== 自动接入相关 API ======
+  
+  // 获取可导入的 Agent 列表
+  getAvailableForImport: (serverUrl, token) => 
+    api.post('/agents/import/available', { serverUrl, token }),
+  
+  // 导入 Agent（自动接入）
+  importAgents: (data) => api.post('/agents/import', data),
+  
+  // 生成 Skill 文件
+  generateSkill: (agentId) => api.post(`/agents/${agentId}/generate-skill`),
+  
+  // 批量生成 Skill 文件
+  generateSkills: (agentIds) => api.post('/agents/generate-skills', { agentIds }),
+  
+  // 获取供应商列表
+  getProviders: () => api.get('/agents/providers'),
+  
+  // 获取供应商模型列表
+  getProviderModels: (provider) => api.get(`/agents/providers/${provider}/models`)
 };
 
 export default agentsApi;

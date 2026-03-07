@@ -73,7 +73,7 @@
     <!-- 实时预览 -->
     <div class="setting-section preview-section">
       <h3 class="section-title">实时预览</h3>
-      <div class="preview-container" :class="[settings.themeMode, 'accent-' + settings.accentColor]">
+      <div class="preview-container" :class="[actualTheme, 'accent-' + settings.accentColor]">
         <div class="preview-header">
           <div class="preview-avatar"></div>
           <div class="preview-info">
@@ -105,25 +105,28 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, reactive, onMounted, watch, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Check } from '@element-plus/icons-vue';
+import { useSettingsStore, THEME_LIGHT, THEME_DARK, THEME_SYSTEM, AVAILABLE_FONTS, FONT_SIZES } from '@/stores/settings';
+
+const settingsStore = useSettingsStore();
 
 // 主题模式选项
 const themeModes = [
-  { value: 'light', label: '明亮', icon: '☀️' },
-  { value: 'dark', label: '暗黑', icon: '🌙' },
-  { value: 'auto', label: '跟随系统', icon: '🖥️' }
+  { value: THEME_LIGHT, label: '明亮', icon: '☀️' },
+  { value: THEME_DARK, label: '暗黑', icon: '🌙' },
+  { value: THEME_SYSTEM, label: '跟随系统', icon: '🖥️' }
 ];
 
-// 字体大小标记
-const fontSizeMarks = {
-  12: '12px',
-  14: '14px',
-  16: '16px',
-  18: '18px',
-  20: '20px'
-};
+// 字体大小标记 - 从 FONT_SIZES 生成
+const fontSizeMarks = computed(() => {
+  const marks = {};
+  FONT_SIZES.forEach(s => {
+    marks[parseInt(s.size)] = s.label;
+  });
+  return marks;
+});
 
 // 强调色选项
 const accentColors = [
@@ -135,86 +138,134 @@ const accentColors = [
   { value: 'rose', label: '玫瑰粉', gradient: 'linear-gradient(135deg, #C2185B 0%, #F06292 100%)' }
 ];
 
-// 设置状态
+// 设置状态 - 使用 settingsStore
 const saving = ref(false);
 const settings = reactive({
-  themeMode: 'light',
-  fontSize: 14,
+  themeMode: settingsStore.theme,
+  fontSize: parseInt(FONT_SIZES.find(s => s.value === settingsStore.fontSize)?.size || '16'),
   accentColor: 'maple'
+});
+
+// 监听 settingsStore 变化，同步到本地 settings
+watch(() => settingsStore.theme, (newTheme) => {
+  settings.themeMode = newTheme;
+});
+
+watch(() => settingsStore.fontSize, (newSize) => {
+  const sizeConfig = FONT_SIZES.find(s => s.value === newSize);
+  if (sizeConfig) {
+    settings.fontSize = parseInt(sizeConfig.size);
+  }
+});
+
+// 计算实际应用的主题
+const actualTheme = computed(() => {
+  if (settings.themeMode === THEME_SYSTEM) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? THEME_DARK : THEME_LIGHT;
+  }
+  return settings.themeMode;
 });
 
 // 默认设置
 const defaultSettings = {
-  themeMode: 'light',
-  fontSize: 14,
+  themeMode: THEME_SYSTEM,
+  fontSize: 16,
   accentColor: 'maple'
 };
 
 // 加载设置
 const loadSettings = () => {
+  // 主题和字体从 settingsStore 加载
+  settings.themeMode = settingsStore.theme;
+  const sizeConfig = FONT_SIZES.find(s => s.value === settingsStore.fontSize);
+  if (sizeConfig) {
+    settings.fontSize = parseInt(sizeConfig.size);
+  }
+  
+  // 强调色从本地存储加载
   try {
-    const saved = localStorage.getItem('themeSettings');
+    const saved = localStorage.getItem('fenlin_themeSettings');
     if (saved) {
       const parsed = JSON.parse(saved);
-      Object.assign(settings, parsed);
-      applySettings();
+      if (parsed.accentColor) {
+        settings.accentColor = parsed.accentColor;
+      }
     }
   } catch (error) {
     console.error('加载设置失败:', error);
   }
+  
+  // 立即应用设置
+  applySettings();
 };
 
 // 应用设置
 const applySettings = () => {
-  // 应用主题模式
-  const root = document.documentElement;
-  if (settings.themeMode === 'dark') {
-    root.classList.add('dark-theme');
-    root.classList.remove('light-theme');
-  } else if (settings.themeMode === 'light') {
-    root.classList.add('light-theme');
-    root.classList.remove('dark-theme');
-  } else {
-    // 跟随系统
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (isDark) {
-      root.classList.add('dark-theme');
-      root.classList.remove('light-theme');
-    } else {
-      root.classList.add('light-theme');
-      root.classList.remove('dark-theme');
-    }
+  // 使用 settingsStore 的方法应用主题
+  settingsStore.setTheme(settings.themeMode);
+  
+  // 应用字体大小 - 转换像素值到枚举值
+  const sizeConfig = FONT_SIZES.find(s => parseInt(s.size) === settings.fontSize);
+  if (sizeConfig) {
+    settingsStore.setFontSize(sizeConfig.value);
   }
 
-  // 应用字体大小
-  root.style.setProperty('--base-font-size', settings.fontSize + 'px');
-
-  // 应用强调色
-  root.setAttribute('data-accent', settings.accentColor);
+  // 应用强调色到 CSS 变量
+  document.documentElement.setAttribute('data-accent', settings.accentColor);
+  
+  // 根据强调色设置 CSS 变量
+  const accentColorMap = {
+    maple: { primary: '#C41E3A', light: '#E63950' },
+    ocean: { primary: '#1E88E5', light: '#42A5F5' },
+    forest: { primary: '#43A047', light: '#66BB6A' },
+    sunset: { primary: '#F57C00', light: '#FFB74D' },
+    lavender: { primary: '#7B1FA2', light: '#AB47BC' },
+    rose: { primary: '#C2185B', light: '#F06292' }
+  };
+  
+  const colors = accentColorMap[settings.accentColor] || accentColorMap.maple;
+  document.documentElement.style.setProperty('--fenlin-primary', colors.primary);
+  document.documentElement.style.setProperty('--fenlin-primary-light', colors.light);
+  document.documentElement.style.setProperty('--fenlin-gradient-primary', `linear-gradient(135deg, ${colors.primary} 0%, ${colors.light} 100%)`);
+  
+  // 保存强调色到 localStorage
+  localStorage.setItem('fenlin_themeSettings', JSON.stringify({
+    accentColor: settings.accentColor
+  }));
 };
 
 // 设置主题模式
 const setThemeMode = (mode) => {
   settings.themeMode = mode;
-  applySettings();
+  settingsStore.setTheme(mode);
+  // 立即显示成功提示
+  ElMessage.success(`已切换到${themeModes.find(m => m.value === mode)?.label}模式`);
 };
 
 // 设置强调色
 const setAccentColor = (color) => {
   settings.accentColor = color;
+  // 立即应用并保存
   applySettings();
 };
 
 // 字体大小变化
-const handleFontSizeChange = () => {
-  applySettings();
+const handleFontSizeChange = (value) => {
+  const sizeConfig = FONT_SIZES.find(s => parseInt(s.size) === value);
+  if (sizeConfig) {
+    settingsStore.setFontSize(sizeConfig.value);
+  }
 };
 
 // 保存设置
 const saveSettings = async () => {
   saving.value = true;
   try {
-    localStorage.setItem('themeSettings', JSON.stringify(settings));
+    // 主题和字体已通过 settingsStore 自动保存
+    // 只需保存强调色
+    localStorage.setItem('themeSettings', JSON.stringify({
+      accentColor: settings.accentColor
+    }));
     applySettings();
     ElMessage.success('设置已保存');
   } catch (error) {
@@ -227,14 +278,20 @@ const saveSettings = async () => {
 // 恢复默认设置
 const resetSettings = () => {
   Object.assign(settings, defaultSettings);
+  settingsStore.setTheme(defaultSettings.themeMode);
+  const sizeConfig = FONT_SIZES.find(s => parseInt(s.size) === defaultSettings.fontSize);
+  if (sizeConfig) {
+    settingsStore.setFontSize(sizeConfig.value);
+  }
+  // 立即应用默认设置
   applySettings();
   ElMessage.info('已恢复默认设置');
 };
 
 // 监听系统主题变化
 const handleSystemThemeChange = (e) => {
-  if (settings.themeMode === 'auto') {
-    applySettings();
+  if (settings.themeMode === THEME_SYSTEM) {
+    settingsStore.applyTheme();
   }
 };
 
@@ -307,7 +364,7 @@ onMounted(() => {
   background: #1a1a2e;
 }
 
-.mode-preview.auto {
+.mode-preview.system {
   background: linear-gradient(135deg, #FAFAFA 50%, #1a1a2e 50%);
 }
 

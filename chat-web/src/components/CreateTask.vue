@@ -2,6 +2,7 @@
   创建任务弹窗组件
   @author 小琳
   @date 2026-03-03
+  @update 移除优先级字段（优先级仅用于项目群）
 -->
 <template>
   <el-dialog
@@ -9,10 +10,17 @@
     @update:model-value="$emit('update:modelValue', $event)"
     title="新建任务"
     width="500px"
+    :close-on-click-modal="false"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="标题" prop="title">
-        <el-input v-model="form.title" placeholder="任务标题" maxlength="100" show-word-limit />
+        <el-input 
+          v-model="form.title" 
+          placeholder="输入任务标题" 
+          maxlength="100" 
+          show-word-limit 
+          clearable
+        />
       </el-form-item>
 
       <el-form-item label="描述">
@@ -20,7 +28,7 @@
           v-model="form.description"
           type="textarea"
           :rows="3"
-          placeholder="任务描述"
+          placeholder="任务描述（可选）"
           maxlength="500"
         />
       </el-form-item>
@@ -36,31 +44,37 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="优先级">
-        <el-select v-model="form.priority" placeholder="选择优先级" style="width: 100%">
-          <el-option label="高" value="high" />
-          <el-option label="中" value="medium" />
-          <el-option label="低" value="low" />
-        </el-select>
-      </el-form-item>
-
       <el-form-item label="截止日期">
         <el-date-picker
           v-model="form.dueDate"
           type="date"
           placeholder="选择截止日期"
           style="width: 100%"
+          :disabled-date="disabledDate"
         />
       </el-form-item>
 
       <el-form-item label="负责人">
-        <el-input v-model="form.assigneeId" placeholder="用户ID（可选）" />
+        <el-select 
+          v-model="form.assigneeId" 
+          placeholder="选择负责人（可选）" 
+          style="width: 100%"
+          clearable
+          filterable
+        >
+          <el-option
+            v-for="member in members"
+            :key="member.id"
+            :label="member.nickname || member.username"
+            :value="member.id"
+          />
+        </el-select>
       </el-form-item>
     </el-form>
 
     <template #footer>
       <el-button @click="$emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" @click="handleSubmit" :loading="loading">创建</el-button>
+      <el-button type="primary" @click="handleSubmit" :loading="loading">创建任务</el-button>
     </template>
   </el-dialog>
 </template>
@@ -82,6 +96,10 @@ const props = defineProps({
   boards: {
     type: Array,
     default: () => []
+  },
+  members: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -95,18 +113,23 @@ const form = reactive({
   title: '',
   description: '',
   boardId: '',
-  priority: 'medium',
   dueDate: null,
   assigneeId: ''
 });
 
 const rules = {
   title: [
-    { required: true, message: '请输入任务标题', trigger: 'blur' }
+    { required: true, message: '请输入任务标题', trigger: 'blur' },
+    { min: 2, max: 100, message: '标题长度在 2 到 100 个字符', trigger: 'blur' }
   ],
   boardId: [
     { required: true, message: '请选择看板列', trigger: 'change' }
   ]
+};
+
+// 禁用过去的日期
+const disabledDate = (time) => {
+  return time.getTime() < Date.now() - 24 * 60 * 60 * 1000;
 };
 
 // 重置表单
@@ -133,7 +156,6 @@ async function handleSubmit() {
       title: form.title,
       description: form.description,
       boardId: form.boardId,
-      priority: form.priority,
       dueDate: form.dueDate?.toISOString() || null,
       assigneeId: form.assigneeId || null
     };
@@ -154,7 +176,6 @@ function resetForm() {
   form.title = '';
   form.description = '';
   form.boardId = props.boards[0]?.id || '';
-  form.priority = 'medium';
   form.dueDate = null;
   form.assigneeId = '';
 }
@@ -163,5 +184,9 @@ function resetForm() {
 <style scoped>
 .el-select {
   width: 100%;
+}
+
+:deep(.el-dialog__body) {
+  padding: 20px;
 }
 </style>

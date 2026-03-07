@@ -345,17 +345,15 @@ function formatDate(timestamp) {
 
 <style scoped>
 .friends-page {
-  height: calc(100vh - 120px);
-  padding: 20px;
+  height: calc(100vh - 56px);
+  padding: 0;
 }
 
 .friends-container {
   display: flex;
   height: 100%;
   background: white;
-  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(196, 30, 58, 0.08);
 }
 
 /* 左侧边栏 */
@@ -368,7 +366,7 @@ function formatDate(timestamp) {
 }
 
 .sidebar-header {
-  padding: 16px 20px;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -378,7 +376,7 @@ function formatDate(timestamp) {
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--fenlin-text-primary, #2C3E50);
 }
@@ -560,7 +558,7 @@ function formatDate(timestamp) {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .friends-page {
-    padding: 12px;
+    padding: 0;
   }
   
   .friends-container {
@@ -575,13 +573,9 @@ function formatDate(timestamp) {
   }
   
   .friend-detail {
-    height: 50%;
-    overflow-y: auto;
-  }
-}
-</style>
-  .friend-detail {
     width: 100%;
     height: 50%;
     padding: 16px;
   }
+}
+</style>

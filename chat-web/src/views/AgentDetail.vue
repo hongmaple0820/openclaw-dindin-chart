@@ -91,12 +91,21 @@
             <div class="stat-label">收藏数</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value">{{ fDate(agent.createdAt) }}</div>
+            <div class="stat-value">{{ formatDate(agent.createdAt) }}</div>
             <div class="stat-label">创建时间</div>
           </div>
           <div class="stat-item">
             <div class="stat-value">{{ formatDate(agent.lastUsedAt) || '未使用' }}</div>
             <div class="stat-label">最近使用</div>
+          </div>
+          <div class="stat-item" v-if="agent.provider">
+            <div class="stat-value">
+              <span class="provider-badge" :class="agent.provider">
+                {{ getProviderIcon(agent.provider) }}
+              </span>
+              {{ getProviderName(agent.provider) }}
+            </div>
+            <div class="stat-label">供应商</div>
           </div>
         </div>
       </el-card>
@@ -167,6 +176,12 @@
           </div>
         </template>
      <el-descriptions :column="2" border>
+          <el-descriptions-item label="供应商" v-if="agent.provider">
+            <span class="provider-tag" :class="agent.provider">
+              {{ getProviderIcon(agent.provider) }}
+              {{ getProviderName(agent.provider) }}
+            </span>
+          </el-descriptions-item>
           <el-descriptions-item label="模型">
             {{ agent.model || '-' }}
           </el-descriptions-item>
@@ -411,6 +426,7 @@ function exportConfig() {
     name: agent.value.name,
     nickname: agent.value.nickname,
     description: agent.value.description,
+    provider: agent.value.provider,
     model: agent.value.model,
     apiEndpoint: agent.value.apiEndpoint,
     temperature: agent.value.temperature,
@@ -456,6 +472,28 @@ async function deleteAgent() {
 function formatDate(timestamp) {
   if (!timestamp) return '';
   return new Date(timestamp).toLocaleString('zh-CN');
+}
+
+// 供应商信息
+const providerInfo = {
+  openai: { name: 'OpenAI', icon: '🟢' },
+  anthropic: { name: 'Anthropic', icon: '🟠' },
+  google: { name: 'Google', icon: '🔵' },
+  alibaba: { name: '阿里云', icon: '🟣' },
+  zhipu: { name: '智谱 AI', icon: '🔴' },
+  deepseek: { name: 'DeepSeek', icon: '🟡' },
+  baichuan: { name: '百川', icon: '⚪' },
+  moonshot: { name: '月之暗面', icon: '🌙' },
+  local: { name: '本地模型', icon: '💻' },
+  custom: { name: '自定义', icon: '⚙️' }
+};
+
+function getProviderName(provider) {
+  return providerInfo[provider]?.name || provider;
+}
+
+function getProviderIcon(provider) {
+  return providerInfo[provider]?.icon || '❓';
 }
 
 function getToolName(tool) {
@@ -565,6 +603,15 @@ onMounted(() => {
 .stat-item { text-align: center; }
 .stat-value { font-size: 20px; font-weight: 600; color: #303133; margin-bottom: 4px; }
 .stat-label { font-size: 13px; color: #909399; }
+.provider-badge { font-size: 14px; margin-right: 4px; }
+.provider-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
+.provider-tag.openai { background: #10a37f20; color: #10a37f; }
+.provider-tag.anthropic { background: #d9770620; color: #d97706; }
+.provider-tag.google { background: #4285f420; color: #4285f4; }
+.provider-tag.alibaba { background: #ff6a0020; color: #ff6a00; }
+.provider-tag.zhipu { background: #e5393520; color: #e53935; }
+.provider-tag.deepseek { background: #fbbf2420; color: #f59e0b; }
+.provider-tag.local { background: #6366f120; color: #6366f1; }
 .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .capability-section { margin-bottom: 20px; }
 .capability-section:last-child { margin-bottom: 0; }

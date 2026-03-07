@@ -9,10 +9,7 @@
       <!-- 会话列表 -->
       <div class="conversation-list">
         <div class="list-header">
-          <h3>私信</h3>
-          <el-button type="primary" size="small" @click="showNewDM = true">
-            <el-icon><Plus /></el-icon>
-          </el-button>
+          <span class="header-title">私信</span>
         </div>
         
         <div class="conversations">
@@ -83,29 +80,12 @@
         <el-empty description="选择一个会话开始聊天" />
       </div>
     </div>
-
-    <!-- 新建私信对话框 -->
-    <el-dialog v-model="showNewDM" title="发起私信" width="400px">
-      <el-form>
-        <el-form-item label="用户名">
-          <el-input v-model="newDMReceiver" placeholder="输入用户名或ID" />
-        </el-form-item>
-        <el-form-item label="消息">
-          <el-input v-model="newDMContent" type="textarea" :rows="3" placeholder="输入消息" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showNewDM = false">取消</el-button>
-        <el-button type="primary" @click="startNewDM" :loading="sending">发送</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, nextTick, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
 import { useUserStore } from '@/stores/user';
 import dmApi from '@/api/dm';
 
@@ -118,10 +98,6 @@ const messages = ref([]);
 const inputText = ref('');
 const sending = ref(false);
 const messagesRef = ref(null);
-
-const showNewDM = ref(false);
-const newDMReceiver = ref('');
-const newDMContent = ref('');
 
 // 加载会话列表
 async function loadConversations() {
@@ -184,37 +160,6 @@ async function sendMessage() {
   }
 }
 
-// 发起新私信
-async function startNewDM() {
-  if (!newDMReceiver.value.trim() || !newDMContent.value.trim()) {
-    ElMessage.warning('请填写完整信息');
-    return;
-  }
-
-  sending.value = true;
-  try {
-    const res = await dmApi.send({
-      receiverId: newDMReceiver.value.trim(),
-      receiverName: newDMReceiver.value.trim(),
-      content: newDMContent.value.trim()
-    });
-
-    if (res.success) {
-      ElMessage.success('发送成功');
-      showNewDM.value = false;
-      newDMReceiver.value = '';
-      newDMContent.value = '';
-      await loadConversations();
-    } else {
-      ElMessage.error(res.error || '发送失败');
-    }
-  } catch (error) {
-    ElMessage.error('发送失败');
-  } finally {
-    sending.value = false;
-  }
-}
-
 // 滚动到底部
 function scrollToBottom() {
   nextTick(() => {
@@ -245,36 +190,33 @@ onMounted(() => {
 
 <style scoped>
 .dm-page {
-  height: calc(100vh - 120px);
-  padding: 20px;
+  height: calc(100vh - 56px);
+  padding: 0;
 }
 
 .dm-container {
   display: flex;
   height: 100%;
   background: #fff;
-  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .conversation-list {
-  width: 300px;
+  width: 280px;
   border-right: 1px solid #e4e7ed;
   display: flex;
   flex-direction: column;
 }
 
 .list-header {
-  padding: 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e4e7ed;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
-.list-header h3 {
-  margin: 0;
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .conversations {
@@ -313,6 +255,7 @@ onMounted(() => {
 
 .partner-name {
   font-weight: 500;
+  font-size: 14px;
 }
 
 .time {
@@ -326,6 +269,7 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-top: 4px;
 }
 
 .unread-badge {
@@ -348,10 +292,10 @@ onMounted(() => {
 }
 
 .chat-header {
-  padding: 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e4e7ed;
   font-weight: 500;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .messages-container {
@@ -403,7 +347,7 @@ onMounted(() => {
 }
 
 .input-area {
-  padding: 16px;
+  padding: 12px 16px;
   border-top: 1px solid #e4e7ed;
   display: flex;
   gap: 12px;
@@ -418,5 +362,30 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+@media (max-width: 768px) {
+  .dm-page {
+    padding: 0;
+  }
+  
+  .conversation-list {
+    width: 100%;
+  }
+  
+  .chat-area {
+    display: none;
+  }
+  
+  .chat-area.mobile-show {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: #fff;
+  }
 }
 </style>

@@ -154,3 +154,164 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--fenlin-primary);
 }
+
+/* ==================== 暗黑主题 ==================== */
+[data-theme="dark"] {
+  /* 品牌主色 - 暗黑模式下稍微调亮 */
+  --fenlin-primary: #E63950;
+  --fenlin-primary-light: #FF6B7A;
+  --fenlin-primary-lighter: #FF8A96;
+  --fenlin-primary-dark: #C41E3A;
+  
+  /* 辅助色 */
+  --fenlin-secondary: #F5C842;
+  --fenlin-secondary-light: #FFE082;
+  --fenlin-secondary-lighter: #FFF3C4;
+  
+  /* 点缀色 */
+  --fenlin-accent: #32CD32;
+  --fenlin-accent-light: #90EE90;
+  --fenlin-accent-lighter: #C8F7C8;
+  
+  /* 中性色 - 暗黑模式 */
+  --fenlin-bg: #1a1a2e;
+  --fenlin-bg-secondary: #16213e;
+  --fenlin-surface: #0f0f23;
+  --fenlin-border: #2d2d44;
+  
+  /* 文字色 - 暗黑模式 */
+  --fenlin-text-primary: #E8E8E8;
+  --fenlin-text-secondary: #B0B0B0;
+  --fenlin-text-tertiary: #808080;
+  
+  /* 渐变 - 暗黑模式 */
+  --fenlin-gradient-primary: linear-gradient(135deg, #E63950 0%, #FF6B7A 100%);
+  --fenlin-gradient-warm: linear-gradient(135deg, #E63950 0%, #F5C842 100%);
+  --fenlin-gradient-nature: linear-gradient(135deg, #32CD32 0%, #F5C842 100%);
+  
+  /* 阴影 - 暗黑模式 */
+  --fenlin-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --fenlin-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --fenlin-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* 暗黑模式全局样式 */
+[data-theme="dark"] body {
+  background: var(--fenlin-bg);
+  color: var(--fenlin-text-primary);
+}
+
+/* 暗黑模式 Element Plus 覆盖 */
+[data-theme="dark"] .el-card,
+[data-theme="dark"] .el-dialog,
+[data-theme="dark"] .el-drawer,
+[data-theme="dark"] .el-message-box,
+[data-theme="dark"] .el-popover {
+  background: var(--fenlin-surface);
+  border-color: var(--fenlin-border);
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-input__wrapper,
+[data-theme="dark"] .el-textarea__inner,
+[data-theme="dark"] .el-select__wrapper {
+  background: var(--fenlin-bg-secondary);
+  border-color: var(--fenlin-border);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .el-input__inner,
+[data-theme="dark"] .el-textarea__inner {
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-input__inner::placeholder,
+[data-theme="dark"] .el-textarea__inner::placeholder {
+  color: var(--fenlin-text-tertiary);
+}
+
+[data-theme="dark"] .el-button {
+  --el-button-bg-color: var(--fenlin-bg-secondary);
+  --el-button-border-color: var(--fenlin-border);
+  --el-button-text-color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-button--primary {
+  --el-button-bg-color: var(--fenlin-primary);
+  --el-button-border-color: var(--fenlin-primary);
+}
+
+[data-theme="dark"] .el-menu {
+  background: var(--fenlin-surface);
+  border-color: var(--fenlin-border);
+}
+
+[data-theme="dark"] .el-menu-item,
+[data-theme="dark"] .el-sub-menu__title {
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-menu-item:hover,
+[data-theme="dark"] .el-sub-menu__title:hover {
+  background: var(--fenlin-bg-secondary);
+}
+
+[data-theme="dark"] .el-menu-item.is-active {
+  color: var(--fenlin-primary);
+  background: rgba(230, 57, 80, 0.1);
+}
+
+[data-theme="dark"] .el-table {
+  background: var(--fenlin-surface);
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-table th,
+[data-theme="dark"] .el-table td {
+  border-color: var(--fenlin-border);
+}
+
+[data-theme="dark"] .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--fenlin-bg-secondary);
+}
+
+[data-theme="dark"] .el-tag {
+  --el-tag-bg-color: var(--fenlin-bg-secondary);
+  --el-tag-border-color: var(--fenlin-border);
+  --el-tag-text-color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-dropdown-menu {
+  background: var(--fenlin-surface);
+  border-color: var(--fenlin-border);
+}
+
+[data-theme="dark"] .el-dropdown-menu__item {
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-dropdown-menu__item:hover {
+  background: var(--fenlin-bg-secondary);
+  color: var(--fenlin-primary);
+}
+
+[data-theme="dark"] .el-empty__description {
+  color: var(--fenlin-text-secondary);
+}
+
+[data-theme="dark"] .el-loading-mask {
+  background: rgba(15, 15, 35, 0.8);
+}
+
+[data-theme="dark"] .el-slider__runway {
+  background: var(--fenlin-border);
+}
+
+/* 暗黑模式滚动条 */
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--fenlin-bg-secondary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--fenlin-primary);
+}

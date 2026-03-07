@@ -347,43 +347,41 @@ function formatDate(timestamp) {
 
 <style scoped>
 .skills-page {
-  height: calc(100vh - 120px);
-  padding: 20px;
+  height: calc(100vh - 56px);
+  padding: 0;
 }
 
 .skills-container {
   display: flex;
   height: 100%;
   background: white;
-  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(196, 30, 58, 0.08);
 }
 
 /* 左侧边栏 */
 .skills-sidebar {
-  width: 380px;
+  width: 300px;
   border-right: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
-  background: #fafafa;
+  background: #fff;
 }
 
 .sidebar-header {
-  padding: 16px 20px;
+  padding: 8px 16px;
   border-bottom: 1px solid #f0f0f0;
   background: white;
 }
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--fenlin-text-primary, #2C3E50);
+  color: #303133;
 }
 
 :deep(.el-tabs) {
-  padding: 0 16px;
+  padding: 0 12px;
   background: white;
 }
 
@@ -392,8 +390,8 @@ function formatDate(timestamp) {
 }
 
 .search-wrapper {
-  padding: 12px 16px;
-  background: white;
+  padding: 8px 12px;
+  background: #fafafa;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -409,7 +407,7 @@ function formatDate(timestamp) {
   justify-content: center;
   gap: 8px;
   padding: 40px;
-  color: var(--fenlin-text-tertiary, #95A5A6);
+  color: #909399;
 }
 
 .empty-skills {
@@ -419,7 +417,7 @@ function formatDate(timestamp) {
 /* 右侧详情 */
 .skill-detail {
   flex: 1;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -428,19 +426,19 @@ function formatDate(timestamp) {
 .detail-header {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .skill-icon-large {
   flex-shrink: 0;
-  width: 80px;
-  height: 80px;
-  border-radius: 16px;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
   background: linear-gradient(135deg, rgba(196, 30, 58, 0.1) 0%, rgba(196, 30, 58, 0.05) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
+  font-size: 32px;
 }
 
 .detail-info {
@@ -448,24 +446,24 @@ function formatDate(timestamp) {
 }
 
 .detail-name {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--fenlin-text-primary, #2C3E50);
+  color: #303133;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .detail-desc {
-  margin-top: 8px;
-  font-size: 14px;
-  color: var(--fenlin-text-secondary, #5D6D7E);
+  margin-top: 4px;
+  font-size: 13px;
+  color: #606266;
 }
 
 .detail-actions {
   display: flex;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .detail-actions .el-button--primary {
@@ -495,7 +493,7 @@ function formatDate(timestamp) {
 
 .example-desc {
   font-size: 13px;
-  color: var(--fenlin-text-secondary, #5D6D7E);
+  color: #606266;
   margin-bottom: 8px;
 }
 
@@ -506,7 +504,7 @@ function formatDate(timestamp) {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .skills-page {
-    padding: 12px;
+    padding: 0;
   }
   
   .skills-container {
@@ -517,11 +515,12 @@ function formatDate(timestamp) {
     width: 100%;
     height: 50%;
     border-right: none;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #e4e7ed;
   }
   
   .skill-detail {
     height: 50%;
+    padding: 12px;
   }
 }
 </style>

@@ -1,7 +1,7 @@
 <!--
-  任务看板组件
+  任务看板组件 - 简洁版
   @author 小琳
-  @date 2026-03-03
+  @date 2026-03-07
 -->
 <template>
   <div class="task-board">
@@ -13,19 +13,11 @@
       @drop="handleDrop($event, board.id)"
     >
       <div class="column-header" :style="{ borderTopColor: board.color || '#409eff' }">
-        <h4>{{ board.name }}</h4>
+        <div class="header-left">
+          <span class="column-dot" :style="{ background: board.color || '#409eff' }"></span>
+          <h4>{{ board.name }}</h4>
+        </div>
         <span class="count">{{ getTaskCount(board.id) }}</span>
-        <el-dropdown v-if="editable" trigger="click">
-          <el-button text size="small">
-            <el-icon><More /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="$emit('edit-board', board)">编辑</el-dropdown-item>
-              <el-dropdown-item @click="$emit('delete-board', board)">删除</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
       </div>
       
       <div class="column-body">
@@ -61,7 +53,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { Plus, More } from '@element-plus/icons-vue';
+import { Plus } from '@element-plus/icons-vue';
 import TaskCard from './TaskCard.vue';
 
 const props = defineProps({
@@ -121,7 +113,7 @@ function handleDrop(event, targetBoardId) {
   gap: 16px;
   height: 100%;
   overflow-x: auto;
-  padding-bottom: 16px;
+  padding: 0 0 16px;
 }
 
 .board-column {
@@ -134,13 +126,25 @@ function handleDrop(event, targetBoardId) {
 }
 
 .column-header {
-  padding: 12px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   border-top: 3px solid #409eff;
   border-radius: 8px 8px 0 0;
   background: #fff;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 .column-header h4 {
@@ -148,7 +152,6 @@ function handleDrop(event, targetBoardId) {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
-  flex: 1;
 }
 
 .column-header .count {
@@ -157,6 +160,7 @@ function handleDrop(event, targetBoardId) {
   border-radius: 10px;
   font-size: 12px;
   color: #606266;
+  font-weight: 500;
 }
 
 .column-body {
@@ -180,6 +184,13 @@ function handleDrop(event, targetBoardId) {
   width: 100%;
   justify-content: flex-start;
   color: #909399;
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+}
+
+.add-task-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
 }
 
 .add-column {
@@ -199,5 +210,6 @@ function handleDrop(event, targetBoardId) {
 .add-column:hover {
   border-color: #409eff;
   color: #409eff;
+  background: #ecf5ff;
 }
 </style>

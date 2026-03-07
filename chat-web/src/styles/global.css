@@ -16,6 +16,53 @@ html, body {
   font-size: 14px;
   color: #333;
   background-color: #f5f7fa;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 暗黑模式全局覆盖 */
+[data-theme="dark"] body {
+  background-color: #1a1a2e;
+  color: #E8E8E8;
+}
+
+[data-theme="dark"] .el-form-item__label {
+  color: var(--fenlin-text-secondary);
+}
+
+[data-theme="dark"] .el-select-dropdown {
+  background: var(--fenlin-surface);
+  border-color: var(--fenlin-border);
+}
+
+[data-theme="dark"] .el-select-dropdown__item {
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-select-dropdown__item:hover {
+  background: var(--fenlin-bg-secondary);
+}
+
+[data-theme="dark"] .el-select-dropdown__item.is-selected {
+  color: var(--fenlin-primary);
+}
+
+[data-theme="dark"] .el-dialog__header,
+[data-theme="dark"] .el-drawer__header {
+  border-bottom-color: var(--fenlin-border);
+}
+
+[data-theme="dark"] .el-dialog__title,
+[data-theme="dark"] .el-drawer__title {
+  color: var(--fenlin-text-primary);
+}
+
+[data-theme="dark"] .el-divider {
+  border-color: var(--fenlin-border);
+}
+
+[data-theme="dark"] .el-checkbox__label,
+[data-theme="dark"] .el-radio__label {
+  color: var(--fenlin-text-primary);
 }
 
 #app {

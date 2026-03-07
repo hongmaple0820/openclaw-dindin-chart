@@ -91,18 +91,102 @@
         </el-tooltip>
       </h4>
       
-      <el-form-item label="模型" prop="model">
-        <el-select v-model="form.model" placeholder="选择模型" style="width: 100%">
-          <el-option label="GPT-4" value="gpt-4" />
-          <el-option label="GPT-4 Turbo" value="gpt-4-turbo" />
-          <el-option label="GPT-3.5 Turbo" value="gpt-3.5-turbo" />
-          <el-option label="Claude 3 Opus" value="claude-3-opus" />
-          <el-option label="Claude 3 Sonnet" value="claude-3-sonnet" />
-          <el-option label="GLM-4" value="glm-4" />
-          <el-option label="Qwen-Max" value="qwen-max" />
-          <el-option label="DeepSeek" value="deepseek-chat" />
-          <el-option label="自定义" value="custom" />
+      <!-- 供应商选择 -->
+      <el-form-item label="模型供应商" prop="provider">
+        <el-select v-model="form.provider" placeholder="选择供应商" style="width: 100%" @change="onProviderChange">
+          <el-option-group label="国际厂商">
+            <el-option label="OpenAI" value="openai">
+              <div class="provider-option">
+                <span class="provider-icon">🟢</span>
+                <span>OpenAI</span>
+              </div>
+            </el-option>
+            <el-option label="Anthropic (Claude)" value="anthropic">
+              <div class="provider-option">
+                <span class="provider-icon">🟠</span>
+                <span>Anthropic (Claude)</span>
+              </div>
+            </el-option>
+            <el-option label="Google (Gemini)" value="google">
+              <div class="provider-option">
+                <span class="provider-icon">🔵</span>
+                <span>Google (Gemini)</span>
+              </div>
+            </el-option>
+          </el-option-group>
+          <el-option-group label="国内厂商">
+            <el-option label="阿里云 (通义千问)" value="alibaba">
+              <div class="provider-option">
+                <span class="provider-icon">🟣</span>
+                <span>阿里云 (通义千问)</span>
+              </div>
+            </el-option>
+            <el-option label="智谱 AI (GLM)" value="zhipu">
+              <div class="provider-option">
+                <span class="provider-icon">🔴</span>
+                <span>智谱 AI (GLM)</span>
+              </div>
+            </el-option>
+            <el-option label="DeepSeek" value="deepseek">
+              <div class="provider-option">
+                <span class="provider-icon">🟡</span>
+                <span>DeepSeek</span>
+              </div>
+            </el-option>
+            <el-option label="百川智能" value="baichuan">
+              <div class="provider-option">
+                <span class="provider-icon">⚪</span>
+                <span>百川智能</span>
+              </div>
+            </el-option>
+            <el-option label="月之暗面 (Kimi)" value="moonshot">
+              <div class="provider-option">
+                <span class="provider-icon">🌙</span>
+                <span>月之暗面 (Kimi)</span>
+              </div>
+            </el-option>
+          </el-option-group>
+          <el-option-group label="其他">
+            <el-option label="本地模型" value="local">
+              <div class="provider-option">
+                <span class="provider-icon">💻</span>
+                <span>本地模型 (Ollama/vLLM)</span>
+              </div>
+            </el-option>
+            <el-option label="自定义" value="custom">
+              <div class="provider-option">
+                <span class="provider-icon">⚙️</span>
+                <span>自定义 API</span>
+              </div>
+            </el-option>
+          </el-option-group>
         </el-select>
+      </el-form-item>
+      
+      <!-- 模型选择（根据供应商动态显示） -->
+      <el-form-item label="模型" prop="model">
+        <el-select v-model="form.model" placeholder="选择模型" style="width: 100%" :disabled="!form.provider">
+          <el-option 
+            v-for="model in availableModels" 
+            :key="model.value" 
+            :label="model.label" 
+            :value="model.value"
+          >
+            <div class="model-option">
+              <span>{{ model.label }}</span>
+              <el-tag v-if="model.tag" size="small" :type="model.tagType">{{ model.tag }}</el-tag>
+            </div>
+          </el-option>
+        </el-select>
+      </el-form-item>
+      
+      <!-- 自定义模型名称 -->
+      <el-form-item 
+        v-if="form.model === 'custom' || form.provider === 'custom'" 
+        label="自定义模型名称" 
+        prop="customModel"
+      >
+        <el-input v-model="form.customModel" placeholder="输入模型名称，如 gpt-4-0125-preview" />
       </el-form-item>
       
       <el-form-item 
@@ -298,7 +382,8 @@ const form = ref({
   description: '',
   avatar: '',
   isPublic: false,
-  model: 'gpt-4',
+  provider: '',
+  model: '',
   customModel: '',
   apiEndpoint: '',
   apiKey: '',
@@ -310,6 +395,94 @@ const form = ref({
   enableMemory: true,
   memoryRetrievalCount: 5
 });
+
+// 供应商对应的模型列表
+const providerModels = {
+  openai: [
+    { label: 'GPT-4o', value: 'gpt-4o', tag: '推荐', tagType: 'success' },
+    { label: 'GPT-4o Mini', value: 'gpt-4o-mini', tag: '快速', tagType: 'info' },
+    { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' },
+    { label: 'GPT-4', value: 'gpt-4' },
+    { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo', tag: '经济', tagType: 'warning' }
+  ],
+  anthropic: [
+    { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20241022', tag: '推荐', tagType: 'success' },
+    { label: 'Claude 3.5 Haiku', value: 'claude-3-5-haiku-20241022', tag: '快速', tagType: 'info' },
+    { label: 'Claude 3 Opus', value: 'claude-3-opus-20240229' },
+    { label: 'Claude 3 Sonnet', value: 'claude-3-sonnet-20240229' },
+    { label: 'Claude 3 Haiku', value: 'claude-3-haiku-20240307', tag: '经济', tagType: 'warning' }
+  ],
+  google: [
+    { label: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash', tag: '推荐', tagType: 'success' },
+    { label: 'Gemini 1.5 Pro', value: 'gemini-1.5-pro' },
+    { label: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash', tag: '快速', tagType: 'info' },
+    { label: 'Gemini 1.0 Pro', value: 'gemini-1.0-pro', tag: '经济', tagType: 'warning' }
+  ],
+  alibaba: [
+    { label: 'Qwen-Max', value: 'qwen-max', tag: '最强', tagType: 'success' },
+    { label: 'Qwen-Max-Longcontext', value: 'qwen-max-longcontext' },
+    { label: 'Qwen-Plus', value: 'qwen-plus' },
+    { label: 'Qwen-Turbo', value: 'qwen-turbo', tag: '快速', tagType: 'info' },
+    { label: 'Qwen-Long', value: 'qwen-long' }
+  ],
+  zhipu: [
+    { label: 'GLM-4-Plus', value: 'glm-4-plus', tag: '推荐', tagType: 'success' },
+    { label: 'GLM-4-0520', value: 'glm-4-0520' },
+    { label: 'GLM-4', value: 'glm-4' },
+    { label: 'GLM-4-Air', value: 'glm-4-air', tag: '快速', tagType: 'info' },
+    { label: 'GLM-4-Flash', value: 'glm-4-flash', tag: '免费', tagType: 'warning' }
+  ],
+  deepseek: [
+    { label: 'DeepSeek-V3', value: 'deepseek-chat', tag: '推荐', tagType: 'success' },
+    { label: 'DeepSeek-Reasoner (R1)', value: 'deepseek-reasoner', tag: '推理' }
+  ],
+  baichuan: [
+    { label: 'Baichuan4', value: 'Baichuan4', tag: '推荐', tagType: 'success' },
+    { label: 'Baichuan3-Turbo', value: 'Baichuan3-Turbo' },
+    { label: 'Baichuan3-Turbo-128k', value: 'Baichuan3-Turbo-128k' }
+  ],
+  moonshot: [
+    { label: 'Moonshot v1 8k', value: 'moonshot-v1-8k' },
+    { label: 'Moonshot v1 32k', value: 'moonshot-v1-32k' },
+    { label: 'Moonshot v1 128k', value: 'moonshot-v1-128k', tag: '长文本', tagType: 'info' }
+  ],
+  local: [
+    { label: 'Llama 3.1 70B', value: 'llama3.1:70b' },
+    { label: 'Llama 3.1 8B', value: 'llama3.1:8b', tag: '轻量', tagType: 'info' },
+    { label: 'Qwen 2.5 72B', value: 'qwen2.5:72b' },
+    { label: 'Mistral 7B', value: 'mistral:7b', tag: '轻量', tagType: 'info' },
+    { label: 'DeepSeek V2', value: 'deepseek-v2:latest' },
+    { label: '自定义本地模型', value: 'custom' }
+  ],
+  custom: [
+    { label: '自定义模型', value: 'custom' }
+  ]
+};
+
+// 根据供应商获取可用模型
+const availableModels = computed(() => {
+  return providerModels[form.value.provider] || [];
+});
+
+// 供应商变更时重置模型
+function onProviderChange() {
+  form.value.model = '';
+  // 根据供应商预设 API Endpoint
+  const endpoints = {
+    openai: 'https://api.openai.com/v1/chat/completions',
+    anthropic: 'https://api.anthropic.com/v1/messages',
+    google: 'https://generativelanguage.googleapis.com/v1beta/models',
+    alibaba: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+    zhipu: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    deepseek: 'https://api.deepseek.com/v1/chat/completions',
+    baichuan: 'https://api.baichuan-ai.com/v1/chat/completions',
+    moonshot: 'https://api.moonshot.cn/v1/chat/completions',
+    local: 'http://localhost:11434/api/chat'
+  };
+  if (endpoints[form.value.provider] && !form.value.apiEndpoint) {
+    form.value.apiEndpoint = endpoints[form.value.provider];
+  }
+}
 
 // 验证规则
 const rules = {
@@ -505,5 +678,22 @@ async function handleSubmit() {
   gap: 12px;
   padding-top: 16px;
   border-top: 1px solid #e4e7ed;
+}
+
+.provider-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-icon {
+  font-size: 14px;
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 </style>

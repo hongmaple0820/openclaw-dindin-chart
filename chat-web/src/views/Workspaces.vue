@@ -10,10 +10,10 @@
       <!-- 左侧空间列表 -->
       <div class="space-list-panel">
         <div class="panel-header">
-          <h3>协作空间</h3>
+          <span class="header-title">协作空间</span>
           <el-button type="primary" size="small" @click="showCreateDialog = true">
             <el-icon><Plus /></el-icon>
-            创建空间
+            创建
           </el-button>
         </div>
 
@@ -24,6 +24,7 @@
             placeholder="搜索空间..."
             :prefix-icon="Search"
             clearable
+            size="small"
           />
         </div>
 
@@ -170,27 +171,89 @@
     </el-dialog>
 
     <!-- 邀请成员弹窗 -->
-    <el-dialog v-model="showInviteDialog" title="邀请成员" width="400px">
-      <el-form label-position="top">
-        <el-form-item label="选择用户">
-          <el-select v-model="inviteUserId" placeholder="选择要邀请的用户" style="width: 100%">
-            <el-option v-for="user in friends" :key="user.id" :label="user.name" :value="user.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="或选择 Agent">
-          <el-select v-model="inviteAgentId" placeholder="选择要添加的 Agent" style="width: 100%">
-            <el-option
-              v-for="agent in availableAgents"
+    <el-dialog v-model="showInviteDialog" title="邀请成员" width="450px">
+      <el-tabs v-model="inviteTab">
+        <el-tab-pane label="好友列表" name="friends">
+          <div class="invite-user-list" v-if="friendStore.friends.length > 0">
+            <div 
+              v-for="friend in friendStore.friends" 
+              :key="friend.id"
+              class="invite-user-item"
+              :class="{ selected: inviteUserId === friend.id }"
+              @click="inviteUserId = friend.id"
+            >
+              <el-avatar :size="36" :src="friend.avatar">
+                {{ (friend.remark || friend.nickname || friend.username)?.charAt(0) }}
+              </el-avatar>
+              <div class="user-info">
+                <div class="user-name">{{ friend.remark || friend.nickname || friend.username }}</div>
+                <div class="user-username">@{{ friend.username }}</div>
+              </div>
+              <el-icon v-if="inviteUserId === friend.id" class="check-icon"><Check /></el-icon>
+            </div>
+          </div>
+          <el-empty v-else description="暂无好友" :image-size="80">
+            <el-button type="primary" size="small" @click="router.push('/friends')">添加好友</el-button>
+          </el-empty>
+        </el-tab-pane>
+        <el-tab-pane label="搜索用户" name="search">
+          <el-input
+            v-model="userSearchQuery"
+            placeholder="搜索用户名或昵称..."
+            clearable
+            @keyup.enter="searchUsers"
+          >
+            <template #append>
+              <el-button @click="searchUsers" :loading="userSearchLoading">搜索</el-button>
+            </template>
+          </el-input>
+          <div class="invite-user-list" v-if="userSearchResults.length > 0" style="margin-top: 12px; max-height: 200px;">
+            <div 
+              v-for="user in userSearchResults" 
+              :key="user.id"
+              class="invite-user-item"
+              :class="{ selected: inviteUserId === user.id }"
+              @click="inviteUserId = user.id"
+            >
+              <el-avatar :size="36" :src="user.avatar">
+                {{ (user.nickname || user.username)?.charAt(0) }}
+              </el-avatar>
+              <div class="user-info">
+                <div class="user-name">{{ user.nickname || user.username }}</div>
+                <div class="user-username">@{{ user.username }}</div>
+              </div>
+              <el-icon v-if="inviteUserId === user.id" class="check-icon"><Check /></el-icon>
+            </div>
+          </div>
+          <el-empty v-else-if="userSearchQuery && !userSearchLoading" description="未找到用户" :image-size="60" />
+        </el-tab-pane>
+        <el-tab-pane label="选择 Agent" name="agents">
+          <div class="invite-user-list" v-if="availableAgents.length > 0">
+            <div 
+              v-for="agent in availableAgents" 
               :key="agent.id"
-              :label="agent.nickname || agent.name"
-              :value="agent.id"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
+              class="invite-user-item"
+              :class="{ selected: inviteAgentId === agent.id }"
+              @click="inviteAgentId = agent.id"
+            >
+              <el-avatar :size="36" :src="agent.avatar">
+                🤖
+              </el-avatar>
+              <div class="user-info">
+                <div class="user-name">{{ agent.nickname || agent.name }}</div>
+                <div class="user-username">{{ agent.description?.slice(0, 30) || 'AI 助手' }}</div>
+              </div>
+              <el-icon v-if="inviteAgentId === agent.id" class="check-icon"><Check /></el-icon>
+            </div>
+          </div>
+          <el-empty v-else description="暂无可用 Agent" :image-size="80" />
+        </el-tab-pane>
+      </el-tabs>
       <template #footer>
         <el-button @click="showInviteDialog = false">取消</el-button>
-        <el-button type="primary" @click="inviteMember" :loading="inviting">邀请</el-button>
+        <el-button type="primary" @click="inviteMember" :loading="inviting" :disabled="!inviteUserId && !inviteAgentId">
+          邀请
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -198,12 +261,16 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Plus, Search, UserFilled, Setting } from '@element-plus/icons-vue';
+import { Plus, Search, UserFilled, Setting, Check } from '@element-plus/icons-vue';
 import api from '@/api';
 import { useUserStore } from '@/stores/user';
+import { useFriendStore } from '@/stores/friends';
 
 const userStore = useUserStore();
+const friendStore = useFriendStore();
+const router = useRouter();
 
 const loading = ref(false);
 const spaces = ref([]);
@@ -218,10 +285,13 @@ const showInviteDialog = ref(false);
 const showSettingsDialog = ref(false);
 const creating = ref(false);
 const inviting = ref(false);
+const inviteTab = ref('friends');
 
 const searchQuery = ref('');
 const availableAgents = ref([]);
-const friends = ref([]);
+const userSearchQuery = ref('');
+const userSearchResults = ref([]);
+const userSearchLoading = ref(false);
 
 const createForm = ref({
   name: '',
@@ -301,6 +371,29 @@ async function loadAgents() {
     }
   } catch (error) {
     console.error('加载 Agent 失败:', error);
+  }
+}
+
+// 搜索用户
+async function searchUsers() {
+  if (!userSearchQuery.value.trim()) {
+    ElMessage.warning('请输入搜索内容');
+    return;
+  }
+  
+  userSearchLoading.value = true;
+  try {
+    const res = await friendStore.searchUsers(userSearchQuery.value.trim());
+    if (res.success) {
+      userSearchResults.value = res.users || [];
+    } else {
+      userSearchResults.value = [];
+    }
+  } catch (error) {
+    console.error('搜索用户失败:', error);
+    userSearchResults.value = [];
+  } finally {
+    userSearchLoading.value = false;
   }
 }
 
@@ -496,7 +589,11 @@ function connectSSE() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadSpaces(), loadAgents()]);
+  await Promise.all([
+    loadSpaces(), 
+    loadAgents(),
+    friendStore.fetchFriends()
+  ]);
   connectSSE();
 });
 
@@ -509,30 +606,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.workspaces-page { height: calc(100vh - 120px); padding: 20px; }
-.workspaces-container { display: flex; height: 100%; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
-.space-list-panel { width: 320px; border-right: 1px solid #e4e7ed; display: flex; flex-direction: column; }
-.panel-header { padding: 16px; border-bottom: 1px solid #e4e7ed; display: flex; justify-content: space-between; align-items: center; }
-.panel-header h3 { margin: 0; font-size: 16px; color: #303133; }
-.search-area { padding: 12px 16px; border-bottom: 1px solid #e4e7ed; }
-.space-list { flex: 1; overflow-y: auto; padding: 8px 0; }
-.space-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: all 0.2s; }
+.workspaces-page { height: calc(100vh - 56px); padding: 0; margin: -24px; }
+.workspaces-container { display: flex; height: 100%; background: #fff; overflow: hidden; }
+.space-list-panel { width: 280px; border-right: 1px solid #e4e7ed; display: flex; flex-direction: column; }
+.panel-header { padding: 12px 16px; border-bottom: 1px solid #e4e7ed; display: flex; justify-content: space-between; align-items: center; }
+.header-title { font-size: 15px; font-weight: 600; color: #303133; }
+.search-area { padding: 8px 12px; border-bottom: 1px solid #e4e7ed; }
+.space-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.space-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: all 0.2s; }
 .space-item:hover { background: #f5f7fa; }
 .space-item.active { background: #ecf5ff; border-left: 3px solid #409eff; }
 .space-avatar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; flex-shrink: 0; }
 .space-info { flex: 1; min-width: 0; }
 .space-name { font-size: 14px; font-weight: 500; color: #303133; }
-.space-meta { font-size: 12px; color: #909399; margin-top: 4px; display: flex; gap: 12px; }
+.space-meta { font-size: 12px; color: #909399; margin-top: 2px; display: flex; gap: 12px; }
 .space-detail-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.detail-header { padding: 16px 20px; border-bottom: 1px solid #e4e7ed; display: flex; justify-content: space-between; align-items: center; }
+.detail-header { padding: 12px 16px; border-bottom: 1px solid #e4e7ed; display: flex; justify-content: space-between; align-items: center; }
 .header-info { display: flex; align-items: center; gap: 12px; }
-.header-info h3 { margin: 0; font-size: 18px; }
+.header-info h3 { margin: 0; font-size: 15px; }
 .space-type { font-size: 12px; color: #67c23a; background: #f0f9ff; padding: 2px 8px; border-radius: 4px; }
-.members-bar { padding: 12px 20px; border-bottom: 1px solid #e4e7ed; display: flex; align-items: center; gap: 8px; }
+.members-bar { padding: 8px 16px; border-bottom: 1px solid #e4e7ed; display: flex; align-items: center; gap: 8px; }
 .members-bar .el-avatar.agent { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 .members-bar .el-avatar.human { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
-.member-count { font-size: 13px; color: #909399; margin-left: 8px; }
-.messages-container { flex: 1; overflow-y: auto; padding: 20px; }
+.member-count { font-size: 12px; color: #909399; margin-left: 8px; }
+.messages-container { flex: 1; overflow-y: auto; padding: 16px; }
 .empty-messages { display: flex; justify-content: center; align-items: center; height: 100%; }
 .message-item { display: flex; gap: 12px; margin-bottom: 16px; }
 .message-item.is-me { flex-direction: row-reverse; }
@@ -541,15 +638,35 @@ onUnmounted(() => {
 .message-content { max-width: 70%; }
 .message-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .is-me .message-header { flex-direction: row-reverse; }
-.sender-name { font-size: 13px; font-weight: 500; color: #606266; }
+.sender-name { font-size: 12px; font-weight: 500; color: #606266; }
 .time { font-size: 11px; color: #909399; }
 .message-text { background: #f4f4f5; padding: 10px 14px; border-radius: 8px; line-height: 1.6; word-break: break-word; }
 .is-me .message-text { background: #409eff; color: #fff; }
-.input-area { border-top: 1px solid #e4e7ed; padding: 16px 20px; background: #fafafa; }
-.input-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.input-area { border-top: 1px solid #e4e7ed; padding: 12px 16px; background: #fafafa; }
+.input-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .empty-state { flex: 1; display: flex; justify-content: center; align-items: center; }
+
+/* 邀请用户列表样式 */
+.invite-user-list { max-height: 280px; overflow-y: auto; }
+.invite-user-item { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  padding: 10px 12px; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  transition: all 0.2s;
+  margin-bottom: 4px;
+}
+.invite-user-item:hover { background: #f5f7fa; }
+.invite-user-item.selected { background: #ecf5ff; border: 1px solid #409eff; }
+.invite-user-item .user-info { flex: 1; min-width: 0; }
+.invite-user-item .user-name { font-size: 14px; font-weight: 500; color: #303133; }
+.invite-user-item .user-username { font-size: 12px; color: #909399; margin-top: 2px; }
+.invite-user-item .check-icon { color: #409eff; font-size: 18px; }
+
 @media (max-width: 768px) {
-  .workspaces-page { padding: 12px; }
+  .workspaces-page { margin: -16px; padding: 0; }
   .workspaces-container { flex-direction: column; }
   .space-list-panel { width: 100%; height: 50%; border-right: none; border-bottom: 1px solid #e4e7ed; }
   .space-detail-panel { height: 50%; }

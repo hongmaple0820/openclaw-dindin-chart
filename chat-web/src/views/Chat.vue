@@ -87,6 +87,19 @@
                   class="message-image"
                 />
               </div>
+              <!-- 文件消息 -->
+              <div v-if="msg.file" class="message-file">
+                <div class="file-icon">
+                  <el-icon :size="28"><Document /></el-icon>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">{{ msg.file.name }}</div>
+                  <div class="file-size">{{ formatFileSize(msg.file.size) }}</div>
+                </div>
+                <el-button text size="small" class="file-download" @click="downloadFile(msg.file)">
+                  <el-icon><Download /></el-icon>
+                </el-button>
+              </div>
               <!-- 消息操作 -->
               <div class="message-actions">
                 <el-button text size="small" @click="replyTo(msg)">回复</el-button>
@@ -98,6 +111,22 @@
           <div v-if="messages.length === 0 && !loading" class="empty-messages">
             <el-empty description="暂无消息，说点什么吧~" />
           </div>
+          
+          <!-- 滚动按钮 -->
+          <transition name="fade">
+            <div v-if="showScrollButtons" class="scroll-buttons">
+              <el-tooltip content="滚动到顶部" placement="left">
+                <el-button circle @click="scrollToTop">
+                  <el-icon><ArrowUp /></el-icon>
+                </el-button>
+              </el-tooltip>
+              <el-tooltip content="滚动到底部" placement="left">
+                <el-button circle type="primary" @click="scrollToBottom">
+                  <el-icon><ArrowDown /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
+          </transition>
         </div>
 
         <!-- 输入区域 -->
@@ -112,7 +141,7 @@
           <div class="input-toolbar">
             <el-popover placement="top" :width="320" trigger="click">
               <template #reference>
-                <el-button text>
+                <el-button text title="表情">
                   <el-icon><PictureFilled /></el-icon>
                 </el-button>
               </template>
@@ -133,13 +162,22 @@
               :before-upload="handleImageUpload"
               accept="image/*"
             >
-              <el-button text>
+              <el-button text title="发送图片">
                 <el-icon><Picture /></el-icon>
               </el-button>
             </el-upload>
             
+            <el-upload
+              :show-file-list="false"
+              :before-upload="handleFileUpload"
+            >
+              <el-button text title="发送文件">
+                <el-icon><FolderOpened /></el-icon>
+              </el-button>
+            </el-upload>
+            
             <!-- @ 按钮 -->
-            <el-button text @click="showMentionPicker = true">
+            <el-button text @click="showMentionPicker = true" title="@用户">
               <el-icon><User /></el-icon>
             </el-button>
           </div>
@@ -244,7 +282,7 @@
 <script setup>
 import { ref, onMounted, nextTick, computed, onUnmounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Refresh, Loading, PictureFilled, Picture, User, Menu, Search } from '@element-plus/icons-vue';
+import { Refresh, Loading, PictureFilled, Picture, User, Menu, Search, ArrowUp, ArrowDown, Document, Download, FolderOpened } from '@element-plus/icons-vue';
 import { useUserStore } from '@/stores/user';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -291,6 +329,10 @@ const mentionDropdownStyle = ref({});
 // @ 选择器（按钮触发）
 const showMentionPicker = ref(false);
 const mentionPickerSearch = ref('');
+
+// 滚动相关
+const showScrollButtons = ref(false);
+const isNearBottom = ref(true);
 
 // 过滤后的用户列表（输入框 @）
 const filteredMentionUsers = computed(() => {
@@ -459,7 +501,8 @@ async function loadPrivateMessages(user) {
       } 
     });
     if (res.success) {
-      messages.value = (res.messages || []).reverse();
+      // 消息按时间正序排列（旧消息在上，新消息在下）
+      messages.value = res.messages || [];
       scrollToBottom();
     }
   } catch (error) {
@@ -493,7 +536,9 @@ async function loadMessages() {
           deduped.push(msg);
         }
       }
-      messages.value = deduped.reverse();
+      // 按时间戳排序（正序：旧消息在上，新消息在下）
+      deduped.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      messages.value = deduped;
       scrollToBottom();
     }
   } catch (error) {
@@ -629,18 +674,129 @@ async function handleImageUpload(file) {
   return false;
 }
 
+// 处理文件上传
+async function handleFileUpload(file) {
+  // 检查文件大小（限制 50MB）
+  const maxSize = 50 * 1024 * 1024;
+  if (file.size > maxSize) {
+    ElMessage.error('文件大小不能超过 50MB');
+    return false;
+  }
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    ElMessage.info('文件上传中...');
+    const res = await api.post('/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000 // 文件上传超时时间延长
+    });
+    
+    if (res.data?.success || res.success) {
+      const fileUrl = res.data?.url || res.url;
+      const fileName = file.name;
+      const fileSize = file.size;
+      
+      // 发送文件消息
+      const fileMessage = {
+        id: 'file-' + Date.now(),
+        type: 'human',
+        sender: currentUser.value,
+        content: `[文件] ${fileName}`,
+        timestamp: Date.now(),
+        source: 'web',
+        file: {
+          name: fileName,
+          size: fileSize,
+          url: fileUrl
+        }
+      };
+      
+      // 乐观更新
+      messages.value.push(fileMessage);
+      scrollToBottom();
+      
+      // 同步到服务器
+      await api.post('/store', {
+        sender: currentUser.value,
+        content: fileMessage.content,
+        source: 'web',
+        file: fileMessage.file
+      });
+      
+      ElMessage.success('文件上传成功');
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error);
+    ElMessage.error('文件上传失败');
+  }
+  
+  return false;
+}
+
 // 滚动到底部
 function scrollToBottom() {
   nextTick(() => {
     if (messagesRef.value) {
-      messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
+      messagesRef.value.scrollTo({
+        top: messagesRef.value.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  });
+}
+
+// 滚动到顶部
+function scrollToTop() {
+  nextTick(() => {
+    if (messagesRef.value) {
+      messagesRef.value.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
     }
   });
 }
 
 // 处理滚动
 function handleScroll() {
-  // TODO: 滚动加载历史
+  if (!messagesRef.value) return;
+  
+  const { scrollTop, scrollHeight, clientHeight } = messagesRef.value;
+  const nearBottom = scrollHeight - scrollTop - clientHeight < 100;
+  
+  isNearBottom.value = nearBottom;
+  // 滚动超过一屏时显示滚动按钮
+  showScrollButtons.value = scrollTop > clientHeight;
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+// 下载文件
+function downloadFile(file) {
+  if (!file?.url) {
+    ElMessage.warning('文件链接不存在');
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = file.url;
+  link.download = file.name || 'download';
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 // 格式化时间
@@ -681,7 +837,11 @@ function setupWebSocket() {
     }
     if (!messages.value.find(m => m.id === msg.id)) {
       messages.value.push(msg);
-      scrollToBottom();
+      
+      // 新消息自动滚动到底部（如果用户在底部附近）
+      if (isNearBottom.value) {
+        scrollToBottom();
+      }
       
       if (msg.sender !== currentUser.value) {
         const isMentionedMe = msg.atTargets?.includes(currentUser.value) || 
@@ -723,22 +883,62 @@ function stopPolling() {
 // 加载在线用户
 async function loadOnlineUsers() {
   try {
+    // 首先尝试获取在线用户列表
     const res = await api.get('/online-users');
-    if (res.success && res.users) {
-      // 合并默认用户和在线用户
-      const defaultUsers = [
-        { id: 1, name: '小琳', role: 'AI', type: 'bot' },
-        { id: 2, name: '小猪', role: 'AI', type: 'bot' },
-        { id: 3, name: '鸿枫', role: '管理员', type: 'human' }
-      ];
-      const userMap = new Map();
-      defaultUsers.forEach(u => userMap.set(u.name, u));
-      res.users.forEach(u => userMap.set(u.name || u.username, u));
-      onlineUsers.value = Array.from(userMap.values());
+    if (res.success && res.users && res.users.length > 0) {
+      onlineUsers.value = res.users.map(u => ({
+        id: u.id || u.username,
+        name: u.name || u.nickname || u.username,
+        nickname: u.nickname || u.name || u.username,
+        role: u.role || (u.type === 'bot' ? 'AI' : ''),
+        type: u.type || 'human',
+        avatar: u.avatar
+      }));
+      return;
     }
   } catch (e) {
-    // 接口可能不存在，使用默认用户
+    console.log('[Chat] /online-users API 不可用，尝试其他方式加载用户');
   }
+  
+  // 尝试从好友列表获取用户
+  try {
+    const friendsRes = await api.get('/friends');
+    if (friendsRes.success && friendsRes.friends) {
+      const users = friendsRes.friends.map(f => ({
+        id: f.id,
+        name: f.remark || f.nickname || f.username,
+        nickname: f.nickname || f.username,
+        role: f.userType === 'bot' ? 'AI' : '',
+        type: f.userType || 'human',
+        online: f.online,
+        avatar: f.avatar
+      }));
+      // 添加默认 AI 用户
+      const defaultUsers = [
+        { id: 'bot-xiaoling', name: '小琳', nickname: '小琳', role: 'AI', type: 'bot' },
+        { id: 'bot-xiaozhu', name: '小猪', nickname: '小猪', role: 'AI', type: 'bot' }
+      ];
+      // 合并用户，确保 AI 用户始终存在
+      const userMap = new Map();
+      defaultUsers.forEach(u => userMap.set(u.id, u));
+      users.forEach(u => {
+        if (u.type !== 'bot') {
+          userMap.set(u.id, u);
+        }
+      });
+      onlineUsers.value = Array.from(userMap.values());
+      return;
+    }
+  } catch (e) {
+    console.log('[Chat] 无法从好友列表加载用户');
+  }
+  
+  // 最后使用默认用户
+  onlineUsers.value = [
+    { id: 'bot-xiaoling', name: '小琳', nickname: '小琳', role: 'AI', type: 'bot' },
+    { id: 'bot-xiaozhu', name: '小猪', nickname: '小猪', role: 'AI', type: 'bot' },
+    { id: 'admin', name: '鸿枫', nickname: '鸿枫', role: '管理员', type: 'human' }
+  ];
 }
 
 onMounted(() => {
@@ -759,17 +959,15 @@ onUnmounted(() => {
 
 <style scoped>
 .chat-page {
-  height: calc(100vh - 120px);
-  padding: 20px;
+  height: calc(100vh - 56px);
+  padding: 0;
 }
 
 .chat-container {
   display: flex;
   height: 100%;
   background: #fff;
-  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* 用户列表 */
@@ -862,6 +1060,7 @@ onUnmounted(() => {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
+  position: relative;
 }
 
 .loading-more {
@@ -872,9 +1071,9 @@ onUnmounted(() => {
 
 .message-item {
   display: flex;
-  margin-bottom: 16px;
-  padding: 8px;
-  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
   transition: background 0.2s;
 }
 
@@ -892,8 +1091,8 @@ onUnmounted(() => {
 }
 
 .message-content {
-  max-width: 70%;
-  margin: 0 12px;
+  max-width: 65%;
+  margin: 0 8px;
 }
 
 .message-header {
@@ -908,7 +1107,7 @@ onUnmounted(() => {
 }
 
 .sender-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #606266;
   cursor: pointer;
@@ -930,9 +1129,29 @@ onUnmounted(() => {
 .message-text {
   background: #f4f4f5;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 12px;
   line-height: 1.6;
   word-break: break-word;
+  position: relative;
+}
+
+/* 微信风格气泡尖角 */
+.message-item:not(.is-self) .message-text::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 12px;
+  border: 6px solid transparent;
+  border-right-color: #f4f4f5;
+}
+
+.message-item.is-self .message-text::before {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 12px;
+  border: 6px solid transparent;
+  border-left-color: #409eff;
 }
 
 .message-text :deep(.mention) {
@@ -953,6 +1172,7 @@ onUnmounted(() => {
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;
+  margin: 4px 0;
 }
 
 .message-text :deep(code) {
@@ -979,6 +1199,15 @@ onUnmounted(() => {
   color: #fff;
 }
 
+.is-self .message-text :deep(code) {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.is-self .message-text :deep(pre) {
+  background: rgba(0,0,0,0.2);
+}
+
 .message-images {
   margin-top: 8px;
   display: flex;
@@ -987,10 +1216,66 @@ onUnmounted(() => {
 }
 
 .message-image {
-  width: 120px;
-  height: 120px;
-  border-radius: 6px;
+  width: 150px;
+  height: 150px;
+  border-radius: 8px;
   cursor: pointer;
+  object-fit: cover;
+}
+
+/* 文件消息样式 */
+.message-file {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  gap: 12px;
+  max-width: 280px;
+}
+
+.is-self .message-file {
+  background: rgba(255,255,255,0.95);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.file-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.file-download {
+  color: #409eff;
+  flex-shrink: 0;
 }
 
 .message-actions {
@@ -1008,6 +1293,44 @@ onUnmounted(() => {
   justify-content: center;
   align-items: center;
   height: 200px;
+}
+
+/* 滚动按钮 */
+.scroll-buttons {
+  position: fixed;
+  right: 24px;
+  bottom: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 50;
+}
+
+.scroll-buttons :deep(.el-button) {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.scroll-buttons :deep(.el-button:hover) {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.scroll-buttons :deep(.el-button .el-icon) {
+  font-size: 20px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* 输入区域 */
@@ -1030,6 +1353,17 @@ onUnmounted(() => {
   padding: 8px 16px 0;
   display: flex;
   gap: 4px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.input-toolbar .el-button {
+  padding: 8px;
+}
+
+.input-toolbar .el-button:hover {
+  background: #f5f7fa;
+  border-radius: 8px;
 }
 
 .emoji-picker {
@@ -1115,10 +1449,33 @@ onUnmounted(() => {
   padding: 12px 16px;
   display: flex;
   gap: 12px;
+  background: #fff;
+  align-items: flex-end;
 }
 
-.input-main .el-input {
+.input-main .el-textarea {
   flex: 1;
+}
+
+.input-main .el-textarea :deep(.el-textarea__inner) {
+  border-radius: 12px;
+  border: 1px solid #e4e7ed;
+  padding: 12px;
+  resize: none;
+  min-height: 44px;
+  line-height: 1.5;
+}
+
+.input-main .el-textarea :deep(.el-textarea__inner:focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+}
+
+.input-main .el-button {
+  height: 44px;
+  min-width: 70px;
+  border-radius: 12px;
+  font-weight: 500;
 }
 
 /* 用户操作弹窗 */
