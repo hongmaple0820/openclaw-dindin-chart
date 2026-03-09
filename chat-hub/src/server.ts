@@ -13,6 +13,8 @@ const fileRoutes = require('./routes/files');
 const characterRoutes = require('./api/character-routes');
 const authV2Routes = require('./routes/auth-v2');
 const userRoutes = require('./routes/user');
+const friendsRoutes = require('./routes/friends');
+const groupsRoutes = require('./routes/groups');
 const sseManager = require('./sse-manager');
 const permissions = require('./permissions');
 const sessionManager = require('./session-manager');
@@ -1961,6 +1963,11 @@ async function start() {
   app.use('/api/character', characterRoutes);
   app.use('/api/v2/auth', authV2Routes);
   app.use('/api/v2/users', userRoutes);
+  app.use('/api/user', userRoutes);  // 兼容前端旧路径
+  
+  // 好友系统和群聊系统路由
+  app.use('/api/friends', friendsRoutes);
+  app.use('/api/groups', groupsRoutes);
 
   app.use('/api/v1/dm', dmRoutes);
   app.use('/api/v1/sessions', sessionRoutes);
