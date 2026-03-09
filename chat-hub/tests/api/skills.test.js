@@ -34,10 +34,16 @@ function createTestApp() {
 describe('Skills API', () => {
   let app;
   let testDb;
+  let consoleErrorSpy;
   
   beforeAll(() => {
     app = createTestApp();
     testDb = getTestDb();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore();
   });
   
   // 模拟 SkillsManager

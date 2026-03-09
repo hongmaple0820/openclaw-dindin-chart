@@ -1965,6 +1965,10 @@ async function start() {
   app.use('/api/v1/dm', dmRoutes);
   app.use('/api/v1/sessions', sessionRoutes);
 
+  // TTS 路由
+  const ttsRoutes = require('./routes/tts');
+  app.use('/api/tts', ttsRoutes);
+
   // 通知系统路由
   const notificationRoutes = require('./routes/notifications');
   app.use('/api/notifications', notificationRoutes);

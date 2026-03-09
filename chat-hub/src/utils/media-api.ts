@@ -33,7 +33,7 @@ interface UploadResultData {
   thumbnailUrl: string | null;
 }
 
-// Define Multer file type locally to avoid Express namespace issues
+// Define Multer file type locally to avoid relying on ambient Express namespace augmentation.
 interface MulterFile {
   fieldname: string;
   originalname: string;
@@ -43,12 +43,13 @@ interface MulterFile {
   destination: string;
   filename: string;
   path: string;
-  buffer: Buffer;
+  buffer?: Buffer;
+  stream?: NodeJS.ReadableStream;
 }
 
-interface MulterRequest extends Request {
+type MulterRequest = Request & {
   file?: MulterFile;
-}
+};
 
 class MediaAPI {
   private dbPath: string;

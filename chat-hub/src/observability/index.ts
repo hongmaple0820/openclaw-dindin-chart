@@ -334,6 +334,27 @@ class Observability {
     };
   }
 
+  getSystemInfo(): Record<string, unknown> {
+    return {
+      hostname: os.hostname(),
+      platform: os.platform(),
+      release: os.release(),
+      arch: os.arch(),
+      uptime: process.uptime(),
+      nodeVersion: process.version,
+      cpuCount: os.cpus().length,
+      loadAverage: os.loadavg(),
+      memory: {
+        process: process.memoryUsage(),
+        system: {
+          total: os.totalmem(),
+          free: os.freemem()
+        }
+      },
+      stats: this.getStats()
+    };
+  }
+
   // ==================== 中间件 ====================
 
   middleware() {

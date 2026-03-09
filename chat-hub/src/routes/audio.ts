@@ -22,15 +22,17 @@ interface UploadedFile {
   originalname: string;
   encoding: string;
   mimetype: string;
-  buffer: Buffer;
   size: number;
   path: string;
   filename: string;
+  buffer?: Buffer;
+  destination?: string;
+  stream?: NodeJS.ReadableStream;
 }
 
-interface RequestWithFile extends Request {
+type RequestWithFile = Request & {
   file?: UploadedFile;
-}
+};
 
 interface AudioData {
   id: string;

@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 
-// Observability 实例将在 server.js 中注入
+// Observability 实例将在 server.ts 中注入
 let observability = null;
 
 router.setObservability = (obs) => {
@@ -89,6 +89,21 @@ router.get('/health', (req, res) => {
     success: true,
     status: 'healthy',
     timestamp: Date.now()
+  });
+});
+
+/**
+ * GET /api/observability/system
+ * 获取运行时系统信息
+ */
+router.get('/system', (req, res) => {
+  if (!observability) {
+    return res.status(503).json({ error: 'Observability not initialized' });
+  }
+
+  res.json({
+    success: true,
+    data: observability.getSystemInfo()
   });
 });
 

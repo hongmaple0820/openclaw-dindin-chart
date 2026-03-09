@@ -58,8 +58,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import * as echarts from 'echarts'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { echarts, graphic } from '@/utils/echarts'
 import api from '../api'
 
 const timeRange = ref('7')
@@ -73,6 +73,7 @@ const sourceChart = ref(null)
 let timeChartInstance = null
 let senderChartInstance = null
 let sourceChartInstance = null
+let resizeHandler = null
 
 const formatTime = (ts) => {
   if (!ts) return '-'
@@ -101,7 +102,7 @@ const loadTimeStats = async () => {
         smooth: true,
         data: data.map(d => d.count),
         areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          color: new graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(25, 118, 210, 0.5)' },
             { offset: 1, color: 'rgba(25, 118, 210, 0.1)' }
           ])
@@ -182,6 +183,19 @@ onMounted(async () => {
   loadTimeStats()
   loadSenderStats()
   loadSourceStats()
+  resizeHandler = () => {
+    timeChartInstance?.resize()
+    senderChartInstance?.resize()
+    sourceChartInstance?.resize()
+  }
+  window.addEventListener('resize', resizeHandler)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeHandler)
+  timeChartInstance?.dispose()
+  senderChartInstance?.dispose()
+  sourceChartInstance?.dispose()
 })
 </script>
 

@@ -1,5 +1,4 @@
 import * as nodemailer from 'nodemailer';
-import * as Imap from 'imap';
 import { EventEmitter } from 'events';
 
 interface EmailConfig {
@@ -8,6 +7,7 @@ interface EmailConfig {
   smtp_user: string;
   smtp_password: string;
   from?: string;
+  inbound_enabled?: boolean;
   imap_host?: string;
   imap_port?: number;
 }
@@ -17,7 +17,7 @@ interface SendOptions {
   subject: string;
   text?: string;
   html?: string;
-  attachments?: (string | nodemailer.Attachment)[];
+  attachments?: (string | MailAttachment)[];
   cc?: string;
   bcc?: string;
 }
@@ -44,10 +44,33 @@ interface EmailStatus {
     user: string;
   };
   imap: {
+    enabled: boolean;
+    available: boolean;
     host: string;
     port: number;
+    reason?: string;
   } | null;
 }
+
+type MailAttachment = NonNullable<nodemailer.SendMailOptions['attachments']>[number];
+
+type ImapClient = {
+  once: (event: string, listener: (...args: any[]) => void) => void;
+  connect: () => void;
+  end: () => void;
+  openBox: (mailbox: string, readOnly: boolean, callback: (err: Error | null, box: any) => void) => void;
+  seq: {
+    fetch: (range: string, options: Record<string, unknown>) => {
+      on: (event: string, listener: (...args: any[]) => void) => void;
+      once: (event: string, listener: (...args: any[]) => void) => void;
+    };
+  };
+};
+
+type ImapModule = {
+  new (config: Record<string, unknown>): ImapClient;
+  parseHeader: (raw: string) => Record<string, string[]>;
+};
 
 /**
  * 邮箱通道插件
@@ -60,7 +83,8 @@ class EmailChannelPlugin extends EventEmitter {
   public name: string;
   private config: EmailConfig;
   private transporter: nodemailer.Transporter | null;
-  private imap: Imap | null;
+  private imap: ImapClient | null;
+  private imapModule: ImapModule | null;
   public connected: boolean;
 
   constructor(config: EmailConfig = {} as EmailConfig) {
@@ -69,7 +93,52 @@ class EmailChannelPlugin extends EventEmitter {
     this.config = config;
     this.transporter = null;
     this.imap = null;
+    this.imapModule = null;
     this.connected = false;
+  }
+
+  private isInboundEnabled(): boolean {
+    return this.config.inbound_enabled === true;
+  }
+
+  private isInboundConfigured(): boolean {
+    return this.isInboundEnabled() && Boolean(this.config.imap_host);
+  }
+
+  private hasImapDependency(): boolean {
+    try {
+      require.resolve('imap');
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private getImapModule(): ImapModule {
+    if (this.imapModule) {
+      return this.imapModule;
+    }
+
+    try {
+      this.imapModule = require('imap') as ImapModule;
+      return this.imapModule;
+    } catch (error) {
+      throw new Error('IMAP 收件能力需要额外安装可选依赖 "imap"，并在初始化时设置 inbound_enabled=true');
+    }
+  }
+
+  private ensureInboundAvailable(): void {
+    if (!this.config.imap_host) {
+      throw new Error('IMAP 未配置，请提供 imap_host');
+    }
+
+    if (!this.isInboundEnabled()) {
+      throw new Error('IMAP 收件能力默认关闭，请在初始化时设置 inbound_enabled=true');
+    }
+
+    if (!this.imap) {
+      this.initImap();
+    }
   }
 
   /**
@@ -104,8 +173,8 @@ class EmailChannelPlugin extends EventEmitter {
       throw error;
     }
 
-    // 如果配置了 IMAP，初始化接收功能
-    if (this.config.imap_host) {
+    // IMAP 收件能力默认关闭，只有显式开启时才初始化。
+    if (this.isInboundConfigured()) {
       this.initImap();
     }
   }
@@ -114,6 +183,8 @@ class EmailChannelPlugin extends EventEmitter {
    * 初始化 IMAP 连接（用于接收邮件）
    */
   private initImap(): void {
+    const Imap = this.getImapModule();
+
     this.imap = new Imap({
       user: this.config.smtp_user,
       password: this.config.smtp_password,
@@ -212,7 +283,7 @@ class EmailChannelPlugin extends EventEmitter {
   /**
    * 发送带附件的邮件
    */
-  async sendWithAttachments(to: string, subject: string, text: string, attachments: (string | nodemailer.Attachment)[]): Promise<{ success: boolean; messageId?: string; response?: string }> {
+  async sendWithAttachments(to: string, subject: string, text: string, attachments: (string | MailAttachment)[]): Promise<{ success: boolean; messageId?: string; response?: string }> {
     return this.send({ to, subject, text, attachments });
   }
 
@@ -237,8 +308,10 @@ class EmailChannelPlugin extends EventEmitter {
    */
   async getUnreadCount(): Promise<UnreadCount> {
     return new Promise((resolve, reject) => {
-      if (!this.imap) {
-        return reject(new Error('IMAP 未配置'));
+      try {
+        this.ensureInboundAvailable();
+      } catch (error) {
+        return reject(error);
       }
 
       this.imap.connect();
@@ -267,8 +340,10 @@ class EmailChannelPlugin extends EventEmitter {
    */
   async getRecentEmails(limit: number = 10): Promise<EmailInfo[]> {
     return new Promise((resolve, reject) => {
-      if (!this.imap) {
-        return reject(new Error('IMAP 未配置'));
+      try {
+        this.ensureInboundAvailable();
+      } catch (error) {
+        return reject(error);
       }
 
       const emails: EmailInfo[] = [];
@@ -302,7 +377,7 @@ class EmailChannelPlugin extends EventEmitter {
               let buffer = '';
               stream.on('data', (chunk: Buffer) => buffer += chunk.toString('utf8'));
               stream.once('end', () => {
-                const parsed = Imap.parseHeader(buffer);
+                const parsed = this.getImapModule().parseHeader(buffer);
                 email.from = parsed.from?.[0];
                 email.to = parsed.to?.[0];
                 email.subject = parsed.subject?.[0];
@@ -347,6 +422,9 @@ class EmailChannelPlugin extends EventEmitter {
    * 获取插件状态
    */
   getStatus(): EmailStatus {
+    const imapConfigured = Boolean(this.config.imap_host);
+    const imapAvailable = imapConfigured && this.isInboundEnabled() && this.hasImapDependency();
+
     return {
       name: this.name,
       connected: this.connected,
@@ -355,9 +433,16 @@ class EmailChannelPlugin extends EventEmitter {
         port: this.config.smtp_port || 587,
         user: this.config.smtp_user
       },
-      imap: this.config.imap_host ? {
-        host: this.config.imap_host,
-        port: this.config.imap_port || 993
+      imap: imapConfigured ? {
+        enabled: this.isInboundEnabled(),
+        available: imapAvailable,
+        host: this.config.imap_host!,
+        port: this.config.imap_port || 993,
+        reason: imapAvailable
+          ? undefined
+          : this.isInboundEnabled()
+            ? '可选依赖 "imap" 未安装'
+            : '收件能力默认关闭，需显式设置 inbound_enabled=true'
       } : null
     };
   }
@@ -369,7 +454,7 @@ let instance: EmailChannelPlugin | null = null;
 /**
  * 获取邮箱插件实例
  */
-function getEmailChannel(config: EmailConfig): EmailChannelPlugin | null {
+function getEmailChannel(config?: EmailConfig): EmailChannelPlugin | null {
   if (!instance && config) {
     instance = new EmailChannelPlugin(config);
   }

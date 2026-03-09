@@ -213,6 +213,101 @@ chat-hub 提供 RESTful API，用于消息的存储、发送、查询和同步�
 
 ---
 
+## Agent V2 API
+
+> 以下端点由 `src/routes/agents-v2.ts` 提供，当前代码库已经实际挂载到 `/api/agents`。
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/agents` | GET | 获取 Agent 列表 |
+| `/api/agents` | POST | 创建 Agent |
+| `/api/agents/:id` | GET | 获取 Agent 详情 |
+| `/api/agents/:id` | PUT | 更新 Agent |
+| `/api/agents/:id` | DELETE | 删除 Agent |
+| `/api/agents/:id/chat` | POST | 与 Agent 对话 |
+| `/api/agents/:id/chat/stream` | POST | SSE 流式对话 |
+| `/api/agents/:id/memories` | GET/POST | 查询或写入记忆 |
+| `/api/agents/:id/memories/:memoryId` | DELETE | 删除记忆 |
+| `/api/agents/:id/sessions` | GET | 获取会话列表 |
+| `/api/agents/:id/sessions/:sessionId/messages` | GET | 获取会话消息 |
+| `/api/agents/:id/sessions/:sessionId` | DELETE | 删除会话 |
+| `/api/agents/:id/sessions/:sessionId/resume` | POST | 恢复会话 |
+| `/api/agents/:id/stats` | GET | 获取 Agent 统计 |
+| `/api/agents/:id/billing` | GET | 获取计费统计 |
+| `/api/agents/:id/billing/export` | GET | 导出计费数据 |
+| `/api/agents/:id/api-token` | POST | 创建 API Token |
+| `/api/agents/:id/api-tokens` | GET | 查询 API Token |
+| `/api/agents/tokens/:tokenId` | DELETE | 删除 API Token |
+
+---
+
+## Observability API
+
+> 以下端点由 `src/routes/observability.ts` 提供，当前代码库已经实际挂载到 `/api/observability`。
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/observability/dashboard` | GET | 仪表盘聚合数据 |
+| `/api/observability/logs` | GET | 查询日志 |
+| `/api/observability/metrics` | GET | 查询指标 |
+| `/api/observability/stats` | GET | 获取观测统计 |
+| `/api/observability/health` | GET | 观测模块健康检查 |
+| `/api/observability/system` | GET | 获取系统运行时信息 |
+
+---
+
+## Email API
+
+> 当前邮件通道仍挂载在 `/api/email`。默认安装只保证 SMTP 发信可用；IMAP 收件箱能力需要额外安装 `imap` 依赖，并在初始化时显式传入 `inbound_enabled: true`。
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/email/init` | POST | 初始化邮件通道 |
+| `/api/email/send` | POST | 发送邮件 |
+| `/api/email/send-text` | POST | 发送纯文本邮件 |
+| `/api/email/send-html` | POST | 发送 HTML 邮件 |
+| `/api/email/test` | GET | 测试 SMTP 连通性 |
+| `/api/email/status` | GET | 查看 SMTP / IMAP 状态 |
+| `/api/email/unread` | GET | 获取未读邮件数，要求启用 IMAP 收件箱 |
+| `/api/email/recent` | GET | 获取最近邮件，要求启用 IMAP 收件箱 |
+| `/api/email/close` | POST | 关闭邮件通道 |
+
+**初始化示例：**
+
+```json
+{
+  "smtp_host": "smtp.example.com",
+  "smtp_port": 587,
+  "smtp_user": "bot@example.com",
+  "smtp_password": "secret",
+  "from": "bot@example.com",
+  "inbound_enabled": false
+}
+```
+
+**启用 IMAP 收件箱时额外需要：**
+
+```json
+{
+  "imap_host": "imap.example.com",
+  "imap_port": 993,
+  "inbound_enabled": true
+}
+```
+
+---
+
+## OpenAI 兼容 API
+
+> 当前服务在 `src/server.ts` 中额外挂载了兼容入口，用于把请求转发到 Agent API。
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/chat/completions` | POST | OpenAI Chat Completions 兼容入口，需要 `X-Agent-ID` |
+| `/v1/models` | GET | OpenAI Models 兼容入口，支持 `X-Agent-ID` |
+
+---
+
 ## Webhook 回调
 
 ### POST /webhook/dingtalk

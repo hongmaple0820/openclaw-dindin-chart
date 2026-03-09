@@ -45,8 +45,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import * as echarts from 'echarts';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { echarts } from '@/utils/echarts';
 
 const props = defineProps({
   data: {
@@ -72,10 +72,24 @@ const currentDisk = ref(0);
 let cpuChart = null;
 let memoryChart = null;
 let diskChart = null;
+let resizeHandler = null;
 
 onMounted(() => {
   initCharts();
   updateCharts();
+  resizeHandler = () => {
+    cpuChart?.resize();
+    memoryChart?.resize();
+    diskChart?.resize();
+  };
+  window.addEventListener('resize', resizeHandler);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeHandler);
+  cpuChart?.dispose();
+  memoryChart?.dispose();
+  diskChart?.dispose();
 });
 
 watch(() => props.data, () => {
@@ -151,7 +165,7 @@ function handlePeriodChange() {
   align-items: center;
 }
 
-.monito {
+.monitor-content {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 20px;

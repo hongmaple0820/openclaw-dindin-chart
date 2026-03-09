@@ -7,8 +7,12 @@
 
 const express = require('express');
 const router = express.Router();
-const { getEmailChannel, initEmailChannel, EmailChannelPlugin } = require('../plugins/channels/email-channel');
-const config = require('../config');
+const { getEmailChannel, initEmailChannel } = require('../plugins/channels/email-channel');
+
+function isInboundUnavailable(error) {
+  const message = (error && error.message) || '';
+  return message.includes('IMAP') || message.includes('inbound_enabled');
+}
 
 // 认证中间件
 function authMiddleware(req, res, next) {
@@ -50,7 +54,9 @@ router.post('/init', adminMiddleware, async (req, res) => {
     
     res.json({
       success: true,
-      message: '邮箱插件初始化成功',
+      message: emailConfig.inbound_enabled === true
+        ? '邮箱插件初始化成功，已启用 IMAP 收件能力'
+        : '邮箱插件初始化成功，当前仅启用 SMTP 发信',
       status: plugin.getStatus()
     });
   } catch (error) {
@@ -247,7 +253,12 @@ router.get('/unread', authMiddleware, async (req, res) => {
     const result = await plugin.getUnreadCount();
     res.json({ success: true, ...result });
   } catch (error) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    const status = isInboundUnavailable(error) ? 503 : 500;
+    res.status(status).json({
+      success: false,
+      error: (error as Error).message,
+      code: isInboundUnavailable(error) ? 'INBOUND_UNAVAILABLE' : 'UNREAD_ERROR'
+    });
   }
 });
 
@@ -271,7 +282,12 @@ router.get('/recent', authMiddleware, async (req, res) => {
     const emails = await plugin.getRecentEmails(limit);
     res.json({ success: true, count: emails.length, emails });
   } catch (error) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    const status = isInboundUnavailable(error) ? 503 : 500;
+    res.status(status).json({
+      success: false,
+      error: (error as Error).message,
+      code: isInboundUnavailable(error) ? 'INBOUND_UNAVAILABLE' : 'RECENT_ERROR'
+    });
   }
 });
 

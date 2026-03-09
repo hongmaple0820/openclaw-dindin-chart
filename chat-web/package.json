@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -17,8 +19,8 @@
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@vueuse/core": "^14.2.0",
-    "axios": "^1.13.4",
-    "dompurify": "^3.3.1",
+    "axios": "^1.13.6",
+    "dompurify": "^3.3.2",
     "echarts": "^6.0.0",
     "element-plus": "^2.13.2",
     "marked": "^17.0.2",
@@ -27,12 +29,15 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@vue/test-utils": "^2.4.6",
     "@iconify-json/ep": "^1.2.4",
     "@tauri-apps/cli": "^2.10.0",
-    "@vitejs/plugin-vue": "^6.0.1",
+    "@vitejs/plugin-vue": "^6.0.4",
+    "jsdom": "^26.1.0",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-icons": "^23.0.1",
     "unplugin-vue-components": "^31.0.0",
-    "vite": "^7.2.4"
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
   }
 }

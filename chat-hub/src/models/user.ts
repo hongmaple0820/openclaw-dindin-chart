@@ -1,12 +1,13 @@
 /**
- * 用户模型 - SQLite 数据库操作
+ * 用户模型 - 基于 better-sqlite3 的用户数据库操作
  */
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
+import BetterSqlite3Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+
+const DbWrapper = require('../db-wrapper');
 
 // 配置类型定义
 interface AppConfig {
@@ -21,7 +22,15 @@ interface AppConfig {
 // 动态导入配置
 const config: AppConfig = require('../config-jwt');
 
-let db: Database | null = null;
+interface DbClient {
+  run(sql: string, params?: unknown[]): Promise<{ changes: number; lastInsertRowid: number | bigint }>;
+  get<T = unknown>(sql: string, params?: unknown[]): Promise<T | null>;
+  all<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>;
+  exec(sql: string): Promise<void>;
+  close(): void;
+}
+
+let db: DbClient | null = null;
 
 interface UserRow {
   id: string;
@@ -75,16 +84,18 @@ interface LoginLogData {
   success: boolean;
 }
 
-async function initDatabase(): Promise<Database> {
+async function initDatabase(): Promise<DbClient> {
   const dataDir = path.dirname(config.database.path);
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  db = await open({
-    filename: config.database.path,
-    driver: sqlite3.Database
-  });
+  const sqlite = BetterSqlite3Database(config.database.path) as unknown as {
+    pragma: (sql: string) => void;
+  };
+  sqlite.pragma('journal_mode = WAL');
+  // Keep the existing async call sites intact while standardizing on better-sqlite3.
+  db = new DbWrapper(sqlite) as DbClient;
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -183,26 +194,26 @@ const UserModel = {
   
   findById: async (id: string): Promise<Omit<UserRow, 'password_hash'> | undefined> => {
     const database = await dbPromise;
-    const user = await database.get('SELECT * FROM users WHERE id = ?', [id]);
+    const user = await database.get<UserRow>('SELECT * FROM users WHERE id = ?', [id]);
     if (user) {
-      delete (user as UserRow).password_hash;
+      delete user.password_hash;
     }
-    return user;
+    return user || undefined;
   },
   
   findByUsername: async (username: string): Promise<UserRow | undefined> => {
     const database = await dbPromise;
-    return database.get('SELECT * FROM users WHERE username = ?', [username]) as Promise<UserRow | undefined>;
+    return (await database.get<UserRow>('SELECT * FROM users WHERE username = ?', [username])) || undefined;
   },
   
   findByEmail: async (email: string): Promise<UserRow | undefined> => {
     const database = await dbPromise;
-    return database.get('SELECT * FROM users WHERE email = ?', [email]) as Promise<UserRow | undefined>;
+    return (await database.get<UserRow>('SELECT * FROM users WHERE email = ?', [email])) || undefined;
   },
   
   findByPhone: async (phone: string): Promise<UserRow | undefined> => {
     const database = await dbPromise;
-    return database.get('SELECT * FROM users WHERE phone = ?', [phone]) as Promise<UserRow | undefined>;
+    return (await database.get<UserRow>('SELECT * FROM users WHERE phone = ?', [phone])) || undefined;
   },
   
   verifyPassword: async (user: UserRow, password: string): Promise<boolean> => {
@@ -290,7 +301,7 @@ const UserModel = {
     const row = await database.get(`SELECT COUNT(*) as count FROM users WHERE ${where}`, params) as { count: number };
     const total = row.count;
     
-    const users = await database.all(`
+    const users = await database.all<Omit<UserRow, 'password_hash'>>(`
       SELECT id, username, email, phone, nickname, avatar, role, status, created_at, last_login_at
       FROM users WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?
     `, [...params, limit, offset]);

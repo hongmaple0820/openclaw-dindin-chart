@@ -265,12 +265,13 @@ await fetch('http://localhost:8273/api/v1/dm/send', {
 openclaw-dindin-chart/
 ├── chat-hub/              # 核心：消息中转服务
 │   ├── src/
-│   │   ├── index.js       # 入口
-│   │   ├── server.js      # Express 服务
-│   │   ├── dingtalk.js    # 钉钉 Webhook 发送
-│   │   ├── message-store.js # SQLite 消息存储
+│   │   ├── index.ts       # 启动入口
+│   │   ├── server.ts      # Express 服务与路由挂载
+│   │   ├── dingtalk.ts    # 钉钉 Webhook 接收
+│   │   ├── dingtalk-sender.ts # 钉钉消息发送
+│   │   ├── message-store.ts # SQLite 消息存储
 │   │   └── bots/
-│   │       └── openclaw-trigger.js  # OpenClaw 触发器
+│   │       └── openclaw-trigger.ts  # OpenClaw 触发器
 │   ├── config/
 │   │   ├── default.json   # 默认配置
 │   │   └── local.json     # 本地配置（git忽略）
@@ -664,7 +665,7 @@ curl -X POST http://localhost:3000/api/v1/dm/send \
 
 1. **确保服务运行**：
    - chat-hub 服务默认运行在端口 `8273`
-   - 可以通过 `curl http://localhost:8273/api/health` 检查服务状态
+   - 可以通过 `curl http://localhost:8273/health` 检查服务状态
 
 2. **消息自动同步**：
    - 在模式 A 下，所有通过 API 发送的消息会自动通过 OpenClaw 钉钉插件同步到钉钉群

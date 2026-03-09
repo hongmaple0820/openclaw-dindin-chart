@@ -107,6 +107,9 @@ cd openclaw-dindin-chart/chat-hub
 # 安装依赖
 npm install
 
+# 如需 IMAP 收件箱能力，请在私有部署镜像或分支中额外安装
+# npm install imap
+
 # 创建本地配置
 cp config/local.example.json config/local.json
 ```
@@ -137,6 +140,9 @@ cp config/local.example.json config/local.json
 ### 启动
 
 ```bash
+# 先编译 TypeScript
+npm run build
+
 # 前台运行（调试用）
 npm start
 
@@ -144,7 +150,7 @@ npm start
 nohup npm start > /tmp/chat-hub.log 2>&1 &
 
 # 使用 PM2 管理
-pm2 start src/server.js --name chat-hub
+pm2 start dist/index.js --name chat-hub
 pm2 save
 ```
 
@@ -198,6 +204,8 @@ docker-compose -f docker-compose.prod.yml down
 > 📘 详细部署说明请参考 [部署指南](docs/DEPLOYMENT.md)
 
 ## 📡 API 接口
+
+> 邮件通道 `/api/email` 默认只保证 SMTP 发信能力。若要启用 IMAP 收件箱接口，需要额外安装 `imap`，并在初始化邮件通道时传入 `inbound_enabled: true`。
 
 ### 核心 API
 
@@ -297,18 +305,19 @@ chat-hub/
 │   ├── local.json            # 本地配置（Git 忽略）
 │   └── local.example.json    # 配置示例
 ├── src/
-│   ├── index.js              # 入口
-│   ├── server.js             # Express 服务
-│   ├── config.js             # 配置加载
-│   ├── message-store.js      # 消息存储
-│   ├── redis-client.js       # Redis 客户端
-│   ├── dingtalk-sender.js    # 钉钉发送
+│   ├── index.ts              # TypeScript 入口
+│   ├── server.ts             # Express 服务
+│   ├── config.ts             # 配置加载
+│   ├── message-store.ts      # 消息存储
+│   ├── redis-client.ts       # Redis 客户端
+│   ├── dingtalk-sender.ts    # 钉钉发送
 │   ├── agent/                # Agent 管理
 │   ├── routes/               # API 路由
 │   ├── services/             # 业务服务
 │   ├── middleware/           # 中间件
 │   └── observability/        # 可观测性
 ├── migrations/               # 数据库迁移
+├── dist/                     # TypeScript 编译产物
 ├── docs/                     # 文档
 │   ├── API.md               # API 文档
 │   ├── DEPLOYMENT.md        # 部署指南
@@ -327,7 +336,7 @@ chat-hub/
 npm install -g pm2
 
 # 启动并设置开机自启
-pm2 start src/server.js --name chat-hub
+pm2 start dist/index.js --name chat-hub
 pm2 startup
 pm2 save
 ```

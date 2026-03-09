@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.git
+.github
+docs
+tests
+*.log
+config/local*.json

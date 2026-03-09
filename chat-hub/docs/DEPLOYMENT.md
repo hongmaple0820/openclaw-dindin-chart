@@ -58,6 +58,7 @@ cd openclaw-dindin-chart/chat-hub
 
 ```bash
 npm install
+npm run build
 ```
 
 ### 3. 创建配置文件
@@ -125,7 +126,7 @@ curl http://localhost:8273/health
 npm install -g pm2
 
 # 启动服务
-pm2 start src/server.js --name chat-hub
+pm2 start dist/index.js --name chat-hub
 
 # 设置开机自启
 pm2 startup
@@ -167,7 +168,7 @@ After=network.target
 Type=simple
 User=maple
 WorkingDirectory=/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub
-ExecStart=/usr/bin/node src/server.js
+ExecStart=/usr/bin/node dist/index.js
 Restart=on-failure
 RestartSec=10
 Environment=NODE_ENV=production
@@ -234,6 +235,8 @@ docker run -d \
   -e NODE_ENV=production \
   chat-hub:latest
 ```
+
+> 多实例 Docker Compose 如果已经把宿主机 `8274` 分配给第二个 `chat-hub`，则不要再把 Relay 暴露到同一个宿主机 `8274`。需要暴露 Relay 时，请显式设置不同的 `RELAY_PORT` 和端口映射。
 
 ### 3. Docker Compose
 

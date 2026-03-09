@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fenlin.ai/schemas/agent-registration.json",
+  "title": "Agent Registration Schema",
+  "description": "Agent 注册请求的 JSON Schema 规范",
+  "type": "object",
+  "required": ["name", "type"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "description": "Agent 名称"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["openclaw", "claude", "chatgpt", "gemini", "generic"],
+      "description": "Agent 类型"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Agent 描述"
+    },
+    "skillUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "Skills 文档 URL"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["messaging", "memory", "tasks", "proactive", "analytics", "search"]
+      },
+      "description": "能力声明"
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/binding"
+      },
+      "description": "绑定关系"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "object",
+      "required": ["type", "target"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["channel", "user", "group", "topic"],
+          "description": "绑定类型"
+        },
+        "target": {
+          "type": "string",
+          "description": "绑定目标"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 1,
+          "description": "优先级（数值越大优先级越高）"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "权限列表"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          },
+          "description": "条件约束"
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["time", "channel", "user", "state"],
+          "description": "条件类型"
+        },
+        "expression": {
+          "type": "string",
+          "description": "条件表达式"
+        }
+      }
+    }
+  }
+}

@@ -20,14 +20,42 @@
 
 ```
 openclaw-dindin-chart/
-├── chat-hub/              # 核心：消息中转服务
-├── chat-web/              # 前端：用户界面
-├── chat-admin-api/        # 后台：管理 API
-├── chat-admin-ui/         # 后台：管理界面
+├── chat-hub/              # 核心：消息中转服务 (TypeScript)
+│   ├── src/               # 源码 (185 个 TS 文件)
+│   ├── config/            # 配置文件
+│   ├── migrations/        # 数据库迁移
+│   └── docker/            # Docker 配置
+├── chat-web/              # 前端：用户界面 (Vue3 + Tauri)
+│   ├── src/               # 源码 (116 个文件)
+│   └── src-tauri/         # Tauri 桌面端配置
+├── chat-mobile/           # 移动端 (uni-app)
 ├── docs/                  # 文档网站 (docsify)
-├── .sisyphus/             # 项目规范文档
-└── tasks/                 # 任务列表
+├── scripts/               # 部署脚本
+└── docker-compose.yml     # 容器编排
 ```
+
+---
+
+## WHERE TO LOOK
+
+| Task | Location | Notes |
+|------|----------|-------|
+| 新增后端 API | `chat-hub/src/` | Express 路由 |
+| 前端页面 | `chat-web/src/views/` | Vue SFC |
+| AI Agent 逻辑 | `chat-hub/src/agent/` | 多模型支持 |
+| 钉钉集成 | `chat-hub/src/dingtalk-sender.ts` | Webhook + 签名 |
+| 用户认证 | `chat-hub/src/auth.ts` | JWT + bcrypt |
+| 配置文件 | `chat-hub/config/local.json` | Git 忽略 |
+| Docker 部署 | `docker-compose.yml` | 多服务编排 |
+
+---
+
+## CODE MAP
+
+| 入口 | 类型 | 位置 | 职责 |
+|------|------|------|------|
+| `chat-hub/src/index.ts` | Backend | 185 文件 | Express 服务、WebSocket、Agent 管理 |
+| `chat-web/src/main.js` | Frontend | 116 文件 | Vue 3 应用入口、Tauri 桌面端 |
 
 ---
 

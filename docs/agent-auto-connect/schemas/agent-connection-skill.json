@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fenlin.ai/schemas/agent-connection-skill.json",
+  "title": "Agent Connection Skill Schema",
+  "description": "Agent 自动接入 Skills 的 JSON Schema 规范",
+  "type": "object",
+  "required": ["name", "description"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 1,
+      "maxLength": 50,
+      "description": "Skills 标识符，只允许小写字母、数字和连字符"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 2000,
+      "description": "功能描述，必须包含触发场景说明"
+    },
+    "triggers": {
+      "type": "object",
+      "description": "触发配置",
+      "properties": {
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "触发关键词列表"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "触发模式（正则表达式）列表"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "触发频道限制"
+        }
+      }
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0",
+      "description": "Skills 版本，遵循语义化版本规范"
+    },
+    "spec": {
+      "type": "string",
+      "const": "agent-connection",
+      "description": "规范类型标识符"
+    },
+    "agentTypes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["openclaw", "claude", "chatgpt", "gemini", "generic"]
+      },
+      "default": ["generic"],
+      "description": "支持的 Agent 类型"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["messaging", "memory", "tasks", "proactive", "analytics", "search"]
+      },
+      "default": [],
+      "description": "能力声明"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "依赖的其他 Skills"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "作者"
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri",
+          "description": "主页 URL"
+        },
+        "license": {
+          "type": "string",
+          "description": "许可证"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "标签"
+        },
+        "icon": {
+          "type": "string",
+          "description": "图标 URL 或 emoji"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "主题色（十六进制）"
+        }
+      }
+    }
+  }
+}

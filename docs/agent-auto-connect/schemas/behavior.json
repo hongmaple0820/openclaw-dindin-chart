@@ -1,0 +1,391 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fenlin.ai/schemas/behavior.json",
+  "title": "Behavior Schema",
+  "description": "自主行为定义的 JSON Schema 规范",
+  "type": "object",
+  "required": ["name", "trigger", "action"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+$",
+      "description": "行为标识符"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "行为名称"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "行为描述"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用"
+    },
+    "trigger": {
+      "oneOf": [
+        { "$ref": "#/definitions/messageTrigger" },
+        { "$ref": "#/definitions/eventTrigger" },
+        { "$ref": "#/definitions/timeTrigger" },
+        { "$ref": "#/definitions/conditionTrigger" }
+      ],
+      "description": "触发器配置"
+    },
+    "condition": {
+      "$ref": "#/definitions/behaviorCondition",
+      "description": "执行条件"
+    },
+    "action": {
+      "$ref": "#/definitions/behaviorAction",
+      "description": "执行动作"
+    },
+    "constraints": {
+      "$ref": "#/definitions/behaviorConstraints",
+      "description": "执行约束"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 50,
+          "description": "优先级"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "messageTrigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "message"
+        },
+        "match": {
+          "type": "object",
+          "properties": {
+            "patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "senders": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "exclude": {
+          "type": "object",
+          "properties": {
+            "patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "eventTrigger": {
+      "type": "object",
+      "required": ["type", "events"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "event"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "事件类型列表"
+        },
+        "filter": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "timeTrigger": {
+      "type": "object",
+      "required": ["type", "schedule"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "time"
+        },
+        "schedule": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["once", "cron", "interval"]
+            },
+            "time": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "cron": {
+              "type": "string"
+            },
+            "interval": {
+              "type": "integer",
+              "minimum": 1000
+            },
+            "timezone": {
+              "type": "string",
+              "default": "UTC"
+            }
+          }
+        },
+        "validFrom": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "conditionTrigger": {
+      "type": "object",
+      "required": ["type", "expression"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "condition"
+        },
+        "expression": {
+          "type": "string",
+          "description": "条件表达式"
+        },
+        "checkInterval": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 60000
+        },
+        "triggerOnce": {
+          "type": "boolean",
+          "default": false
+        },
+        "resetCondition": {
+          "type": "string"
+        }
+      }
+    },
+    "behaviorCondition": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "type": "object",
+          "properties": {
+            "inConversation": {
+              "type": "boolean"
+            },
+            "lastMessageTime": {
+              "type": "integer"
+            },
+            "activeAgents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "object"
+            },
+            "dayOfWeek": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
+            },
+            "channel": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "and": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/behaviorCondition"
+          }
+        },
+        "or": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/behaviorCondition"
+          }
+        },
+        "not": {
+          "$ref": "#/definitions/behaviorCondition"
+        }
+      }
+    },
+    "behaviorAction": {
+      "type": "object",
+      "required": ["type", "params"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["send_message", "call_api", "create_task", "update_state", "custom"]
+        },
+        "params": {
+          "type": "object"
+        },
+        "templates": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "onError": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["ignore", "retry", "fallback"]
+            },
+            "retryCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "fallback": {
+              "$ref": "#/definitions/behaviorAction"
+            }
+          }
+        }
+      }
+    },
+    "behaviorConstraints": {
+      "type": "object",
+      "properties": {
+        "cooldown": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "冷却时间（毫秒）"
+        },
+        "maxExecutions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxExecutionsPer": {
+          "type": "object",
+          "properties": {
+            "minute": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "hour": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "day": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "timeWindow": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "pattern": "^[0-9]{2}:[0-9]{2}$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^[0-9]{2}:[0-9]{2}$"
+            },
+            "timezone": {
+              "type": "string"
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "users": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
