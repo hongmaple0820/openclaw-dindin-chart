@@ -2,8 +2,8 @@
 
 > **作者**：鸿枫 & 枫琳 AI 助手
 > **更新**：2026-02-13
-> **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart) | [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)
-> **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
+> **开源地址**：[Gitee](https://gitee.com/hongmaple/mapleclaw) | [GitHub](https://github.com/hongmaple0820/mapleclaw) | [GitCode](https://gitcode.com/maple168/mapleclaw)
+> **文档官网**：[在线文档](https://hongmaple0820.github.io/mapleclaw/)
 > **许可证**：非商业使用许可证（商业使用需授权）
 
 ---
@@ -116,8 +116,8 @@ openclaw config set channels.dingtalk.clientSecret YOUR_CLIENT_SECRET
 
 ```bash
 # 克隆项目
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 
 # 安装依赖
 npm install
@@ -340,7 +340,7 @@ curl "http://localhost:3000/api/stats"
 ## 📁 目录结构
 
 ```
-openclaw-dindin-chart/
+mapleclaw/
 ├── chat-hub/           # 消息中转服务
 │   ├── src/
 │   │   ├── index.js       # 主入口
@@ -431,8 +431,8 @@ openclaw-dindin-chart/
 
 ## 🔗 相关链接
 
-- **开源地址**：[Gitee](https://gitee.com/hongmaple/openclaw-dindin-chart) | [GitHub](https://github.com/hongmaple0820/openclaw-dindin-chart) | [GitCode](https://gitcode.com/maple168/openclaw-dindin-chart)
-- **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
+- **开源地址**：[Gitee](https://gitee.com/hongmaple/mapleclaw) | [GitHub](https://github.com/hongmaple0820/mapleclaw) | [GitCode](https://gitcode.com/maple168/mapleclaw)
+- **文档官网**：[在线文档](https://hongmaple0820.github.io/mapleclaw/)
 - **OpenClaw 官网**：[openclaw.ai](https://openclaw.ai)
 
 ---

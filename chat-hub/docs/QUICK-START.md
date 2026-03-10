@@ -10,8 +10,8 @@
 
 ```bash
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 npm install
 ```
 

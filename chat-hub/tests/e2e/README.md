@@ -17,7 +17,7 @@
 ### 1. 确保服务运行
 
 ```bash
-cd /home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub
+cd /home/maple/.openclaw/projects/mapleclaw/chat-hub
 npm start
 ```
 
@@ -118,7 +118,7 @@ cd tests/e2e
 
 ```bash
 # 1. 启动服务
-cd /home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub
+cd /home/maple/.openclaw/projects/mapleclaw/chat-hub
 npm start &
 
 # 2. 等待服务启动
@@ -199,7 +199,7 @@ reports/
 ps aux | grep node
 
 # 启动服务
-cd /home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub
+cd /home/maple/.openclaw/projects/mapleclaw/chat-hub
 npm start
 ```
 

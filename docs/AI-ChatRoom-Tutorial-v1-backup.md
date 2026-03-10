@@ -2,8 +2,8 @@
 
 > 作者：鸿枫 & 小琳（AI 助手）  
 > 更新：2026-02-06 07:00  
-> 开源地址：https://gitee.com/hongmaple/openclaw-dindin-chart  
-> GitHub 镜像：https://github.com/hongmaple/openclaw-dindin-chart  
+> 开源地址：https://gitee.com/hongmaple/mapleclaw  
+> GitHub 镜像：https://github.com/hongmaple/mapleclaw  
 > 许可证：**非商业使用许可证**（商业使用需授权）
 
 ---
@@ -29,8 +29,8 @@
 
 **快速体验**：
 ```bash
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 npm install
 cp config/default.json config/local.json
 # 编辑 local.json 配置你的密钥
@@ -38,7 +38,7 @@ npm start
 ```
 
 **技术支持**：
-- 提 Issue：https://gitee.com/hongmaple/openclaw-dindin-chart/issues
+- 提 Issue：https://gitee.com/hongmaple/mapleclaw/issues
 - 加入交流群：（钉钉群二维码）
 
 ---
@@ -188,8 +188,8 @@ openclaw config set channels.dingtalk.clientSecret YOUR_CLIENT_SECRET
 ```bash
 # 克隆项目
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 
 # 安装依赖
 npm install
@@ -418,7 +418,7 @@ ssh -L 8080:localhost:8080 user@your-server
 
 3. 检查服务运行状态：
 ```bash
-pm2 start ~/.openclaw/openclaw-dindin-chart/chat-hub/start.sh --name chat-hub
+pm2 start ~/.openclaw/mapleclaw/chat-hub/start.sh --name chat-hub
 pm2 logs chat-hub --lines 30
 ```
 
@@ -470,7 +470,7 @@ node src/index.js
 ```
 
 ```bash
-pm2 start ~/.openclaw/openclaw-dindin-chart/chat-hub/start.sh --name chat-hub
+pm2 start ~/.openclaw/mapleclaw/chat-hub/start.sh --name chat-hub
 ```
 
 ### 坑 12：触发器只监听一个 Redis 频道
@@ -663,7 +663,7 @@ const replySignals = [
 
 运行测试：
 ```bash
-cd ~/.openclaw/openclaw-dindin-chart
+cd ~/.openclaw/mapleclaw
 bash tests/run-all.sh
 ```
 
@@ -743,8 +743,8 @@ bash tests/run-all.sh
 
 ## 🔗 相关资源
 
-- **开源仓库**：https://gitee.com/hongmaple/openclaw-dindin-chart
-- **GitHub 镜像**：https://github.com/hongmaple/openclaw-dindin-chart
+- **开源仓库**：https://gitee.com/hongmaple/mapleclaw
+- **GitHub 镜像**：https://github.com/hongmaple/mapleclaw
 - **OpenClaw 官网**：https://openclaw.ai
 - **OpenClaw 文档**：https://docs.openclaw.ai
 
@@ -770,8 +770,8 @@ bash tests/run-all.sh
 
 如果这个项目对你有帮助，请给个 Star ⭐
 
-- Gitee：https://gitee.com/hongmaple/openclaw-dindin-chart
-- GitHub：https://github.com/hongmaple/openclaw-dindin-chart
+- Gitee：https://gitee.com/hongmaple/mapleclaw
+- GitHub：https://github.com/hongmaple/mapleclaw
 
 ---
 

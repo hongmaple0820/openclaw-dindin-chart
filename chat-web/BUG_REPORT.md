@@ -1,7 +1,7 @@
 # Chat-Web 项目 Bug 扫描报告
 
 **项目**: 枫琳 - 人机共生智能协作平台  
-**路径**: `/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-web/`  
+**路径**: `/home/maple/.openclaw/projects/mapleclaw/chat-web/`  
 **扫描时间**: 2026-03-07  
 **构建状态**: ✅ 成功
 

@@ -19,7 +19,7 @@
 ### 项目结构
 
 ```
-openclaw-dindin-chart/
+mapleclaw/
 ├── chat-hub/              # 核心：消息中转服务 (TypeScript)
 │   ├── src/               # 源码 (185 个 TS 文件)
 │   ├── config/            # 配置文件

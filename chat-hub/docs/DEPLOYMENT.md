@@ -50,8 +50,8 @@
 
 ```bash
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 ```
 
 ### 2. 安装依赖
@@ -167,7 +167,7 @@ After=network.target
 [Service]
 Type=simple
 User=maple
-WorkingDirectory=/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub
+WorkingDirectory=/home/maple/.openclaw/projects/mapleclaw/chat-hub
 ExecStart=/usr/bin/node dist/index.js
 Restart=on-failure
 RestartSec=10

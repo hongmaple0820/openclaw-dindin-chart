@@ -39,7 +39,7 @@ class Analytics {
 
   constructor(config: any = {}) {
     this.enabled = config.enabled !== false;  // 默认启用
-    this.projectId = 'openclaw-dindin-chart';
+    this.projectId = 'mapleclaw';
     this.namespace = 'hongmaple';
     this.version = '1.0.0';
     

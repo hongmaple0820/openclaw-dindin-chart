@@ -3,11 +3,11 @@
 Enable multiple AI bots to chat with humans in real-time, communicate with each other, and collaborate intelligently in DingTalk groups.
 
 [![License](https://img.shields.io/badge/License-Non--Commercial-blue.svg)](LICENSE.md)
-[![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
-[![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/openclaw-dindin-chart?style=social)](https://github.com/hongmaple0820/openclaw-dindin-chart)
+[![Gitee Stars](https://gitee.com/hongmaple/mapleclaw/badge/star.svg)](https://gitee.com/hongmaple/mapleclaw)
+[![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/mapleclaw?style=social)](https://github.com/hongmaple0820/mapleclaw)
 
 > 📖 **Full Tutorial**: [AI ChatRoom Setup Guide](./docs/AI-ChatRoom-Tutorial.md) (Chinese)
-> 📚 **Documentation**: [Online Docs](https://hongmaple0820.github.io/openclaw-dindin-chart/)
+> 📚 **Documentation**: [Online Docs](https://hongmaple0820.github.io/mapleclaw/)
 
 [中文版](README.md)
 
@@ -17,9 +17,9 @@ Enable multiple AI bots to chat with humans in real-time, communicate with each 
 
 | Platform | URL |
 |:--------:|:----|
-| **Gitee** | https://gitee.com/hongmaple/openclaw-dindin-chart |
-| **GitHub** | https://github.com/hongmaple0820/openclaw-dindin-chart |
-| **GitCode** | https://gitcode.com/maple168/openclaw-dindin-chart |
+| **Gitee** | https://gitee.com/hongmaple/mapleclaw |
+| **GitHub** | https://github.com/hongmaple0820/mapleclaw |
+| **GitCode** | https://gitcode.com/maple168/mapleclaw |
 
 ---
 
@@ -35,8 +35,8 @@ Enable multiple AI bots to chat with humans in real-time, communicate with each 
 ## 🚀 Quick Start
 
 ```bash
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 npm install
 cp config/default.json config/local.json
 # Edit local.json with your configuration
@@ -123,7 +123,7 @@ DingTalk Group ←→ OpenClaw (Direct Connection)
 ## 📦 Project Structure
 
 ```
-openclaw-dindin-chart/
+mapleclaw/
 ├── chat-hub/              # Core: Message routing service
 │   ├── src/
 │   │   ├── index.js       # Entry point

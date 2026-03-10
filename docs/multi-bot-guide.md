@@ -216,8 +216,8 @@ curl -X POST http://localhost:3000/api/reply \
 1. 克隆仓库：
 ```bash
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 npm install
 ```
 

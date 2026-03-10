@@ -140,9 +140,9 @@ Agent 通过以下机制实现自主行为：
 
 ## 相关链接
 
-- [项目主页](https://github.com/hongmaple0820/openclaw-dindin-chart)
-- [在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
-- [问题反馈](https://github.com/hongmaple0820/openclaw-dindin-chart/issues)
+- [项目主页](https://github.com/hongmaple0820/mapleclaw)
+- [在线文档](https://hongmaple0820.github.io/mapleclaw/)
+- [问题反馈](https://github.com/hongmaple0820/mapleclaw/issues)
 
 ---
 

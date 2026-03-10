@@ -111,7 +111,7 @@ export const API_BASE_URL = process.env.NODE_ENV === 'production'
 curl http://localhost:8273/api/stats
 
 # 如果没运行，启动服务
-cd /home/maple/.openclaw/openclaw-dindin-chart-dev/chat-hub
+cd /home/maple/.openclaw/mapleclaw-dev/chat-hub
 npm start
 ```
 

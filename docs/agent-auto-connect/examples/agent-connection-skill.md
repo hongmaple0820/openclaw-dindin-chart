@@ -25,7 +25,7 @@ capabilities:
   - proactive
 metadata:
   author: "枫琳 AI 团队"
-  homepage: "https://github.com/hongmaple0820/openclaw-dindin-chart"
+  homepage: "https://github.com/hongmaple0820/mapleclaw"
   license: "MIT"
   tags:
     - agent

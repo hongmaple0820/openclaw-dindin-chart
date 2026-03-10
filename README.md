@@ -3,11 +3,11 @@
 让多个 AI 机器人在钉钉群中与人类实时聊天、智能协作。
 
 [![License](https://img.shields.io/badge/License-非商业使用-blue.svg)](LICENSE.md)
-[![Gitee Stars](https://gitee.com/hongmaple/openclaw-dindin-chart/badge/star.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
-[![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/openclaw-dindin-chart?style=social)](https://github.com/hongmaple0820/openclaw-dindin-chart)
+[![Gitee Stars](https://gitee.com/hongmaple/mapleclaw/badge/star.svg)](https://gitee.com/hongmaple/mapleclaw)
+[![GitHub Stars](https://img.shields.io/github/stars/hongmaple0820/mapleclaw?style=social)](https://github.com/hongmaple0820/mapleclaw)
 
 > 📖 **完整教程**：[AI 聊天室搭建教程](./docs/AI-ChatRoom-Tutorial.md)
-> 📚 **文档官网**：[在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/)
+> 📚 **文档官网**：[在线文档](https://hongmaple0820.github.io/mapleclaw/)
 
 [English](README.en.md)
 
@@ -17,9 +17,9 @@
 
 | 平台 | 地址 |
 |:----:|:-----|
-| **Gitee** | https://gitee.com/hongmaple/openclaw-dindin-chart |
-| **GitHub** | https://github.com/hongmaple0820/openclaw-dindin-chart |
-| **GitCode** | https://gitcode.com/maple168/openclaw-dindin-chart |
+| **Gitee** | https://gitee.com/hongmaple/mapleclaw |
+| **GitHub** | https://github.com/hongmaple0820/mapleclaw |
+| **GitCode** | https://gitcode.com/maple168/mapleclaw |
 
 ---
 
@@ -35,8 +35,8 @@
 ## 🚀 快速开始
 
 ```bash
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 npm install
 cp config/default.json config/local.json
 # 编辑 local.json 配置你的密钥
@@ -262,7 +262,7 @@ await fetch('http://localhost:8273/api/v1/dm/send', {
 ## 📦 项目结构
 
 ```
-openclaw-dindin-chart/
+mapleclaw/
 ├── chat-hub/              # 核心：消息中转服务
 │   ├── src/
 │   │   ├── index.ts       # 启动入口
@@ -312,8 +312,8 @@ openclaw-dindin-chart/
 ```bash
 # 克隆项目
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 
 # 安装依赖
 npm install
@@ -732,7 +732,7 @@ curl -X POST http://localhost:3000/api/v1/dm/send \
 
 ### 📖 其他资源
 - [完整搭建教程](./docs/AI-ChatRoom-Tutorial.md) ⭐
-- [在线文档](https://hongmaple0820.github.io/openclaw-dindin-chart/) 📚
+- [在线文档](https://hongmaple0820.github.io/mapleclaw/) 📚
 
 ---
 

@@ -2,7 +2,7 @@
 
 基于 Node.js + Redis + SQLite 的消息中转服务，让多个 AI 机器人（OpenClaw）能够在钉钉群中与人类实时聊天、智能协作。
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://gitee.com/hongmaple/openclaw-dindin-chart)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://gitee.com/hongmaple/mapleclaw)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
@@ -101,8 +101,8 @@
 ```bash
 # 克隆项目
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 
 # 安装依赖
 npm install

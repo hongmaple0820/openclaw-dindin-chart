@@ -37,13 +37,13 @@ Phase 0 只有在以下条件全部满足时才算完成：
 
 | ID | 状态 | 问题 | 代码证据 | 影响 |
 |---|---|---|---|---|
-| B-01 | 已完成 | 根 README 已对齐到 `index.ts/server.ts` 真实入口 | [`README.md`](/home/maple/.openclaw/projects/openclaw-dindin-chart/README.md) | 文档漂移已收敛 |
-| B-02 | 已完成 | Jest 覆盖路径已修正，当前按模块级统计 `skills`、`observability`、`email` 路由 | [`jest.config.js`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub/tests/jest.config.js) | 覆盖率不再恒为 0，CI 门禁可用 |
-| B-03 | 进行中 | Relay 默认端口与容器端口冲突 | [`server.ts`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub/src/server.ts:2065), [`docker-compose.yml`](/home/maple/.openclaw/projects/openclaw-dindin-chart/docker-compose.yml:36) | 本地与容器语义冲突，影响切流与排障 |
-| B-04 | 进行中 | Redis 仍是主通知链路，Relay 只是可选旁路 | [`server.ts`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub/src/server.ts:2072), [`server.ts`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub/src/server.ts:305) | 不能直接宣称“已完成 Relay 替代 Redis” |
-| B-05 | 已完成 | Observability 前后端契约已补齐 `/system` | [`observability.js`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-web/src/api/observability.js), [`observability.ts`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub/src/routes/observability.ts) | 契约漂移已收敛 |
-| B-06 | 已完成 | Observability 路由注释已改为 `server.ts` | [`observability.ts`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-hub/src/routes/observability.ts:7) | 再次文档漂移风险下降 |
-| B-07 | 已完成 | 前端已具备测试脚本与最小冒烟链路 | [`chat-web/package.json`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-web/package.json), [`Home.test.js`](/home/maple/.openclaw/projects/openclaw-dindin-chart/chat-web/src/views/Home.test.js) | 已建立 UI 回归门禁骨架 |
+| B-01 | 已完成 | 根 README 已对齐到 `index.ts/server.ts` 真实入口 | [`README.md`](/home/maple/.openclaw/projects/mapleclaw/README.md) | 文档漂移已收敛 |
+| B-02 | 已完成 | Jest 覆盖路径已修正，当前按模块级统计 `skills`、`observability`、`email` 路由 | [`jest.config.js`](/home/maple/.openclaw/projects/mapleclaw/chat-hub/tests/jest.config.js) | 覆盖率不再恒为 0，CI 门禁可用 |
+| B-03 | 进行中 | Relay 默认端口与容器端口冲突 | [`server.ts`](/home/maple/.openclaw/projects/mapleclaw/chat-hub/src/server.ts:2065), [`docker-compose.yml`](/home/maple/.openclaw/projects/mapleclaw/docker-compose.yml:36) | 本地与容器语义冲突，影响切流与排障 |
+| B-04 | 进行中 | Redis 仍是主通知链路，Relay 只是可选旁路 | [`server.ts`](/home/maple/.openclaw/projects/mapleclaw/chat-hub/src/server.ts:2072), [`server.ts`](/home/maple/.openclaw/projects/mapleclaw/chat-hub/src/server.ts:305) | 不能直接宣称“已完成 Relay 替代 Redis” |
+| B-05 | 已完成 | Observability 前后端契约已补齐 `/system` | [`observability.js`](/home/maple/.openclaw/projects/mapleclaw/chat-web/src/api/observability.js), [`observability.ts`](/home/maple/.openclaw/projects/mapleclaw/chat-hub/src/routes/observability.ts) | 契约漂移已收敛 |
+| B-06 | 已完成 | Observability 路由注释已改为 `server.ts` | [`observability.ts`](/home/maple/.openclaw/projects/mapleclaw/chat-hub/src/routes/observability.ts:7) | 再次文档漂移风险下降 |
+| B-07 | 已完成 | 前端已具备测试脚本与最小冒烟链路 | [`chat-web/package.json`](/home/maple/.openclaw/projects/mapleclaw/chat-web/package.json), [`Home.test.js`](/home/maple/.openclaw/projects/mapleclaw/chat-web/src/views/Home.test.js) | 已建立 UI 回归门禁骨架 |
 | B-08 | 待处理 | 仓库未见 Sonar/ZAP/Lighthouse 等配置 | 本地扫描结果 | 安全与性能目标无承载面 |
 
 ## 4. 任务拆解

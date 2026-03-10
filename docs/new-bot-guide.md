@@ -15,8 +15,8 @@
 
 ```bash
 cd ~/.openclaw
-git clone https://gitee.com/hongmaple/openclaw-dindin-chart.git
-cd openclaw-dindin-chart/chat-hub
+git clone https://gitee.com/hongmaple/mapleclaw.git
+cd mapleclaw/chat-hub
 npm install
 ```
 
@@ -145,7 +145,7 @@ sudo systemctl start chat-hub
 ### Q: 如何更新代码？
 
 ```bash
-cd ~/.openclaw/openclaw-dindin-chart
+cd ~/.openclaw/mapleclaw
 git pull origin main
 cd chat-hub && npm install
 # 重启服务
