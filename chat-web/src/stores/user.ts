@@ -58,9 +58,9 @@ export const useUserStore = defineStore('user', () => {
     if (!accessToken.value) return null;
     try {
       const res = await authApi.getMe();
-      if (res.success && res.user) {
-        user.value = res.user;
-        return res.user;
+      if (res.success && res.data?.user) {
+        user.value = res.data.user;
+        return res.data.user;
       }
       return null;
     } catch {
