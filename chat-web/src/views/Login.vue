@@ -4,8 +4,8 @@
   @date 2026-02-06
 -->
 <template>
-  <div class="login-page">
-    <el-card class="login-card">
+  <div class="login-page" role="main">
+    <el-card class="login-card" role="form" aria-label="登录表单">
       <template #header>
         <div class="card-header">
           <h2>登录</h2>
@@ -21,6 +21,8 @@
         :closable="false"
         show-icon
         class="status-alert"
+        role="alert"
+        aria-live="polite"
       />
 
       <el-form
@@ -36,6 +38,8 @@
             placeholder="请输入用户名"
             :prefix-icon="User"
             size="large"
+            aria-label="用户名"
+            aria-required="true"
           />
         </el-form-item>
 
@@ -47,6 +51,8 @@
             :prefix-icon="Lock"
             size="large"
             show-password
+            aria-label="密码"
+            aria-required="true"
           />
         </el-form-item>
 
@@ -57,13 +63,14 @@
             :loading="loading"
             native-type="submit"
             class="submit-btn"
+            aria-label="登录按钮"
           >
             登录
           </el-button>
         </el-form-item>
 
         <div class="form-footer">
-          <router-link to="/register">没有账号？立即注册</router-link>
+          <router-link to="/register" aria-label="前往注册页面">没有账号？立即注册</router-link>
         </div>
       </el-form>
     </el-card>

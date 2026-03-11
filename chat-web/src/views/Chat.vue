@@ -5,57 +5,60 @@
   功能：消息列表、@智能提及、Markdown渲染、表情、图片、私聊入口
 -->
 <template>
-  <div class="chat-page">
+  <div class="chat-page" role="main">
     <!-- 移动端遮罩层 -->
-    <div class="mobile-overlay" :class="{ show: showMobileMenu }" @click="showMobileMenu = false"></div>
+    <div class="mobile-overlay" :class="{ show: showMobileMenu }" @click="showMobileMenu = false" aria-hidden="true"></div>
     
     <div class="chat-container">
       <!-- 在线用户列表 -->
-      <div class="user-list" :class="{ 'show-mobile': showMobileMenu }">
+      <aside class="user-list" :class="{ 'show-mobile': showMobileMenu }" aria-label="在线成员列表">
         <div class="list-header">
           <h3>在线成员</h3>
-          <el-badge :value="onlineUsers.length" type="success" />
+          <el-badge :value="onlineUsers.length" type="success" aria-label="在线人数" />
         </div>
-        <div class="users">
+        <div class="users" role="list">
           <div
             v-for="user in onlineUsers"
             :key="user.id"
             class="user-item"
+            role="listitem"
+            tabindex="0"
             @click="showUserActions(user)"
+            @keypress.enter="showUserActions(user)"
           >
-            <el-avatar :size="32">{{ user.name?.[0] || user.nickname?.[0] || '?' }}</el-avatar>
+            <el-avatar :size="32" :aria-label="user.name || user.nickname">{{ user.name?.[0] || user.nickname?.[0] || '?' }}</el-avatar>
             <span class="user-name">{{ user.name || user.nickname }}</span>
             <span class="user-role" v-if="user.role">{{ user.role }}</span>
-            <span class="user-type" v-if="user.type === 'bot'">🤖</span>
+            <span class="user-type" v-if="user.type === 'bot'" aria-label="机器人">🤖</span>
           </div>
         </div>
-      </div>
+      </aside>
 
       <!-- 聊天区域 -->
-      <div class="chat-area">
-        <div class="chat-header">
-          <el-button class="mobile-menu-btn" text @click="showMobileMenu = !showMobileMenu">
+      <section class="chat-area" aria-label="聊天区域">
+        <header class="chat-header">
+          <el-button class="mobile-menu-btn" text @click="showMobileMenu = !showMobileMenu" aria-label="打开成员列表">
             <el-icon><Menu /></el-icon>
           </el-button>
           <h3>{{ chatTitle }}</h3>
           <div class="header-actions">
-            <el-button v-if="isPrivateChat" text @click="exitPrivateChat">
+            <el-button v-if="isPrivateChat" text @click="exitPrivateChat" aria-label="返回群聊">
               返回群聊
             </el-button>
-            <el-button text @click="loadMessages">
+            <el-button text @click="loadMessages" aria-label="刷新消息">
               <el-icon><Refresh /></el-icon>
             </el-button>
           </div>
-        </div>
+        </header>
 
         <!-- 消息列表 -->
-        <div class="messages-container" ref="messagesRef" @scroll="handleScroll">
-          <div v-if="loading" class="loading-more">
+        <div class="messages-container" ref="messagesRef" @scroll="handleScroll" role="log" aria-label="消息列表" aria-live="polite">
+          <div v-if="loading" class="loading-more" aria-busy="true">
             <el-icon class="is-loading"><Loading /></el-icon>
             加载中...
           </div>
           
-          <div
+          <article
             v-for="msg in messages"
             :key="msg.id"
             class="message-item"
@@ -63,8 +66,10 @@
               'is-self': msg.sender === currentUser,
               'is-mentioned': isMentioned(msg)
             }"
+            role="article"
+            :aria-label="msg.sender + '的消息'"
           >
-            <el-avatar :size="36" @click="showUserActions({ name: msg.sender })">
+            <el-avatar :size="36" @click="showUserActions({ name: msg.sender })" :aria-label="msg.sender">
               {{ msg.sender?.[0] || '?' }}
             </el-avatar>
             <div class="message-content">
@@ -77,7 +82,7 @@
               <!-- Markdown 渲染 -->
               <div class="message-text" v-html="renderMessage(msg.content)"></div>
               <!-- 图片预览 -->
-              <div v-if="msg.images?.length" class="message-images">
+              <div v-if="msg.images?.length" class="message-images" role="img" :aria-label="'图片 ' + msg.images.length + ' 张'">
                 <el-image
                   v-for="(img, idx) in msg.images"
                   :key="idx"
@@ -85,10 +90,11 @@
                   :preview-src-list="msg.images"
                   fit="cover"
                   class="message-image"
+                  :aria-label="'图片 ' + (idx + 1)"
                 />
               </div>
               <!-- 文件消息 -->
-              <div v-if="msg.file" class="message-file">
+              <div v-if="msg.file" class="message-file" role="link">
                 <div class="file-icon">
                   <el-icon :size="28"><Document /></el-icon>
                 </div>
@@ -96,8 +102,12 @@
                   <div class="file-name">{{ msg.file.name }}</div>
                   <div class="file-size">{{ formatFileSize(msg.file.size) }}</div>
                 </div>
-                <el-button text size="small" class="file-download" @click="downloadFile(msg.file)">
+                <el-button text size="small" class="file-download" @click="downloadFile(msg.file)" :aria-label="'下载 ' + msg.file.name">
                   <el-icon><Download /></el-icon>
+                </el-button>
+              </div>
+            </div>
+          </article>
                 </el-button>
               </div>
               <!-- 消息操作 -->

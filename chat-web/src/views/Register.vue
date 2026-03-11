@@ -4,8 +4,8 @@
   @date 2026-02-06
 -->
 <template>
-  <div class="register-page">
-    <el-card class="register-card">
+  <div class="register-page" role="main">
+    <el-card class="register-card" role="form" aria-label="注册表单">
       <template #header>
         <div class="card-header">
           <h2>注册</h2>
@@ -14,7 +14,7 @@
       </template>
 
       <!-- 注册成功提示 -->
-      <div v-if="registered" class="success-panel">
+      <div v-if="registered" class="success-panel" role="status" aria-live="polite">
         <el-result icon="success" title="注册成功！">
           <template #sub-title>
             <p>你的账号 <strong>{{ registeredUser }}</strong> 已提交</p>
@@ -24,7 +24,7 @@
             </p>
           </template>
           <template #extra>
-            <el-button type="primary" @click="router.push('/login')">
+            <el-button type="primary" @click="router.push('/login')" aria-label="返回登录">
               返回登录
             </el-button>
           </template>
@@ -58,6 +58,8 @@
             placeholder="2-20位字母、数字、下划线、中文"
             :prefix-icon="User"
             size="large"
+            aria-label="用户名"
+            aria-required="true"
           />
         </el-form-item>
 
@@ -67,6 +69,7 @@
             placeholder="你想被叫什么名字？"
             :prefix-icon="UserFilled"
             size="large"
+            aria-label="昵称"
           />
         </el-form-item>
 
@@ -76,6 +79,7 @@
             placeholder="用于找回密码（可选）"
             :prefix-icon="Message"
             size="large"
+            aria-label="邮箱"
           />
         </el-form-item>
 
