@@ -2159,6 +2159,24 @@ async function start() {
   }
   app.use('/api/observability', observabilityRoutes);
 
+  // Tracking 埋点服务
+  let trackingService = null;
+  try {
+    const { TrackingService } = require('./services/tracking-service');
+    trackingService = new TrackingService(v2DbRaw);
+    console.log('[Server] TrackingService 初始化完成');
+  } catch (e: any) {
+    console.log('[Server] TrackingService 初始化失败:', e.message);
+  }
+
+  // Tracking 路由
+  const trackingRoutes = require('./routes/tracking');
+  if (trackingService && trackingRoutes.setTrackingService) {
+    trackingRoutes.setTrackingService(trackingService);
+  }
+  app.use('/api/tracking', trackingRoutes);
+  app.use('/api/tracking', trackingRoutes);
+
   // ==================== Monitoring (监控告警) ====================
   let monitoringService = null;
   try {
