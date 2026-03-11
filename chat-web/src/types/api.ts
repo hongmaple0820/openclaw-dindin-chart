@@ -1,31 +1,28 @@
-/**
- * API 响应类型定义
- * @author 小琳
- * @date 2026-03-11
- */
+import type { User } from './models';
 
-export interface ApiResponse<T = unknown> {
+export interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
-  data?: T;
-  message?: string;
   error?: string;
+  message?: string;
   code?: string;
+  [key: string]: unknown;
 }
 
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+export interface PaginatedResponse<T> extends ApiResponse {
   total: number;
   page: number;
   limit: number;
+  items?: T[];
 }
 
 export interface LoginResponse extends ApiResponse {
-  user?: import('./models').User;
+  user?: User;
   accessToken?: string;
   refreshToken?: string;
 }
 
 export interface RegisterResponse extends ApiResponse {
-  user?: import('./models').User;
+  user?: User;
   accessToken?: string;
   refreshToken?: string;
 }

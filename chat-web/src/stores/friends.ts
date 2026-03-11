@@ -6,24 +6,35 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { friendApi } from '@/api/friends';
+import type { Friend, FriendRequest, ApiResponse } from '@/types';
+
+interface FriendWithGroup extends Friend {
+  groupName?: string;
+  remark?: string;
+}
+
+interface ApiResponseWithFriends extends ApiResponse {
+  friends?: FriendWithGroup[];
+}
+
+interface ApiResponseWithRequests extends ApiResponse {
+  requests?: FriendRequest[];
+}
 
 export const useFriendStore = defineStore('friends', () => {
-  // 状态
-  const friends = ref([]);
-  const requests = ref([]);
-  const currentFriend = ref(null);
+  const friends = ref<FriendWithGroup[]>([]);
+  const requests = ref<FriendRequest[]>([]);
+  const currentFriend = ref<FriendWithGroup | null>(null);
   const loading = ref(false);
   const requestLoading = ref(false);
 
-  // 计算属性
   const friendCount = computed(() => friends.value.length);
   const pendingRequestCount = computed(() => 
     requests.value.filter(r => r.status === 'pending').length
   );
 
-  // 按分组分类好友
   const friendsByGroup = computed(() => {
-    const groups = {};
+    const groups: Record<string, FriendWithGroup[]> = {};
     friends.value.forEach(friend => {
       const group = friend.groupName || '默认分组';
       if (!groups[group]) {
@@ -34,74 +45,66 @@ export const useFriendStore = defineStore('friends', () => {
     return groups;
   });
 
-  // 获取好友列表
-  async function fetchFriends() {
+  async function fetchFriends(): Promise<ApiResponseWithFriends> {
     loading.value = true;
     try {
       const res = await friendApi.getList();
-      if (res.success) {
+      if (res.success && res.friends) {
         friends.value = res.friends;
       }
-      return res;
+      return res as ApiResponseWithFriends;
     } catch (error) {
       console.error('获取好友列表失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     } finally {
       loading.value = false;
     }
   }
 
-  // 获取好友申请列表
-  async function fetchRequests() {
+  async function fetchRequests(): Promise<ApiResponseWithRequests> {
     requestLoading.value = true;
     try {
       const res = await friendApi.getRequests();
-      if (res.success) {
+      if (res.success && res.requests) {
         requests.value = res.requests;
       }
-      return res;
+      return res as ApiResponseWithRequests;
     } catch (error) {
       console.error('获取好友申请失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     } finally {
       requestLoading.value = false;
     }
   }
 
-  // 搜索用户
-  async function searchUsers(query) {
+  async function searchUsers(query: string): Promise<ApiResponse> {
     try {
       const res = await friendApi.search(query);
       return res;
     } catch (error) {
       console.error('搜索用户失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 发送好友申请
-  async function sendRequest(data) {
+  async function sendRequest(data: { userId: string; message?: string }): Promise<ApiResponse> {
     try {
       const res = await friendApi.sendRequest(data);
       return res;
     } catch (error) {
       console.error('发送好友申请失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 处理好友申请
-  async function handleRequest(requestId, status) {
+  async function handleRequest(requestId: string, status: 'accepted' | 'rejected'): Promise<ApiResponse> {
     try {
       const res = await friendApi.handleRequest(requestId, status);
       if (res.success) {
-        // 更新申请列表
         const index = requests.value.findIndex(r => r.id === requestId);
         if (index !== -1) {
           if (status === 'accepted') {
-            // 同意后移除申请
             requests.value.splice(index, 1);
-            // 刷新好友列表
             await fetchFriends();
           } else {
             requests.value[index].status = status;
@@ -111,16 +114,14 @@ export const useFriendStore = defineStore('friends', () => {
       return res;
     } catch (error) {
       console.error('处理好友申请失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 设置好友备注
-  async function setRemark(friendId, remark) {
+  async function setRemark(friendId: string, remark: string): Promise<ApiResponse> {
     try {
       const res = await friendApi.setRemark(friendId, remark);
       if (res.success) {
-        // 更新本地状态
         const friend = friends.value.find(f => f.id === friendId);
         if (friend) {
           friend.remark = remark;
@@ -129,21 +130,18 @@ export const useFriendStore = defineStore('friends', () => {
       return res;
     } catch (error) {
       console.error('设置备注失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 删除好友
-  async function deleteFriend(friendId) {
+  async function deleteFriend(friendId: string): Promise<ApiResponse> {
     try {
       const res = await friendApi.delete(friendId);
       if (res.success) {
-        // 从列表中移除
         const index = friends.value.findIndex(f => f.id === friendId);
         if (index !== -1) {
           friends.value.splice(index, 1);
         }
-        // 清除当前选中的好友
         if (currentFriend.value?.id === friendId) {
           currentFriend.value = null;
         }
@@ -151,16 +149,14 @@ export const useFriendStore = defineStore('friends', () => {
       return res;
     } catch (error) {
       console.error('删除好友失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 拉黑用户
-  async function blockUser(friendId) {
+  async function blockUser(friendId: string): Promise<ApiResponse> {
     try {
       const res = await friendApi.block(friendId);
       if (res.success) {
-        // 从好友列表移除
         const index = friends.value.findIndex(f => f.id === friendId);
         if (index !== -1) {
           friends.value.splice(index, 1);
@@ -172,32 +168,27 @@ export const useFriendStore = defineStore('friends', () => {
       return res;
     } catch (error) {
       console.error('拉黑失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 选择好友
-  function selectFriend(friend) {
+  function selectFriend(friend: FriendWithGroup): void {
     currentFriend.value = friend;
   }
 
-  // 清除选择
-  function clearSelection() {
+  function clearSelection(): void {
     currentFriend.value = null;
   }
 
   return {
-    // 状态
     friends,
     requests,
     currentFriend,
     loading,
     requestLoading,
-    // 计算属性
     friendCount,
     pendingRequestCount,
     friendsByGroup,
-    // 方法
     fetchFriends,
     fetchRequests,
     searchUsers,

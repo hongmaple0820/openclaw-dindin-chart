@@ -6,22 +6,31 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { groupApi } from '@/api/groups';
+import type { Group, GroupMember } from '@/types';
+
+interface GroupWithUnread extends Group {
+  unreadCount?: number;
+}
+
+interface CreateGroupData {
+  name: string;
+  description?: string;
+  avatar?: string;
+  memberIds?: string[];
+}
 
 export const useGroupStore = defineStore('groups', () => {
-  // 状态
-  const groups = ref([]);
-  const currentGroup = ref(null);
-  const currentMembers = ref([]);
+  const groups = ref<GroupWithUnread[]>([]);
+  const currentGroup = ref<Group | null>(null);
+  const currentMembers = ref<GroupMember[]>([]);
   const loading = ref(false);
-  const error = ref(null);
+  const error = ref<string | null>(null);
 
-  // 计算属性
   const totalUnread = computed(() => {
     return groups.value.reduce((sum, g) => sum + (g.unreadCount || 0), 0);
   });
 
-  // 加载群聊列表
-  async function fetchGroups() {
+  async function fetchGroups(): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
@@ -32,32 +41,30 @@ export const useGroupStore = defineStore('groups', () => {
         error.value = res.error || '加载群聊列表失败';
       }
     } catch (err) {
-      error.value = err.message || '加载群聊列表失败';
+      error.value = (err as Error).message || '加载群聊列表失败';
     } finally {
       loading.value = false;
     }
   }
 
-  // 加载群详情
-  async function fetchGroupDetail(id) {
+  async function fetchGroupDetail(id: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await groupApi.getDetail(id);
-      if (res.success) {
+      if (res.success && res.group) {
         currentGroup.value = res.group;
       } else {
         error.value = res.error || '加载群详情失败';
       }
     } catch (err) {
-      error.value = err.message || '加载群详情失败';
+      error.value = (err as Error).message || '加载群详情失败';
     } finally {
       loading.value = false;
     }
   }
 
-  // 加载群成员
-  async function fetchMembers(id) {
+  async function fetchMembers(id: string): Promise<void> {
     try {
       const res = await groupApi.getMembers(id);
       if (res.success) {
@@ -68,13 +75,12 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 创建群聊
-  async function createGroup(data) {
+  async function createGroup(data: CreateGroupData): Promise<Group | null> {
     loading.value = true;
     error.value = null;
     try {
       const res = await groupApi.create(data);
-      if (res.success) {
+      if (res.success && res.group) {
         groups.value.unshift(res.group);
         return res.group;
       } else {
@@ -82,19 +88,17 @@ export const useGroupStore = defineStore('groups', () => {
         return null;
       }
     } catch (err) {
-      error.value = err.message || '创建群聊失败';
+      error.value = (err as Error).message || '创建群聊失败';
       return null;
     } finally {
       loading.value = false;
     }
   }
 
-  // 邀请成员
-  async function inviteMembers(groupId, userIds) {
+  async function inviteMembers(groupId: string, userIds: string[]): Promise<boolean> {
     try {
       const res = await groupApi.invite(groupId, { userIds });
       if (res.success) {
-        // 刷新成员列表
         await fetchMembers(groupId);
         return true;
       }
@@ -105,8 +109,7 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 移除成员
-  async function removeMember(groupId, userId) {
+  async function removeMember(groupId: string, userId: string): Promise<boolean> {
     try {
       const res = await groupApi.removeMember(groupId, userId);
       if (res.success) {
@@ -120,14 +123,13 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 设置管理员
-  async function setAdmin(groupId, userId, isAdmin) {
+  async function setAdmin(groupId: string, userId: string, isAdmin: boolean): Promise<boolean> {
     try {
       const res = await groupApi.setAdmin(groupId, userId, isAdmin);
       if (res.success) {
         const member = currentMembers.value.find(m => m.userId === userId);
         if (member) {
-          member.isAdmin = isAdmin;
+          member.role = isAdmin ? 'admin' : 'member';
         }
         return true;
       }
@@ -138,12 +140,10 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 转让群主
-  async function transferOwner(groupId, newOwnerId) {
+  async function transferOwner(groupId: string, newOwnerId: string): Promise<boolean> {
     try {
       const res = await groupApi.transfer(groupId, newOwnerId);
       if (res.success) {
-        // 刷新群详情和成员
         await fetchGroupDetail(groupId);
         await fetchMembers(groupId);
         return true;
@@ -155,8 +155,7 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 退出群聊
-  async function leaveGroup(groupId) {
+  async function leaveGroup(groupId: string): Promise<boolean> {
     try {
       const res = await groupApi.leave(groupId);
       if (res.success) {
@@ -174,8 +173,7 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 解散群聊
-  async function dismissGroup(groupId) {
+  async function dismissGroup(groupId: string): Promise<boolean> {
     try {
       const res = await groupApi.dismiss(groupId);
       if (res.success) {
@@ -193,8 +191,7 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 设置群名片
-  async function setNickname(groupId, userId, nickname) {
+  async function setNickname(groupId: string, userId: string, nickname: string): Promise<boolean> {
     try {
       const res = await groupApi.setNickname(groupId, userId, nickname);
       if (res.success) {
@@ -211,8 +208,7 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 更新群信息
-  async function updateGroup(groupId, data) {
+  async function updateGroup(groupId: string, data: Partial<Group>): Promise<boolean> {
     try {
       const res = await groupApi.update(groupId, data);
       if (res.success) {
@@ -232,22 +228,18 @@ export const useGroupStore = defineStore('groups', () => {
     }
   }
 
-  // 清除当前群
-  function clearCurrentGroup() {
+  function clearCurrentGroup(): void {
     currentGroup.value = null;
     currentMembers.value = [];
   }
 
   return {
-    // 状态
     groups,
     currentGroup,
     currentMembers,
     loading,
     error,
-    // 计算属性
     totalUnread,
-    // 方法
     fetchGroups,
     fetchGroupDetail,
     fetchMembers,
