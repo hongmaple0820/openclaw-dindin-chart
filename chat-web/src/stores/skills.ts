@@ -6,25 +6,39 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { skillApi } from '@/api/skills';
+import type { Skill, ApiResponse } from '@/types';
+
+interface SkillWithExtras extends Skill {
+  type?: 'built-in' | 'my' | 'market';
+  category?: string;
+  installed?: boolean;
+  installedAt?: string;
+}
+
+interface MCPServer {
+  id: string;
+  name: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  enabled: boolean;
+}
 
 export const useSkillStore = defineStore('skills', () => {
-  // 状态
-  const skills = ref([]);
-  const currentSkill = ref(null);
-  const mcpServers = ref([]);
-  const categories = ref([]);
+  const skills = ref<SkillWithExtras[]>([]);
+  const currentSkill = ref<SkillWithExtras | null>(null);
+  const mcpServers = ref<MCPServer[]>([]);
+  const categories = ref<string[]>([]);
   const loading = ref(false);
   const detailLoading = ref(false);
-  const currentTab = ref('built-in'); // built-in, my, market
+  const currentTab = ref<'built-in' | 'my' | 'market'>('built-in');
   const searchQuery = ref('');
   const categoryFilter = ref('');
 
-  // 计算属性
   const skillCount = computed(() => skills.value.length);
 
-  // 按分类分组
   const skillsByCategory = computed(() => {
-    const groups = {};
+    const groups: Record<string, SkillWithExtras[]> = {};
     skills.value.forEach(skill => {
       const category = skill.category || '未分类';
       if (!groups[category]) {
@@ -35,23 +49,19 @@ export const useSkillStore = defineStore('skills', () => {
     return groups;
   });
 
-  // 内置技能
   const builtInSkills = computed(() => 
     skills.value.filter(s => s.type === 'built-in')
   );
 
-  // 我的技能（已安装）
   const mySkills = computed(() => 
     skills.value.filter(s => s.installed)
   );
 
-  // 市场技能
   const marketSkills = computed(() => 
     skills.value.filter(s => s.type === 'market')
   );
 
-  // 获取技能列表
-  async function fetchSkills(params = {}) {
+  async function fetchSkills(params: Record<string, unknown> = {}): Promise<ApiResponse> {
     loading.value = true;
     try {
       const res = await skillApi.getList({
@@ -60,41 +70,38 @@ export const useSkillStore = defineStore('skills', () => {
         category: categoryFilter.value,
         ...params
       });
-      if (res.success) {
-        skills.value = res.skills;
+      if (res.success && res.skills) {
+        skills.value = res.skills as SkillWithExtras[];
       }
       return res;
     } catch (error) {
       console.error('获取技能列表失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     } finally {
       loading.value = false;
     }
   }
 
-  // 获取技能详情
-  async function fetchSkillDetail(skillId) {
+  async function fetchSkillDetail(skillId: string): Promise<ApiResponse> {
     detailLoading.value = true;
     try {
       const res = await skillApi.getDetail(skillId);
-      if (res.success) {
-        currentSkill.value = res.skill;
+      if (res.success && res.skill) {
+        currentSkill.value = res.skill as SkillWithExtras;
       }
       return res;
     } catch (error) {
       console.error('获取技能详情失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     } finally {
       detailLoading.value = false;
     }
   }
 
-  // 安装技能
-  async function installSkill(skillId, options = {}) {
+  async function installSkill(skillId: string, options: Record<string, unknown> = {}): Promise<ApiResponse> {
     try {
       const res = await skillApi.install(skillId, options);
       if (res.success) {
-        // 更新本地状态
         const skill = skills.value.find(s => s.id === skillId);
         if (skill) {
           skill.installed = true;
@@ -104,22 +111,19 @@ export const useSkillStore = defineStore('skills', () => {
       return res;
     } catch (error) {
       console.error('安装技能失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 卸载技能
-  async function uninstallSkill(skillId) {
+  async function uninstallSkill(skillId: string): Promise<ApiResponse> {
     try {
       const res = await skillApi.uninstall(skillId);
       if (res.success) {
-        // 更新本地状态
         const skill = skills.value.find(s => s.id === skillId);
         if (skill) {
           skill.installed = false;
-          skill.installedAt = null;
+          skill.installedAt = undefined;
         }
-        // 如果是当前选中的技能，清除选择
         if (currentSkill.value?.id === skillId) {
           currentSkill.value = null;
         }
@@ -127,33 +131,30 @@ export const useSkillStore = defineStore('skills', () => {
       return res;
     } catch (error) {
       console.error('卸载技能失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 更新技能配置
-  async function updateSkillConfig(skillId, config) {
+  async function updateSkillConfig(skillId: string, config: Record<string, unknown>): Promise<ApiResponse> {
     try {
       const res = await skillApi.updateConfig(skillId, config);
       if (res.success) {
-        // 更新本地状态
         const skill = skills.value.find(s => s.id === skillId);
-        if (skill) {
+        if (skill && skill.config) {
           skill.config = { ...skill.config, ...config };
         }
-        if (currentSkill.value?.id === skillId) {
+        if (currentSkill.value?.id === skillId && currentSkill.value.config) {
           currentSkill.value.config = { ...currentSkill.value.config, ...config };
         }
       }
       return res;
     } catch (error) {
       console.error('更新技能配置失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 切换启用状态
-  async function toggleSkillEnabled(skillId, enabled) {
+  async function toggleSkillEnabled(skillId: string, enabled: boolean): Promise<ApiResponse> {
     try {
       const res = await skillApi.toggleEnabled(skillId, enabled);
       if (res.success) {
@@ -168,68 +169,63 @@ export const useSkillStore = defineStore('skills', () => {
       return res;
     } catch (error) {
       console.error('切换技能状态失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 测试技能调用
-  async function testSkillCall(skillId, params = {}) {
+  async function testSkillCall(skillId: string, params: Record<string, unknown> = {}): Promise<ApiResponse> {
     try {
       const res = await skillApi.testCall(skillId, params);
       return res;
     } catch (error) {
       console.error('测试技能调用失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 获取 MCP 服务器列表
-  async function fetchMCPServers() {
+  async function fetchMCPServers(): Promise<ApiResponse> {
     try {
       const res = await skillApi.getMCPServers();
-      if (res.success) {
-        mcpServers.value = res.servers;
+      if (res.success && res.servers) {
+        mcpServers.value = res.servers as MCPServer[];
       }
       return res;
     } catch (error) {
       console.error('获取 MCP 服务器列表失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 添加 MCP 服务器
-  async function addMCPServer(server) {
+  async function addMCPServer(server: Partial<MCPServer>): Promise<ApiResponse> {
     try {
       const res = await skillApi.addMCPServer(server);
-      if (res.success) {
-        mcpServers.value.push(res.server);
+      if (res.success && res.server) {
+        mcpServers.value.push(res.server as MCPServer);
       }
       return res;
     } catch (error) {
       console.error('添加 MCP 服务器失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 更新 MCP 服务器
-  async function updateMCPServer(serverId, server) {
+  async function updateMCPServer(serverId: string, server: Partial<MCPServer>): Promise<ApiResponse> {
     try {
       const res = await skillApi.updateMCPServer(serverId, server);
-      if (res.success) {
+      if (res.success && res.server) {
         const index = mcpServers.value.findIndex(s => s.id === serverId);
         if (index !== -1) {
-          mcpServers.value[index] = res.server;
+          mcpServers.value[index] = res.server as MCPServer;
         }
       }
       return res;
     } catch (error) {
       console.error('更新 MCP 服务器失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 删除 MCP 服务器
-  async function deleteMCPServer(serverId) {
+  async function deleteMCPServer(serverId: string): Promise<ApiResponse> {
     try {
       const res = await skillApi.deleteMCPServer(serverId);
       if (res.success) {
@@ -241,51 +237,44 @@ export const useSkillStore = defineStore('skills', () => {
       return res;
     } catch (error) {
       console.error('删除 MCP 服务器失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 获取分类列表
-  async function fetchCategories() {
+  async function fetchCategories(): Promise<ApiResponse> {
     try {
       const res = await skillApi.getCategories();
-      if (res.success) {
-        categories.value = res.categories;
+      if (res.success && res.categories) {
+        categories.value = res.categories as string[];
       }
       return res;
     } catch (error) {
       console.error('获取分类列表失败:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  // 选择技能
-  function selectSkill(skill) {
+  function selectSkill(skill: SkillWithExtras): void {
     currentSkill.value = skill;
   }
 
-  // 清除选择
-  function clearSelection() {
+  function clearSelection(): void {
     currentSkill.value = null;
   }
 
-  // 设置当前 Tab
-  function setCurrentTab(tab) {
+  function setCurrentTab(tab: 'built-in' | 'my' | 'market'): void {
     currentTab.value = tab;
   }
 
-  // 设置搜索关键词
-  function setSearchQuery(query) {
+  function setSearchQuery(query: string): void {
     searchQuery.value = query;
   }
 
-  // 设置分类筛选
-  function setCategoryFilter(category) {
+  function setCategoryFilter(category: string): void {
     categoryFilter.value = category;
   }
 
   return {
-    // 状态
     skills,
     currentSkill,
     mcpServers,
@@ -295,13 +284,11 @@ export const useSkillStore = defineStore('skills', () => {
     currentTab,
     searchQuery,
     categoryFilter,
-    // 计算属性
     skillCount,
     skillsByCategory,
     builtInSkills,
     mySkills,
     marketSkills,
-    // 方法
     fetchSkills,
     fetchSkillDetail,
     installSkill,
