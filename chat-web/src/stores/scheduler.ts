@@ -6,22 +6,42 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { schedulerApi } from '@/api/scheduler';
+import type { SchedulerJob, ApiResponse } from '@/types';
+
+type SchedulerJobType = 'message' | 'command' | 'reminder' | 'webhook';
+
+interface SchedulerTask extends SchedulerJob {
+  lastStatus?: 'success' | 'failed' | 'running';
+}
+
+interface ExecutionHistory {
+  id: string;
+  jobId: string;
+  status: 'success' | 'failed' | 'running';
+  startedAt: string;
+  completedAt?: string;
+  output?: string;
+  error?: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+}
 
 export const useSchedulerStore = defineStore('scheduler', () => {
-  // ==================== 状态 ====================
-  const tasks = ref([]);
-  const currentTask = ref(null);
-  const history = ref([]);
+  const tasks = ref<SchedulerTask[]>([]);
+  const currentTask = ref<SchedulerTask | null>(null);
+  const history = ref<ExecutionHistory[]>([]);
   const loading = ref(false);
-  const error = ref(null);
-  const pagination = ref({
+  const error = ref<string | null>(null);
+  const pagination = ref<Pagination>({
     page: 1,
     limit: 20,
     total: 0
   });
 
-  // ==================== 计算属性 ====================
-  
   const enabledTasks = computed(() => 
     tasks.value.filter(t => t.enabled)
   );
@@ -49,74 +69,72 @@ export const useSchedulerStore = defineStore('scheduler', () => {
     return stats;
   });
 
-  // ==================== 任务列表操作 ====================
-  
-  async function fetchTasks() {
+  async function fetchTasks(): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await schedulerApi.getList();
-      if (res.success) {
-        tasks.value = res.tasks || [];
+      if (res.success && res.jobs) {
+        tasks.value = res.jobs as SchedulerTask[];
       } else {
         error.value = res.error || '加载定时任务列表失败';
       }
     } catch (err) {
-      error.value = err.message || '加载定时任务列表失败';
+      error.value = (err as Error).message || '加载定时任务列表失败';
     } finally {
       loading.value = false;
     }
   }
 
-  // ==================== 任务详情操作 ====================
-
-  async function fetchTaskDetail(id) {
+  async function fetchTaskDetail(id: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await schedulerApi.getDetail(id);
-      if (res.success) {
-        currentTask.value = res.task;
+      if (res.success && res.job) {
+        currentTask.value = res.job as SchedulerTask;
       } else {
         error.value = res.error || '加载定时任务详情失败';
       }
     } catch (err) {
-      error.value = err.message || '加载定时任务详情失败';
+      error.value = (err as Error).message || '加载定时任务详情失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function createTask(data) {
+  async function createTask(data: { name: string; cron: string; type: SchedulerJobType; config: Record<string, unknown>; enabled?: boolean }): Promise<SchedulerTask | null> {
     loading.value = true;
     error.value = null;
     try {
       const res = await schedulerApi.create(data);
-      if (res.success) {
-        tasks.value.unshift(res.task);
-        return res.task;
+      if (res.success && res.job) {
+        const task = res.job as SchedulerTask;
+        tasks.value.unshift(task);
+        return task;
       } else {
         error.value = res.error || '创建定时任务失败';
         return null;
       }
     } catch (err) {
-      error.value = err.message || '创建定时任务失败';
+      error.value = (err as Error).message || '创建定时任务失败';
       return null;
     } finally {
       loading.value = false;
     }
   }
 
-  async function updateTask(id, data) {
+  async function updateTask(id: string, data: Partial<SchedulerTask>): Promise<boolean> {
     try {
       const res = await schedulerApi.update(id, data);
-      if (res.success) {
+      if (res.success && res.job) {
+        const task = res.job as SchedulerTask;
         const idx = tasks.value.findIndex(t => t.id === id);
         if (idx !== -1) {
-          tasks.value[idx] = { ...tasks.value[idx], ...data };
+          tasks.value[idx] = task;
         }
         if (currentTask.value?.id === id) {
-          currentTask.value = { ...currentTask.value, ...data };
+          currentTask.value = task;
         }
         return true;
       }
@@ -127,7 +145,7 @@ export const useSchedulerStore = defineStore('scheduler', () => {
     }
   }
 
-  async function deleteTask(id) {
+  async function deleteTask(id: string): Promise<boolean> {
     try {
       const res = await schedulerApi.delete(id);
       if (res.success) {
@@ -144,18 +162,17 @@ export const useSchedulerStore = defineStore('scheduler', () => {
     }
   }
 
-  // ==================== 任务状态操作 ====================
-
-  async function toggleTask(id) {
+  async function toggleTask(id: string): Promise<boolean> {
     try {
       const res = await schedulerApi.toggle(id);
       if (res.success) {
-        const idx = tasks.value.findIndex(t => t.id === id);
-        if (idx !== -1) {
-          tasks.value[idx].enabled = !tasks.value[idx].enabled;
+        const enabled = (res as ApiResponse & { enabled?: boolean }).enabled;
+        const task = tasks.value.find(t => t.id === id);
+        if (task && enabled !== undefined) {
+          task.enabled = enabled;
         }
-        if (currentTask.value?.id === id) {
-          currentTask.value.enabled = !currentTask.value.enabled;
+        if (currentTask.value?.id === id && enabled !== undefined) {
+          currentTask.value.enabled = enabled;
         }
         return true;
       }
@@ -166,80 +183,55 @@ export const useSchedulerStore = defineStore('scheduler', () => {
     }
   }
 
-  async function runNow(id) {
+  async function runTaskNow(id: string): Promise<string | null> {
     try {
       const res = await schedulerApi.runNow(id);
-      if (res.success) {
-        const idx = tasks.value.findIndex(t => t.id === id);
-        if (idx !== -1) {
-          tasks.value[idx].lastRunAt = new Date().toISOString();
-          tasks.value[idx].lastStatus = 'running';
-        }
-        return true;
+      if (res.success && res.executionId) {
+        return res.executionId as string;
       }
-      return false;
+      return null;
     } catch (err) {
       console.error('立即执行失败:', err);
-      return false;
+      return null;
     }
   }
 
-  // ==================== 执行历史操作 ====================
-
-  async function fetchHistory(params = {}) {
-    loading.value = true;
-    error.value = null;
+  async function fetchHistory(params: { page?: number; limit?: number; status?: string } = {}): Promise<void> {
     try {
-      const res = await schedulerApi.getHistory({
-        page: pagination.value.page,
-        limit: pagination.value.limit,
-        ...params
-      });
-      if (res.success) {
-        history.value = res.history || [];
-        pagination.value.total = res.total || 0;
-      } else {
-        error.value = res.error || '加载执行历史失败';
+      const res = await schedulerApi.getHistory(params);
+      if (res.success && res.history) {
+        history.value = res.history as ExecutionHistory[];
       }
     } catch (err) {
-      error.value = err.message || '加载执行历史失败';
-    } finally {
-      loading.value = false;
+      console.error('获取执行历史失败:', err);
     }
   }
 
-  async function fetchTaskHistory(taskId, params = {}) {
+  async function fetchTaskHistory(id: string, params: Record<string, unknown> = {}): Promise<void> {
     try {
-      const res = await schedulerApi.getTaskHistory(taskId, params);
-      if (res.success) {
-        if (currentTask.value?.id === taskId) {
-          currentTask.value.history = res.history || [];
-        }
-        return res.history || [];
+      const res = await schedulerApi.getTaskHistory(id, params);
+      if (res.success && res.history) {
+        history.value = res.history as ExecutionHistory[];
       }
-      return [];
     } catch (err) {
-      console.error('加载任务执行历史失败:', err);
-      return [];
+      console.error('获取任务执行历史失败:', err);
     }
   }
 
-  // ==================== Cron 工具 ====================
-
-  async function validateCron(cron) {
+  async function validateCron(cron: string): Promise<{ valid: boolean; error?: string }> {
     try {
       const res = await schedulerApi.validateCron(cron);
-      return res.success && res.valid;
+      return { valid: (res as ApiResponse & { valid?: boolean }).valid || false, error: res.error };
     } catch (err) {
-      return false;
+      return { valid: false, error: (err as Error).message };
     }
   }
 
-  async function getNextRuns(cron, count = 5) {
+  async function getNextRuns(cron: string, count = 5): Promise<string[]> {
     try {
       const res = await schedulerApi.getNextRuns(cron, count);
-      if (res.success) {
-        return res.runs || [];
+      if (res.success && res.runs) {
+        return res.runs as string[];
       }
       return [];
     } catch (err) {
@@ -248,46 +240,31 @@ export const useSchedulerStore = defineStore('scheduler', () => {
     }
   }
 
-  // ==================== 工具方法 ====================
-
-  function setPage(page) {
-    pagination.value.page = page;
-  }
-
-  function clearCurrentTask() {
+  function clearCurrentTask(): void {
     currentTask.value = null;
   }
 
   return {
-    // 状态
     tasks,
     currentTask,
     history,
     loading,
     error,
     pagination,
-    // 计算属性
     enabledTasks,
     disabledTasks,
     taskStats,
-    // 任务列表方法
     fetchTasks,
-    // 任务详情方法
     fetchTaskDetail,
     createTask,
     updateTask,
     deleteTask,
-    // 任务状态方法
     toggleTask,
-    runNow,
-    // 执行历史方法
+    runTaskNow,
     fetchHistory,
     fetchTaskHistory,
-    // Cron 工具方法
     validateCron,
     getNextRuns,
-    // 工具方法
-    setPage,
     clearCurrentTask
   };
 });

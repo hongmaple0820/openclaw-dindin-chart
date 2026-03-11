@@ -4,7 +4,19 @@
  * @date 2026-02-06
  */
 
+interface NotifyOptions {
+  tag?: string;
+  renotify?: boolean;
+  silent?: boolean;
+  timeout?: number;
+  onClick?: () => void;
+  body?: string;
+}
+
 class NotificationManager {
+  private permission: NotificationPermission = 'default';
+  private enabled = true;
+
   constructor() {
     this.permission = 'default';
     this.enabled = true;
@@ -13,7 +25,7 @@ class NotificationManager {
   /**
    * 请求通知权限
    */
-  async requestPermission() {
+  async requestPermission(): Promise<boolean> {
     if (!('Notification' in window)) {
       console.warn('[Notify] 浏览器不支持通知');
       return false;
@@ -36,14 +48,14 @@ class NotificationManager {
   /**
    * 检查是否可以发送通知
    */
-  canNotify() {
+  canNotify(): boolean {
     return this.enabled && this.permission === 'granted' && document.hidden;
   }
 
   /**
    * 发送通知
    */
-  notify(title, options = {}) {
+  notify(title: string, options: NotifyOptions = {}): Notification | null {
     if (!this.canNotify()) return null;
 
     try {
@@ -51,8 +63,6 @@ class NotificationManager {
         icon: '/favicon.ico',
         badge: '/favicon.ico',
         tag: options.tag || 'chat-message',
-        renotify: options.renotify || false,
-        silent: options.silent || false,
         ...options
       });
 
@@ -80,7 +90,7 @@ class NotificationManager {
   /**
    * 发送新消息通知
    */
-  notifyMessage(sender, content, options = {}) {
+  notifyMessage(sender: string, content: string, options: NotifyOptions = {}): Notification | null {
     const truncated = content.length > 50 ? content.slice(0, 50) + '...' : content;
     return this.notify(`${sender} 发来消息`, {
       body: truncated,
@@ -92,7 +102,7 @@ class NotificationManager {
   /**
    * 发送 @ 提及通知
    */
-  notifyMention(sender, content, options = {}) {
+  notifyMention(sender: string, content: string, options: NotifyOptions = {}): Notification | null {
     const truncated = content.length > 50 ? content.slice(0, 50) + '...' : content;
     return this.notify(`${sender} @ 了你`, {
       body: truncated,
@@ -105,7 +115,7 @@ class NotificationManager {
   /**
    * 启用/禁用通知
    */
-  setEnabled(enabled) {
+  setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     localStorage.setItem('notification_enabled', enabled ? '1' : '0');
   }
@@ -113,7 +123,7 @@ class NotificationManager {
   /**
    * 从本地存储恢复设置
    */
-  restore() {
+  restore(): void {
     const saved = localStorage.getItem('notification_enabled');
     if (saved !== null) {
       this.enabled = saved === '1';

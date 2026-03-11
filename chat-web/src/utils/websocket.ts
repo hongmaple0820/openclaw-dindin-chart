@@ -4,7 +4,17 @@
  * @date 2026-02-06
  */
 
+type EventCallback = (data: unknown) => void;
+
 class ChatWebSocket {
+  private ws: WebSocket | null = null;
+  private clientId: string | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 2000;
+  private listeners: Map<string, EventCallback[]> = new Map();
+  public isConnected = false;
+
   constructor() {
     this.ws = null;
     this.clientId = null;
@@ -18,12 +28,12 @@ class ChatWebSocket {
   /**
    * 连接 WebSocket
    */
-  connect() {
+  connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) {
       return Promise.resolve();
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       const url = `${protocol}//${host}/ws`;
@@ -70,7 +80,7 @@ class ChatWebSocket {
   /**
    * 处理收到的消息
    */
-  handleMessage(data) {
+  handleMessage(data: { type: string; clientId?: string; message?: unknown; user?: unknown }): void {
     console.log('[WS] 收到:', data.type);
 
     switch (data.type) {
@@ -103,7 +113,7 @@ class ChatWebSocket {
   /**
    * 发送消息
    */
-  send(data) {
+  send(data: unknown): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }
@@ -112,7 +122,7 @@ class ChatWebSocket {
   /**
    * 重连调度
    */
-  scheduleReconnect() {
+  scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.log('[WS] 达到最大重连次数');
       return;
@@ -130,7 +140,7 @@ class ChatWebSocket {
   /**
    * 事件监听
    */
-  on(event, callback) {
+  on(event: string, callback: EventCallback): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -140,7 +150,7 @@ class ChatWebSocket {
   /**
    * 移除监听
    */
-  off(event, callback) {
+  off(event: string, callback: EventCallback): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       const index = callbacks.indexOf(callback);
@@ -153,7 +163,7 @@ class ChatWebSocket {
   /**
    * 触发事件
    */
-  emit(event, data) {
+  emit(event: string, data: unknown): void {
     const callbacks = this.listeners.get(event) || [];
     callbacks.forEach(cb => cb(data));
   }
@@ -161,7 +171,7 @@ class ChatWebSocket {
   /**
    * 断开连接
    */
-  disconnect() {
+  disconnect(): void {
     if (this.ws) {
       this.ws.close();
       this.ws = null;

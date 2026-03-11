@@ -3,8 +3,15 @@
  * 提供系统托盘、窗口控制、系统通知等功能
  */
 
+// 扩展 Window 接口
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
+
 // 检测是否在 Tauri 环境中运行
-export const isTauri = () => {
+export const isTauri = (): boolean => {
   return typeof window !== 'undefined' && window.__TAURI_INTERNALS__ !== undefined
 }
 

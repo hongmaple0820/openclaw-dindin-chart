@@ -3,11 +3,11 @@
  * @author 小琳
  * @date 2026-02-06
  */
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 
 // 路由配置
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('@/layouts/DefaultLayout.vue'),
