@@ -6,19 +6,43 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { projectApi } from '@/api/projects';
+import type { Project, Task, Skill } from '@/types';
+
+interface ProjectWithStatus extends Project {
+  status?: string;
+}
+
+interface ProjectMember {
+  userId: string;
+  username: string;
+  role: 'owner' | 'admin' | 'member';
+}
+
+interface Board {
+  id: string;
+  name: string;
+  order: number;
+}
+
+interface TaskWithBoard extends Task {
+  boardId?: string;
+  comments?: { id: string; content: string; author: string; createdAt: string }[];
+}
+
+interface SkillWithConfig extends Skill {
+  projectId?: string;
+}
 
 export const useProjectStore = defineStore('projects', () => {
-  // ==================== 状态 ====================
-  const projects = ref([]);
-  const currentProject = ref(null);
-  const currentMembers = ref([]);
-  const currentSkills = ref([]);
-  const currentTasks = ref([]);
-  const currentBoards = ref([]);
+  const projects = ref<ProjectWithStatus[]>([]);
+  const currentProject = ref<ProjectWithStatus | null>(null);
+  const currentMembers = ref<ProjectMember[]>([]);
+  const currentSkills = ref<SkillWithConfig[]>([]);
+  const currentTasks = ref<TaskWithBoard[]>([]);
+  const currentBoards = ref<Board[]>([]);
   const loading = ref(false);
-  const error = ref(null);
+  const error = ref<string | null>(null);
 
-  // ==================== 计算属性 ====================
   const activeProjects = computed(() => 
     projects.value.filter(p => p.status === 'active')
   );
@@ -28,70 +52,69 @@ export const useProjectStore = defineStore('projects', () => {
   );
 
   const tasksByStatus = computed(() => {
-    const result = {};
+    const result: Record<string, TaskWithBoard[]> = {};
     currentBoards.value.forEach(board => {
       result[board.id] = currentTasks.value.filter(t => t.boardId === board.id);
     });
     return result;
   });
 
-  // ==================== 项目群操作 ====================
-  
-  async function fetchProjects() {
+  async function fetchProjects(): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await projectApi.getList();
       if (res.success) {
-        projects.value = res.projects || [];
+        projects.value = (res.projects as ProjectWithStatus[]) || [];
       } else {
         error.value = res.error || '加载项目群列表失败';
       }
     } catch (err) {
-      error.value = err.message || '加载项目群列表失败';
+      error.value = (err as Error).message || '加载项目群列表失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function fetchProjectDetail(id) {
+  async function fetchProjectDetail(id: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await projectApi.getDetail(id);
-      if (res.success) {
-        currentProject.value = res.project;
+      if (res.success && res.project) {
+        currentProject.value = res.project as ProjectWithStatus;
       } else {
         error.value = res.error || '加载项目群详情失败';
       }
     } catch (err) {
-      error.value = err.message || '加载项目群详情失败';
+      error.value = (err as Error).message || '加载项目群详情失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function createProject(data) {
+  async function createProject(data: { name: string; description?: string }): Promise<ProjectWithStatus | null> {
     loading.value = true;
     error.value = null;
     try {
       const res = await projectApi.create(data);
-      if (res.success) {
-        projects.value.unshift(res.project);
-        return res.project;
+      if (res.success && res.project) {
+        const project = res.project as ProjectWithStatus;
+        projects.value.unshift(project);
+        return project;
       } else {
         error.value = res.error || '创建项目群失败';
         return null;
       }
     } catch (err) {
-      error.value = err.message || '创建项目群失败';
+      error.value = (err as Error).message || '创建项目群失败';
       return null;
     } finally {
       loading.value = false;
     }
   }
 
-  async function updateProject(id, data) {
+  async function updateProject(id: string, data: Partial<Project>): Promise<boolean> {
     try {
       const res = await projectApi.update(id, data);
       if (res.success) {
@@ -111,7 +134,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function deleteProject(id) {
+  async function deleteProject(id: string): Promise<boolean> {
     try {
       const res = await projectApi.delete(id);
       if (res.success) {
@@ -128,20 +151,18 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  // ==================== 成员操作 ====================
-
-  async function fetchMembers(id) {
+  async function fetchMembers(id: string): Promise<void> {
     try {
       const res = await projectApi.getMembers(id);
-      if (res.success) {
-        currentMembers.value = res.members || [];
+      if (res.success && res.members) {
+        currentMembers.value = res.members as ProjectMember[];
       }
     } catch (err) {
       console.error('加载成员列表失败:', err);
     }
   }
 
-  async function addMember(projectId, userId) {
+  async function addMember(projectId: string, userId: string): Promise<boolean> {
     try {
       const res = await projectApi.addMember(projectId, userId);
       if (res.success) {
@@ -155,7 +176,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function removeMember(projectId, userId) {
+  async function removeMember(projectId: string, userId: string): Promise<boolean> {
     try {
       const res = await projectApi.removeMember(projectId, userId);
       if (res.success) {
@@ -169,25 +190,24 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  // ==================== 技能操作 ====================
-
-  async function fetchSkills(id) {
+  async function fetchSkills(id: string): Promise<void> {
     try {
       const res = await projectApi.getSkills(id);
-      if (res.success) {
-        currentSkills.value = res.skills || [];
+      if (res.success && res.skills) {
+        currentSkills.value = res.skills as SkillWithConfig[];
       }
     } catch (err) {
       console.error('加载技能列表失败:', err);
     }
   }
 
-  async function createSkill(projectId, data) {
+  async function createSkill(projectId: string, data: { name: string; description?: string }): Promise<SkillWithConfig | null> {
     try {
       const res = await projectApi.createSkill(projectId, data);
-      if (res.success) {
-        currentSkills.value.push(res.skill);
-        return res.skill;
+      if (res.success && res.skill) {
+        const skill = res.skill as SkillWithConfig;
+        currentSkills.value.push(skill);
+        return skill;
       }
       return null;
     } catch (err) {
@@ -196,7 +216,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function updateSkill(projectId, skillId, data) {
+  async function updateSkill(projectId: string, skillId: string, data: Partial<Skill>): Promise<boolean> {
     try {
       const res = await projectApi.updateSkill(projectId, skillId, data);
       if (res.success) {
@@ -213,7 +233,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function deleteSkill(projectId, skillId) {
+  async function deleteSkill(projectId: string, skillId: string): Promise<boolean> {
     try {
       const res = await projectApi.deleteSkill(projectId, skillId);
       if (res.success) {
@@ -227,25 +247,24 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  // ==================== 任务操作 ====================
-
-  async function fetchTasks(id) {
+  async function fetchTasks(id: string): Promise<void> {
     try {
       const res = await projectApi.getTasks(id);
-      if (res.success) {
-        currentTasks.value = res.tasks || [];
+      if (res.success && res.tasks) {
+        currentTasks.value = res.tasks as TaskWithBoard[];
       }
     } catch (err) {
       console.error('加载任务列表失败:', err);
     }
   }
 
-  async function createTask(projectId, data) {
+  async function createTask(projectId: string, data: { title: string; description?: string; priority?: 'low' | 'medium' | 'high' }): Promise<TaskWithBoard | null> {
     try {
       const res = await projectApi.createTask(projectId, data);
-      if (res.success) {
-        currentTasks.value.push(res.task);
-        return res.task;
+      if (res.success && res.task) {
+        const task = res.task as TaskWithBoard;
+        currentTasks.value.push(task);
+        return task;
       }
       return null;
     } catch (err) {
@@ -254,7 +273,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function updateTask(projectId, taskId, data) {
+  async function updateTask(projectId: string, taskId: string, data: Partial<Task>): Promise<boolean> {
     try {
       const res = await projectApi.updateTask(projectId, taskId, data);
       if (res.success) {
@@ -271,7 +290,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function deleteTask(projectId, taskId) {
+  async function deleteTask(projectId: string, taskId: string): Promise<boolean> {
     try {
       const res = await projectApi.deleteTask(projectId, taskId);
       if (res.success) {
@@ -285,16 +304,17 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function addComment(projectId, taskId, content) {
+  async function addComment(projectId: string, taskId: string, content: string): Promise<{ id: string; content: string; author: string; createdAt: string } | null> {
     try {
       const res = await projectApi.addComment(projectId, taskId, content);
-      if (res.success) {
+      if (res.success && res.comment) {
+        const comment = res.comment as { id: string; content: string; author: string; createdAt: string };
         const task = currentTasks.value.find(t => t.id === taskId);
         if (task) {
           if (!task.comments) task.comments = [];
-          task.comments.push(res.comment);
+          task.comments.push(comment);
         }
-        return res.comment;
+        return comment;
       }
       return null;
     } catch (err) {
@@ -303,25 +323,24 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  // ==================== 看板操作 ====================
-
-  async function fetchBoards(id) {
+  async function fetchBoards(id: string): Promise<void> {
     try {
       const res = await projectApi.getBoards(id);
-      if (res.success) {
-        currentBoards.value = res.boards || [];
+      if (res.success && res.boards) {
+        currentBoards.value = res.boards as Board[];
       }
     } catch (err) {
       console.error('加载看板列表失败:', err);
     }
   }
 
-  async function createBoard(projectId, data) {
+  async function createBoard(projectId: string, data: { name: string }): Promise<Board | null> {
     try {
       const res = await projectApi.createBoard(projectId, data);
-      if (res.success) {
-        currentBoards.value.push(res.board);
-        return res.board;
+      if (res.success && res.board) {
+        const board = res.board as Board;
+        currentBoards.value.push(board);
+        return board;
       }
       return null;
     } catch (err) {
@@ -330,11 +349,11 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  async function reorderBoards(projectId, data) {
+  async function reorderBoards(projectId: string, data: { boardIds: string[] }): Promise<boolean> {
     try {
       const res = await projectApi.reorderBoards(projectId, data);
-      if (res.success) {
-        currentBoards.value = res.boards || currentBoards.value;
+      if (res.success && res.boards) {
+        currentBoards.value = res.boards as Board[];
         return true;
       }
       return false;
@@ -344,9 +363,7 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
-  // ==================== 工具方法 ====================
-
-  function clearCurrentProject() {
+  function clearCurrentProject(): void {
     currentProject.value = null;
     currentMembers.value = [];
     currentSkills.value = [];
@@ -355,7 +372,6 @@ export const useProjectStore = defineStore('projects', () => {
   }
 
   return {
-    // 状态
     projects,
     currentProject,
     currentMembers,
@@ -364,36 +380,29 @@ export const useProjectStore = defineStore('projects', () => {
     currentBoards,
     loading,
     error,
-    // 计算属性
     activeProjects,
     completedProjects,
     tasksByStatus,
-    // 项目群方法
     fetchProjects,
     fetchProjectDetail,
     createProject,
     updateProject,
     deleteProject,
-    // 成员方法
     fetchMembers,
     addMember,
     removeMember,
-    // 技能方法
     fetchSkills,
     createSkill,
     updateSkill,
     deleteSkill,
-    // 任务方法
     fetchTasks,
     createTask,
     updateTask,
     deleteTask,
     addComment,
-    // 看板方法
     fetchBoards,
     createBoard,
     reorderBoards,
-    // 工具方法
     clearCurrentProject
   };
 });

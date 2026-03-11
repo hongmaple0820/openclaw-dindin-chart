@@ -6,14 +6,29 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { taskApi } from '@/api/tasks';
+import type { Task } from '@/types';
+
+interface TaskWithExtras extends Task {
+  pinned?: boolean;
+  assignees?: { id: string; name: string }[];
+  logs?: { id: string; content: string; createdAt: string }[];
+  comments?: { id: string; content: string; author: string; createdAt: string }[];
+}
+
+interface TaskFilters {
+  status: string;
+  priority: string;
+  assignee: string;
+  search: string;
+  pinned: boolean;
+}
 
 export const useTaskStore = defineStore('tasks', () => {
-  // ==================== 状态 ====================
-  const tasks = ref([]);
-  const currentTask = ref(null);
+  const tasks = ref<TaskWithExtras[]>([]);
+  const currentTask = ref<TaskWithExtras | null>(null);
   const loading = ref(false);
-  const error = ref(null);
-  const filters = ref({
+  const error = ref<string | null>(null);
+  const filters = ref<TaskFilters>({
     status: '',
     priority: '',
     assignee: '',
@@ -21,10 +36,8 @@ export const useTaskStore = defineStore('tasks', () => {
     pinned: false
   });
 
-  // ==================== 计算属性 ====================
-  
   const pendingTasks = computed(() => 
-    tasks.value.filter(t => t.status === 'pending')
+    tasks.value.filter(t => t.status === 'todo')
   );
 
   const inProgressTasks = computed(() => 
@@ -32,7 +45,7 @@ export const useTaskStore = defineStore('tasks', () => {
   );
 
   const completedTasks = computed(() => 
-    tasks.value.filter(t => t.status === 'completed')
+    tasks.value.filter(t => t.status === 'done')
   );
 
   const pinnedTasks = computed(() => 
@@ -67,30 +80,28 @@ export const useTaskStore = defineStore('tasks', () => {
     return result;
   });
 
-  // ==================== 任务列表操作 ====================
-  
-  async function fetchTasks(params = {}) {
+  async function fetchTasks(params: Record<string, unknown> = {}): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await taskApi.getList(params);
-      if (res.success) {
-        tasks.value = res.tasks || [];
+      if (res.success && res.tasks) {
+        tasks.value = res.tasks as TaskWithExtras[];
       } else {
         error.value = res.error || '加载任务列表失败';
       }
     } catch (err) {
-      error.value = err.message || '加载任务列表失败';
+      error.value = (err as Error).message || '加载任务列表失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function fetchPinnedTasks() {
+  async function fetchPinnedTasks(): Promise<void> {
     try {
       const res = await taskApi.getPinned();
-      if (res.success) {
-        res.tasks?.forEach(task => {
+      if (res.success && res.tasks) {
+        (res.tasks as TaskWithExtras[]).forEach(task => {
           const idx = tasks.value.findIndex(t => t.id === task.id);
           if (idx !== -1) {
             tasks.value[idx] = task;
@@ -102,46 +113,45 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 任务详情操作 ====================
-
-  async function fetchTaskDetail(id) {
+  async function fetchTaskDetail(id: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await taskApi.getDetail(id);
-      if (res.success) {
-        currentTask.value = res.task;
+      if (res.success && res.task) {
+        currentTask.value = res.task as TaskWithExtras;
       } else {
         error.value = res.error || '加载任务详情失败';
       }
     } catch (err) {
-      error.value = err.message || '加载任务详情失败';
+      error.value = (err as Error).message || '加载任务详情失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function createTask(data) {
+  async function createTask(data: { title: string; description?: string; priority?: 'low' | 'medium' | 'high' }): Promise<TaskWithExtras | null> {
     loading.value = true;
     error.value = null;
     try {
       const res = await taskApi.create(data);
-      if (res.success) {
-        tasks.value.unshift(res.task);
-        return res.task;
+      if (res.success && res.task) {
+        const task = res.task as TaskWithExtras;
+        tasks.value.unshift(task);
+        return task;
       } else {
         error.value = res.error || '创建任务失败';
         return null;
       }
     } catch (err) {
-      error.value = err.message || '创建任务失败';
+      error.value = (err as Error).message || '创建任务失败';
       return null;
     } finally {
       loading.value = false;
     }
   }
 
-  async function updateTask(id, data) {
+  async function updateTask(id: string, data: Partial<Task>): Promise<boolean> {
     try {
       const res = await taskApi.update(id, data);
       if (res.success) {
@@ -161,7 +171,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function deleteTask(id) {
+  async function deleteTask(id: string): Promise<boolean> {
     try {
       const res = await taskApi.delete(id);
       if (res.success) {
@@ -178,9 +188,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 状态操作 ====================
-
-  async function updateStatus(id, status) {
+  async function updateStatus(id: string, status: Task['status']): Promise<boolean> {
     try {
       const res = await taskApi.updateStatus(id, status);
       if (res.success) {
@@ -200,7 +208,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function togglePin(id) {
+  async function togglePin(id: string): Promise<boolean> {
     try {
       const res = await taskApi.togglePin(id);
       if (res.success) {
@@ -220,9 +228,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 执行者操作 ====================
-
-  async function addAssignee(taskId, userId) {
+  async function addAssignee(taskId: string, userId: string): Promise<boolean> {
     try {
       const res = await taskApi.addAssignee(taskId, userId);
       if (res.success) {
@@ -236,14 +242,12 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function removeAssignee(taskId, userId) {
+  async function removeAssignee(taskId: string, userId: string): Promise<boolean> {
     try {
       const res = await taskApi.removeAssignee(taskId, userId);
       if (res.success) {
-        if (currentTask.value?.id === taskId) {
-          currentTask.value.assignees = currentTask.value.assignees?.filter(
-            a => a.id !== userId
-          );
+        if (currentTask.value?.id === taskId && currentTask.value.assignees) {
+          currentTask.value.assignees = currentTask.value.assignees.filter(a => a.id !== userId);
         }
         return true;
       }
@@ -254,7 +258,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function setAssignees(taskId, userIds) {
+  async function setAssignees(taskId: string, userIds: string[]): Promise<boolean> {
     try {
       const res = await taskApi.setAssignees(taskId, userIds);
       if (res.success) {
@@ -268,17 +272,16 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 日志操作 ====================
-
-  async function addLog(taskId, content) {
+  async function addLog(taskId: string, content: string): Promise<{ id: string; content: string; createdAt: string } | null> {
     try {
       const res = await taskApi.addLog(taskId, content);
-      if (res.success) {
+      if (res.success && res.log) {
+        const log = res.log as { id: string; content: string; createdAt: string };
         if (currentTask.value?.id === taskId) {
           if (!currentTask.value.logs) currentTask.value.logs = [];
-          currentTask.value.logs.push(res.log);
+          currentTask.value.logs.push(log);
         }
-        return res.log;
+        return log;
       }
       return null;
     } catch (err) {
@@ -287,17 +290,16 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 评论操作 ====================
-
-  async function addComment(taskId, content) {
+  async function addComment(taskId: string, content: string): Promise<{ id: string; content: string; author: string; createdAt: string } | null> {
     try {
       const res = await taskApi.addComment(taskId, content);
-      if (res.success) {
+      if (res.success && res.comment) {
+        const comment = res.comment as { id: string; content: string; author: string; createdAt: string };
         if (currentTask.value?.id === taskId) {
           if (!currentTask.value.comments) currentTask.value.comments = [];
-          currentTask.value.comments.push(res.comment);
+          currentTask.value.comments.push(comment);
         }
-        return res.comment;
+        return comment;
       }
       return null;
     } catch (err) {
@@ -306,14 +308,12 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function deleteComment(taskId, commentId) {
+  async function deleteComment(taskId: string, commentId: string): Promise<boolean> {
     try {
       const res = await taskApi.deleteComment(taskId, commentId);
       if (res.success) {
-        if (currentTask.value?.id === taskId) {
-          currentTask.value.comments = currentTask.value.comments?.filter(
-            c => c.id !== commentId
-          );
+        if (currentTask.value?.id === taskId && currentTask.value.comments) {
+          currentTask.value.comments = currentTask.value.comments.filter(c => c.id !== commentId);
         }
         return true;
       }
@@ -324,9 +324,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 批量操作 ====================
-
-  async function batchUpdateStatus(taskIds, status) {
+  async function batchUpdateStatus(taskIds: string[], status: Task['status']): Promise<boolean> {
     try {
       const res = await taskApi.batchUpdateStatus(taskIds, status);
       if (res.success) {
@@ -345,7 +343,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  async function batchDelete(taskIds) {
+  async function batchDelete(taskIds: string[]): Promise<boolean> {
     try {
       const res = await taskApi.batchDelete(taskIds);
       if (res.success) {
@@ -362,13 +360,11 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  // ==================== 工具方法 ====================
-
-  function setFilter(key, value) {
-    filters.value[key] = value;
+  function setFilter(key: keyof TaskFilters, value: string | boolean): void {
+    (filters.value as Record<string, string | boolean>)[key] = value;
   }
 
-  function clearFilters() {
+  function clearFilters(): void {
     filters.value = {
       status: '',
       priority: '',
@@ -378,47 +374,37 @@ export const useTaskStore = defineStore('tasks', () => {
     };
   }
 
-  function clearCurrentTask() {
+  function clearCurrentTask(): void {
     currentTask.value = null;
   }
 
   return {
-    // 状态
     tasks,
     currentTask,
     loading,
     error,
     filters,
-    // 计算属性
     pendingTasks,
     inProgressTasks,
     completedTasks,
     pinnedTasks,
     filteredTasks,
-    // 任务列表方法
     fetchTasks,
     fetchPinnedTasks,
-    // 任务详情方法
     fetchTaskDetail,
     createTask,
     updateTask,
     deleteTask,
-    // 状态方法
     updateStatus,
     togglePin,
-    // 执行者方法
     addAssignee,
     removeAssignee,
     setAssignees,
-    // 日志方法
     addLog,
-    // 评论方法
     addComment,
     deleteComment,
-    // 批量操作方法
     batchUpdateStatus,
     batchDelete,
-    // 工具方法
     setFilter,
     clearFilters,
     clearCurrentTask
