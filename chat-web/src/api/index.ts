@@ -3,12 +3,10 @@
  * @author 小琳
  * @date 2026-02-06
  */
-import axios from 'axios';
-import { useUserStore } from '@/stores/user';
+import axios, { type AxiosInstance, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
+import type { ApiResponse } from '@/types';
 
-// 创建 axios 实例
-// 使用相对路径，走 vite proxy
-const api = axios.create({
+const api: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 10000,
   headers: {
@@ -16,9 +14,8 @@ const api = axios.create({
   }
 });
 
-// 请求拦截器 - 添加 token
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -30,7 +27,6 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器 - 处理 token 过期
 api.interceptors.response.use(
   (response) => {
     return response.data;
@@ -38,7 +34,6 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Token 过期，尝试刷新
     if (error.response?.status === 401 && 
         error.response?.data?.code === 'TOKEN_EXPIRED' && 
         !originalRequest._retry) {
@@ -59,8 +54,7 @@ api.interceptors.response.use(
             return api(originalRequest);
           }
         }
-      } catch (refreshError) {
-        // 刷新失败，清除登录状态
+      } catch {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         window.location.href = '/login';
@@ -72,7 +66,13 @@ api.interceptors.response.use(
 );
 
 export const configApi = {
-  getStatus: () => api.get('/config/status')
+  getStatus: () => api.get<ApiResponse>('/config/status')
 };
 
-export default api;
+export default api as {
+  get: <T = unknown>(url: string, config?: AxiosRequestConfig) => Promise<ApiResponse<T>>;
+  post: <T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) => Promise<ApiResponse<T>>;
+  put: <T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) => Promise<ApiResponse<T>>;
+  delete: <T = unknown>(url: string, config?: AxiosRequestConfig) => Promise<ApiResponse<T>>;
+  patch: <T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) => Promise<ApiResponse<T>>;
+};
