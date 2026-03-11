@@ -6,39 +6,47 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authApi } from '@/api/auth';
+import type { User, LoginResponse, ApiResponse } from '@/types';
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+interface RegisterData {
+  username: string;
+  password: string;
+  email?: string;
+  nickname?: string;
+}
 
 export const useUserStore = defineStore('user', () => {
-  // 状态
-  const user = ref(null);
-  const accessToken = ref(localStorage.getItem('accessToken') || '');
-  const refreshToken = ref(localStorage.getItem('refreshToken') || '');
+  const user = ref<User | null>(null);
+  const accessToken = ref<string>(localStorage.getItem('accessToken') || '');
+  const refreshToken = ref<string>(localStorage.getItem('refreshToken') || '');
 
-  // 计算属性
   const isLoggedIn = computed(() => !!accessToken.value && !!user.value);
   const isAdmin = computed(() => user.value?.role === 'admin');
   const username = computed(() => user.value?.username || '');
   const nickname = computed(() => user.value?.nickname || user.value?.username || '');
 
-  // 登录
-  async function login(credentials) {
+  async function login(credentials: LoginCredentials): Promise<LoginResponse> {
     const res = await authApi.login(credentials);
-    if (res.success) {
+    if (res.success && res.user && res.accessToken && res.refreshToken) {
       setAuth(res.user, res.accessToken, res.refreshToken);
     }
     return res;
   }
 
-  // 注册
-  async function register(data) {
+  async function register(data: RegisterData): Promise<LoginResponse> {
     const res = await authApi.register(data);
-    if (res.success) {
+    if (res.success && res.user && res.accessToken && res.refreshToken) {
       setAuth(res.user, res.accessToken, res.refreshToken);
     }
     return res;
   }
 
-  // 设置认证信息
-  function setAuth(userData, access, refresh) {
+  function setAuth(userData: User, access: string, refresh: string): void {
     user.value = userData;
     accessToken.value = access;
     refreshToken.value = refresh;
@@ -46,36 +54,34 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('refreshToken', refresh);
   }
 
-  // 获取当前用户信息
-  async function fetchUser() {
+  async function fetchUser(): Promise<User | null> {
     if (!accessToken.value) return null;
     try {
       const res = await authApi.getMe();
-      if (res.success) {
+      if (res.success && res.user) {
         user.value = res.user;
+        return res.user;
       }
-      return res.user;
-    } catch (error) {
+      return null;
+    } catch {
       logout();
       return null;
     }
   }
 
-  // 登出
-  async function logout(logoutAll = false) {
+  async function logout(logoutAll = false): Promise<void> {
     try {
       if (refreshToken.value) {
         await authApi.logout(refreshToken.value, logoutAll);
       }
-    } catch (error) {
+    } catch {
       // 忽略错误
     } finally {
       clearAuth();
     }
   }
 
-  // 清除认证信息
-  function clearAuth() {
+  function clearAuth(): void {
     user.value = null;
     accessToken.value = '';
     refreshToken.value = '';
@@ -83,24 +89,20 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('refreshToken');
   }
 
-  // 更新用户信息
-  function updateUser(data) {
+  function updateUser(data: Partial<User>): void {
     if (user.value) {
       user.value = { ...user.value, ...data };
     }
   }
 
   return {
-    // 状态
     user,
     accessToken,
     refreshToken,
-    // 计算属性
     isLoggedIn,
     isAdmin,
     username,
     nickname,
-    // 方法
     login,
     register,
     setAuth,
