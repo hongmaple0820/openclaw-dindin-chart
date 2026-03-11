@@ -2175,7 +2175,6 @@ async function start() {
     trackingRoutes.setTrackingService(trackingService);
   }
   app.use('/api/tracking', trackingRoutes);
-  app.use('/api/tracking', trackingRoutes);
 
   // ==================== Monitoring (监控告警) ====================
   let monitoringService = null;
