@@ -6,20 +6,53 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { sandboxApi } from '@/api/sandbox';
+import type { Sandbox } from '@/types';
+
+interface SandboxWithResources extends Sandbox {
+  cpuUsage?: number;
+  memoryUsage?: number;
+  diskUsage?: number;
+}
+
+interface SandboxFile {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  modifiedAt?: string;
+}
+
+interface TerminalEntry {
+  command: string;
+  output: string;
+  timestamp: number;
+}
+
+interface ResourceUsage {
+  cpu: number;
+  memory: number;
+  disk: number;
+  timestamp: number;
+}
+
+interface Process {
+  pid: number;
+  name: string;
+  cpu: number;
+  memory: number;
+}
 
 export const useSandboxStore = defineStore('sandboxes', () => {
-  // ==================== 状态 ====================
-  const sandboxes = ref([]);
-  const currentSandbox = ref(null);
-  const currentFiles = ref([]);
+  const sandboxes = ref<SandboxWithResources[]>([]);
+  const currentSandbox = ref<SandboxWithResources | null>(null);
+  const currentFiles = ref<SandboxFile[]>([]);
   const currentFileContent = ref('');
-  const terminalHistory = ref([]);
-  const resourceHistory = ref([]);
-  const processes = ref([]);
+  const terminalHistory = ref<TerminalEntry[]>([]);
+  const resourceHistory = ref<ResourceUsage[]>([]);
+  const processes = ref<Process[]>([]);
   const loading = ref(false);
-  const error = ref(null);
+  const error = ref<string | null>(null);
 
-  // ==================== 计算属性 ====================
   const activeSandboxes = computed(() => 
     sandboxes.value.filter(s => s.status === 'running')
   );
@@ -37,83 +70,62 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }, { cpu: 0, memory: 0, disk: 0 });
   });
 
-  // ==================== 沙箱操作 ====================
-  
-  async function fetchSandboxes() {
+  async function fetchSandboxes(): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await sandboxApi.getList();
-      if (res.success) {
-        sandboxes.value = res.sandboxes || [];
+      if (res.success && res.sandboxes) {
+        sandboxes.value = res.sandboxes as SandboxWithResources[];
       } else {
         error.value = res.error || '加载沙箱列表失败';
       }
     } catch (err) {
-      error.value = err.message || '加载沙箱列表失败';
+      error.value = (err as Error).message || '加载沙箱列表失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function fetchSandboxDetail(id) {
+  async function fetchSandboxDetail(id: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       const res = await sandboxApi.getDetail(id);
-      if (res.success) {
-        currentSandbox.value = res.sandbox;
+      if (res.success && res.sandbox) {
+        currentSandbox.value = res.sandbox as SandboxWithResources;
       } else {
         error.value = res.error || '加载沙箱详情失败';
       }
     } catch (err) {
-      error.value = err.message || '加载沙箱详情失败';
+      error.value = (err as Error).message || '加载沙箱详情失败';
     } finally {
       loading.value = false;
     }
   }
 
-  async function createSandbox(data) {
+  async function createSandbox(data: { name: string; image?: string }): Promise<SandboxWithResources | null> {
     loading.value = true;
     error.value = null;
     try {
       const res = await sandboxApi.create(data);
-      if (res.success) {
-        sandboxes.value.unshift(res.sandbox);
-        return res.sandbox;
+      if (res.success && res.sandbox) {
+        const sandbox = res.sandbox as SandboxWithResources;
+        sandboxes.value.unshift(sandbox);
+        return sandbox;
       } else {
         error.value = res.error || '创建沙箱失败';
         return null;
       }
     } catch (err) {
-      error.value = err.message || '创建沙箱失败';
+      error.value = (err as Error).message || '创建沙箱失败';
       return null;
     } finally {
       loading.value = false;
     }
   }
 
-  async function startSandbox(id) {
-    try {
-      const res = await sandboxApi.start(id);
-      if (res.success) {
-        const sandbox = sandboxes.value.find(s => s.id === id);
-        if (sandbox) {
-          sandbox.status = 'running';
-        }
-        if (currentSandbox.value?.id === id) {
-          currentSandbox.value.status = 'running';
-        }
-        return true;
-      }
-      return false;
-    } catch (err) {
-      console.error('启动沙箱失败:', err);
-      return false;
-    }
-  }
-
-  async function stopSandbox(id) {
+  async function stopSandbox(id: string): Promise<boolean> {
     try {
       const res = await sandboxApi.stop(id);
       if (res.success) {
@@ -133,9 +145,9 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  async function restartSandbox(id) {
+  async function restartSandbox(id: string): Promise<boolean> {
     try {
-      const res = await si.restart(id);
+      const res = await sandboxApi.restart(id);
       if (res.success) {
         const sandbox = sandboxes.value.find(s => s.id === id);
         if (sandbox) {
@@ -153,7 +165,7 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  async function deleteSandbox(id) {
+  async function deleteSandbox(id: string): Promise<boolean> {
     try {
       const res = await sandboxApi.delete(id);
       if (res.success) {
@@ -170,25 +182,23 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  // ==================== 文件操作 ====================
-
-  async function fetchFiles(id, path = '/') {
+  async function fetchFiles(id: string, path = '/'): Promise<void> {
     try {
       const res = await sandboxApi.getFiles(id, path);
-      if (res.success) {
-        currentFiles.value = res.files || [];
+      if (res.success && res.files) {
+        currentFiles.value = res.files as SandboxFile[];
       }
     } catch (err) {
       console.error('加载文件列表失败:', err);
     }
   }
 
-  async function fetchFileContent(id, filePath) {
+  async function fetchFileContent(id: string, filePath: string): Promise<string | null> {
     try {
       const res = await sandboxApi.getFileContent(id, filePath);
-      if (res.success) {
-        currentFileContent.value = res.content;
-        return res.content;
+      if (res.success && res.content) {
+        currentFileContent.value = res.content as string;
+        return res.content as string;
       }
       return null;
     } catch (err) {
@@ -197,7 +207,7 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  async function saveFileContent(id, filePath, content) {
+  async function saveFileContent(id: string, filePath: string, content: string): Promise<boolean> {
     try {
       const res = await sandboxApi.saveFileContent(id, filePath, content);
       return res.success;
@@ -207,18 +217,16 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  // ==================== 终端操作 ====================
-
-  async function executeCommand(id, command) {
+  async function executeCommand(id: string, command: string): Promise<string | null> {
     try {
       const res = await sandboxApi.executeCommand(id, command);
-      if (res.success) {
+      if (res.success && res.output) {
         terminalHistory.value.push({
           command,
-          output: res.output,
-          timestamp: new Date().toISOString()
+          output: res.output as string,
+          timestamp: Date.now()
         });
-        return res.output;
+        return res.output as string;
       }
       return null;
     } catch (err) {
@@ -227,60 +235,55 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  async function fetchTerminalHistory(id) {
+  async function fetchTerminalHistory(id: string): Promise<void> {
     try {
       const res = await sandboxApi.getTerminalHistory(id);
-      if (res.success) {
-        terminalHistory.value = res.history || [];
+      if (res.success && res.history) {
+        terminalHistory.value = res.history as TerminalEntry[];
       }
     } catch (err) {
       console.error('加载终端历史失败:', err);
     }
   }
 
-  // ==================== 资源监控 ====================
-
-  async function fetchResourceUsage(id) {
+  async function fetchResourceUsage(id: string): Promise<void> {
     try {
       const res = await sandboxApi.getResourceUsage(id);
-      if (res.success && currentSandbox.value?.id === id) {
-        currentSandbox.value = {
-          ...currentSandbox.value,
-          ...res.usage
-        };
+      if (res.success && res.usage) {
+        const usage = res.usage as ResourceUsage;
+        resourceHistory.value.push({
+          ...usage,
+          timestamp: Date.now()
+        });
       }
-      return res.usage;
     } catch (err) {
-      console.error('获取资源使用情况失败:', err);
-      return null;
+      console.error('获取资源使用失败:', err);
     }
   }
 
-  async function fetchResourceHistory(id, period = '1h') {
+  async function fetchResourceHistory(id: string, period = '1h'): Promise<void> {
     try {
       const res = await sandboxApi.getResourceHistory(id, period);
-      if (res.success) {
-        resourceHistory.value = res.history || [];
+      if (res.success && res.history) {
+        resourceHistory.value = res.history as ResourceUsage[];
       }
     } catch (err) {
       console.error('获取资源历史失败:', err);
     }
   }
 
-  // ==================== 进程管理 ====================
-
-  async function fetchProcesses(id) {
+  async function fetchProcesses(id: string): Promise<void> {
     try {
       const res = await sandboxApi.getProcesses(id);
-      if (res.success) {
-        processes.value = res.processes || [];
+      if (res.success && res.processes) {
+        processes.value = res.processes as Process[];
       }
     } catch (err) {
       console.error('获取进程列表失败:', err);
     }
   }
 
-  async function killProcess(id, pid) {
+  async function killProcess(id: string, pid: number): Promise<boolean> {
     try {
       const res = await sandboxApi.killProcess(id, pid);
       if (res.success) {
@@ -294,9 +297,7 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     }
   }
 
-  // ==================== 工具方法 ====================
-
-  function clearCurrentSandbox() {
+  function clearCurrentSandbox(): void {
     currentSandbox.value = null;
     currentFiles.value = [];
     currentFileContent.value = '';
@@ -306,7 +307,6 @@ export const useSandboxStore = defineStore('sandboxes', () => {
   }
 
   return {
-    // 状态
     sandboxes,
     currentSandbox,
     currentFiles,
@@ -316,32 +316,24 @@ export const useSandboxStore = defineStore('sandboxes', () => {
     processes,
     loading,
     error,
-    // 计算属性
     activeSandboxes,
     stoppedSandboxes,
     totalResources,
-    // 沙箱方法
     fetchSandboxes,
     fetchSandboxDetail,
     createSandbox,
-    startSandbox,
     stopSandbox,
     restartSandbox,
     deleteSandbox,
-    // 文件方法
     fetchFiles,
     fetchFileContent,
     saveFileContent,
-    // 终端方法
     executeCommand,
     fetchTerminalHistory,
-    // 资源方法
     fetchResourceUsage,
     fetchResourceHistory,
-    // 进程方法
     fetchProcesses,
     killProcess,
-    // 工具方法
     clearCurrentSandbox
   };
 });
