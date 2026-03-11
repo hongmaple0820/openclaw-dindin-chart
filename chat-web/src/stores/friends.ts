@@ -50,7 +50,7 @@ export const useFriendStore = defineStore('friends', () => {
     try {
       const res = await friendApi.getList();
       if (res.success && res.friends) {
-        friends.value = res.friends;
+        friends.value = res.friends as FriendWithGroup[];
       }
       return res as ApiResponseWithFriends;
     } catch (error) {
@@ -66,7 +66,7 @@ export const useFriendStore = defineStore('friends', () => {
     try {
       const res = await friendApi.getRequests();
       if (res.success && res.requests) {
-        requests.value = res.requests;
+        requests.value = res.requests as FriendRequest[];
       }
       return res as ApiResponseWithRequests;
     } catch (error) {

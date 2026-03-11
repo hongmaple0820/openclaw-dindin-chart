@@ -36,7 +36,7 @@ export const useGroupStore = defineStore('groups', () => {
     try {
       const res = await groupApi.getList();
       if (res.success) {
-        groups.value = res.groups || [];
+        groups.value = (res.groups as GroupWithUnread[]) || [];
       } else {
         error.value = res.error || '加载群聊列表失败';
       }
@@ -52,8 +52,8 @@ export const useGroupStore = defineStore('groups', () => {
     error.value = null;
     try {
       const res = await groupApi.getDetail(id);
-      if (res.success && res.group) {
-        currentGroup.value = res.group;
+      if (res.success) {
+        currentGroup.value = res.group as Group;
       } else {
         error.value = res.error || '加载群详情失败';
       }
@@ -68,7 +68,7 @@ export const useGroupStore = defineStore('groups', () => {
     try {
       const res = await groupApi.getMembers(id);
       if (res.success) {
-        currentMembers.value = res.members || [];
+        currentMembers.value = (res.members as GroupMember[]) || [];
       }
     } catch (err) {
       console.error('加载成员列表失败:', err);
@@ -81,8 +81,9 @@ export const useGroupStore = defineStore('groups', () => {
     try {
       const res = await groupApi.create(data);
       if (res.success && res.group) {
-        groups.value.unshift(res.group);
-        return res.group;
+        const group = res.group as Group;
+        groups.value.unshift(group);
+        return group;
       } else {
         error.value = res.error || '创建群聊失败';
         return null;

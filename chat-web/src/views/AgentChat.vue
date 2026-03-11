@@ -236,7 +236,7 @@ async function loadAgent() {
   }
 }
 
-asynction loadMessages() {
+async function loadMessages() {
   try {
     const res = await api.get(`/agents/${route.params.id}/messages`);
     if (res.success) {
@@ -412,14 +412,16 @@ onMounted(() => {
   loadAgent();
   inputRef.value?.focus();
 });
-</scriptn<style scoped>
+</script>
+
+<style scoped>
 .agent-chat-page { height: calc(100vh - 60px); display: flex; flex-direction: column; }
 .loading-container, .error-container { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #909399; }
 .loading-container p { margin-top: 16px; }
 .chat-container { display: flex; flex-direction: column; height: 100%; background: #fff; }
 .chat-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e4e7ed; }
 .header-left { display: flex; align-items: center; gap: 12px; }
-.agent-info h3 { marginont-size: 16px; color: #303133; }
+.agent-info h3 { margin: 0; font-size: 16px; color: #303133; }
 .status-text { font-size: 12px; }
 .status-text.status-active { color: #67c23a; }
 .status-text.status-inactive { color: #909399; }

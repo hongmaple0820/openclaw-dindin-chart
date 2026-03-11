@@ -99,28 +99,133 @@ EOF
 log_ok "配置模板创建完成"
 
 # ============ 阶段 4: 安装 Skills ============
-log_info "阶段 4/6: 安装常用 Skills..."
+log_info "阶段 4/6: 安装常用 Skills (60+)..."
 
-PUBLIC_SKILLS=(
-    "weather"
-    "edge-tts"
-    "planning-with-files"
-    "browser-use"
-    "canvas-design"
+# 开发工具类
+DEV_SKILLS=(
     "frontend-design"
+    "api-dev"
+    "database"
+    "docker-essentials"
+    "kubernetes"
+    "git-essentials"
+    "github"
+    "pr-reviewer"
+    "refactor-assist"
+    "swagger-gen"
+    "eslint-config-gen"
+    "readme-gen"
+    "markdown-formatter"
+    "claude-api"
+    "mcp-builder"
+    "deploy-to-vercel"
+)
+
+# 运维监控类
+OPS_SKILLS=(
+    "healthcheck"
+    "perf-profiler"
+    "system_monitor"
+    "log-analyzer"
+    "pm2"
+    "nginx-gen"
+    "cloudflare"
+    "security-sentinel"
+)
+
+# 数据库类
+DB_SKILLS=(
+    "sql-toolkit"
+    "postgres"
+    "redis"
+)
+
+# 文档生成类
+DOC_SKILLS=(
     "pdf"
     "docx"
     "pptx"
-    "mcp-builder"
+    "canvas-design"
+    "algorithmic-art"
+    "ckm-design"
+    "ckm-slides"
+    "ckm-banner-design"
 )
 
-for skill in "${PUBLIC_SKILLS[@]}"; do
+# 通信协作类
+COMM_SKILLS=(
+    "telegram"
+    "discord"
+    "slack-gif-creator"
+    "voice-call"
+    "gemini"
+)
+
+# 自动化类
+AUTO_SKILLS=(
+    "automation-workflows"
+    "browser-use"
+    "tmux"
+    "video-frames"
+    "subagent-driven-development"
+    "dispatching-parallel-agents"
+)
+
+# 内容创作类
+CONTENT_SKILLS=(
+    "weather"
+    "edge-tts"
+    "planning-with-files"
+    "brainstorming"
+    "internal-comms"
+    "doc-coauthoring"
+    "release-skills"
+    "find-skills"
+    "humanizer-zh"
+    "brand-guidelines"
+    "remote-browser"
+    "receiving-code-review"
+    "requesting-code-review"
+    "executing-plans"
+    "finishing-a-development-branch"
+)
+
+# 搜索获取类
+FETCH_SKILLS=(
+    "web-search"
+    "web-fetch"
+    "mcporter"
+    "nano-pdf"
+    "skill-creator"
+    "agent-reach"
+)
+
+# 合并所有 skills
+ALL_SKILLS=(
+    "${DEV_SKILLS[@]}"
+    "${OPS_SKILLS[@]}"
+    "${DB_SKILLS[@]}"
+    "${DOC_SKILLS[@]}"
+    "${COMM_SKILLS[@]}"
+    "${AUTO_SKILLS[@]}"
+    "${CONTENT_SKILLS[@]}"
+    "${FETCH_SKILLS[@]}"
+)
+
+# 去重并安装
+INSTALLED=0
+FAILED=0
+for skill in "${ALL_SKILLS[@]}"; do
     if npx clawhub@latest install "$skill" 2>/dev/null; then
         log_ok "$skill ✓"
+        ((INSTALLED++))
     else
         log_warn "$skill 安装失败，跳过"
+        ((FAILED++))
     fi
 done
+
+log_info "Skills 安装完成: 成功 $INSTALLED, 失败 $FAILED"
 
 # ============ 阶段 5: 安装工具 ============
 log_info "阶段 5/6: 安装辅助工具..."
