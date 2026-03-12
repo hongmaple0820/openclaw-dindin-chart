@@ -1,17 +1,10 @@
 /**
  * JWT 认证中间件
+ * 使用 auth.ts 的 verifyToken 确保数据库一致性
  */
-import * as jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
-const config = require('../config');
-const { UserModel } = require('../models/user');
-
-interface JwtPayload {
-  userId: string;
-  type?: string;
-  exp?: number;
-}
+const auth = require('../auth');
 
 interface User {
   id: string;
@@ -34,30 +27,17 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   
   const token = authHeader.substring(7);
   
-  try {
-    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
-    const user = await UserModel.findById(decoded.userId);
-    
-    if (!user) {
-      res.status(401).json({ success: false, error: '用户不存在' });
-      return;
-    }
-    
-    if (user.status !== 'active') {
-      res.status(403).json({ success: false, error: '账户已被禁用' });
-      return;
-    }
-    
-    req.user = user;
-    req.userId = user.id;
-    next();
-  } catch (error: any) {
-    if (error.name === 'TokenExpiredError') {
-      res.status(401).json({ success: false, error: '令牌已过期', code: 'TOKEN_EXPIRED' });
-      return;
-    }
-    res.status(401).json({ success: false, error: '无效的认证令牌' });
+  // 使用 auth.ts 的 verifyToken（查询 users.db）
+  const result = auth.verifyToken(token);
+  
+  if (!result.success) {
+    res.status(401).json(result);
+    return;
   }
+  
+  req.user = result.user;
+  req.userId = result.user.id;
+  next();
 };
 
 export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -70,39 +50,29 @@ export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFu
   
   const token = authHeader.substring(7);
   
-  try {
-    const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
-    const user = await UserModel.findById(decoded.userId);
-    if (user && user.status === 'active') {
-      req.user = user;
-      req.userId = user.id;
+  const result = auth.verifyToken(token);
+  if (result.success) {
+    req.user = result.user;
+    req.userId = result.user.id;
+  }
+  
+  next();
+};
+
+export const requireRole = (roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, error: '未登录' });
+      return;
     }
-  } catch (error) {
-    // Ignore errors for optional auth
-  }
-  
-  next();
+    
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({ success: false, error: '权限不足' });
+      return;
+    }
+    
+    next();
+  };
 };
 
-export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  if (!req.user || req.user.role !== 'admin') {
-    res.status(403).json({ success: false, error: '需要管理员权限' });
-    return;
-  }
-  next();
-};
-
-export const generateToken = (userId: string): string => {
-  return jwt.sign({ userId }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
-};
-
-export const generateRefreshToken = (userId: string): { token: string; expiresAt: number } => {
-  const token = jwt.sign({ userId, type: 'refresh' }, config.jwt.secret, { 
-    expiresIn: config.jwt.refreshExpiresIn 
-  });
-  
-  const decoded = jwt.decode(token) as JwtPayload;
-  const expiresAt = (decoded?.exp || 0) * 1000;
-  
-  return { token, expiresAt };
-};
+export const requireAdmin = requireRole(['admin']);
