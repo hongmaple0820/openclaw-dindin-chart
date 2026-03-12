@@ -75,31 +75,6 @@
 
 ---
 
-## ⚠️ 许可证声明
-
-```bash
-git clone https://gitee.com/hongmaple/mapleclaw.git
-cd mapleclaw/chat-hub
-npm install
-cp config/default.json config/local.json
-# 编辑 local.json 配置你的密钥
-npm start
-```
-
----
-
-## ⚠️ 许可证声明
-
-本项目采用 **非商业使用许可证**。
-
-- ✅ 允许：个人学习、个人使用、学术研究
-- ❌ 禁止：未经授权的商业使用
-- 🔑 商业授权：请联系 2496155694@qq.com
-
-详见 [LICENSE.md](LICENSE.md)
-
----
-
 ## 🎯 主动消息发送方案
 
 AI助手可以通过两种方案发送主动消息到钉钉：
