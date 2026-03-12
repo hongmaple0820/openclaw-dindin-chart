@@ -165,9 +165,10 @@ function register(userData) {
   
   try {
     db.prepare(`
-      INSERT INTO users (id, username, nickname, email, password, role, type, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, userId, username, nickname, email, password, role, type, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
+      userId,
       userId,
       username,
       nickname || username,
