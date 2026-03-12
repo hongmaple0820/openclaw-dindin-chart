@@ -11,7 +11,8 @@ const os = require('os');
 
 // 测试配置
 const TEST_PORT = process.env.TEST_PORT || 8274;
-const TEST_DB_PATH = path.join(os.homedir(), '.openclaw/chat-data/test-chat-hub.db');
+// 使用内存数据库避免 WSL 文件权限问题
+const TEST_DB_PATH = ':memory:';
 
 // 全局测试数据库
 let testDb = null;
@@ -20,20 +21,8 @@ let testDb = null;
  * 初始化测试数据库
  */
 function initTestDb() {
-  // 确保目录存在
-  const dbDir = path.dirname(TEST_DB_PATH);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-  
-  // 删除旧测试数据库
-  if (fs.existsSync(TEST_DB_PATH)) {
-    fs.unlinkSync(TEST_DB_PATH);
-  }
-  
+  // 使用内存数据库，无需目录和删除操作
   testDb = new Database(TEST_DB_PATH);
-  // WSL 兼容性：使用 DELETE 模式而非 WAL
-  testDb.pragma('journal_mode = DELETE');
   
   // 创建必要的表
   createTables();
