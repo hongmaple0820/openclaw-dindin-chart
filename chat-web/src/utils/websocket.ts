@@ -2,6 +2,7 @@
  * WebSocket 客户端
  * @author 小琳
  * @date 2026-02-06
+ * @updated 2026-03-12 - 添加心跳机制、指数退避重连、连接状态通知
  */
 
 type EventCallback = (data: unknown) => void;
@@ -10,17 +11,22 @@ class ChatWebSocket {
   private ws: WebSocket | null = null;
   private clientId: string | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 2000;
+  private maxReconnectAttempts = 10;
+  private baseReconnectDelay = 1000;
+  private maxReconnectDelay = 30000;
   private listeners: Map<string, EventCallback[]> = new Map();
   public isConnected = false;
+
+  // 心跳机制
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  private missedHeartbeats = 0;
+  private readonly maxMissedHeartbeats = 3;
 
   constructor() {
     this.ws = null;
     this.clientId = null;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 2000;
     this.listeners = new Map();
     this.isConnected = false;
   }
@@ -45,13 +51,20 @@ class ChatWebSocket {
         console.log('[WS] 已连接');
         this.isConnected = true;
         this.reconnectAttempts = 0;
-        
+        this.missedHeartbeats = 0;
+
         // 发送认证信息
         const user = JSON.parse(localStorage.getItem('user') || 'null');
         if (user) {
           this.send({ type: 'auth', user });
         }
-        
+
+        // 启动心跳
+        this.startHeartbeat();
+
+        // 通知连接状态
+        this.emit('connection_status', { connected: true });
+
         resolve();
       };
 
@@ -64,14 +77,23 @@ class ChatWebSocket {
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('[WS] 连接断开');
+      this.ws.onclose = (event) => {
+        console.log('[WS] 连接断开', event.code, event.reason);
         this.isConnected = false;
-        this.scheduleReconnect();
+        this.stopHeartbeat();
+
+        // 通知连接状态
+        this.emit('connection_status', { connected: false, code: event.code });
+
+        // 非正常关闭才重连
+        if (event.code !== 1000) {
+          this.scheduleReconnect();
+        }
       };
 
       this.ws.onerror = (error) => {
         console.error('[WS] 连接错误:', error);
+        this.emit('error', error);
         reject(error);
       };
     });
@@ -81,6 +103,13 @@ class ChatWebSocket {
    * 处理收到的消息
    */
   handleMessage(data: { type: string; clientId?: string; message?: unknown; user?: unknown }): void {
+    // 心跳响应
+    if (data.type === 'pong') {
+      this.missedHeartbeats = 0;
+      this.resetHeartbeatTimeout();
+      return;
+    }
+
     console.log('[WS] 收到:', data.type);
 
     switch (data.type) {
@@ -101,10 +130,6 @@ class ChatWebSocket {
         this.emit('user_offline', data.user);
         break;
 
-      case 'pong':
-        // 心跳响应
-        break;
-
       default:
         this.emit(data.type, data);
     }
@@ -120,17 +145,73 @@ class ChatWebSocket {
   }
 
   /**
-   * 重连调度
+   * 启动心跳
    */
-  scheduleReconnect(): void {
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+
+    // 每 30 秒发送心跳
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.missedHeartbeats++;
+
+        if (this.missedHeartbeats > this.maxMissedHeartbeats) {
+          console.log('[WS] 心跳超时，重连');
+          this.ws.close();
+          return;
+        }
+
+        this.send({ type: 'ping' });
+
+        // 设置心跳超时
+        this.heartbeatTimeout = setTimeout(() => {
+          console.log('[WS] 心跳响应超时');
+        }, 10000);
+      }
+    }, 30000);
+  }
+
+  /**
+   * 重置心跳超时
+   */
+  private resetHeartbeatTimeout(): void {
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+
+  /**
+   * 停止心跳
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    this.resetHeartbeatTimeout();
+  }
+
+  /**
+   * 重连调度（指数退避）
+   */
+  private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.log('[WS] 达到最大重连次数');
+      this.emit('reconnect_failed', { attempts: this.reconnectAttempts });
       return;
     }
 
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * this.reconnectAttempts;
+
+    // 指数退避：1s, 2s, 4s, 8s, 16s, 30s...
+    const delay = Math.min(
+      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+      this.maxReconnectDelay
+    );
+
     console.log(`[WS] ${delay}ms 后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
 
     setTimeout(() => {
       this.connect().catch(() => {});
@@ -144,7 +225,7 @@ class ChatWebSocket {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event).push(callback);
+    this.listeners.get(event)!.push(callback);
   }
 
   /**
@@ -163,7 +244,7 @@ class ChatWebSocket {
   /**
    * 触发事件
    */
-  emit(event: string, data: unknown): void {
+  private emit(event: string, data: unknown): void {
     const callbacks = this.listeners.get(event) || [];
     callbacks.forEach(cb => cb(data));
   }
@@ -172,10 +253,12 @@ class ChatWebSocket {
    * 断开连接
    */
   disconnect(): void {
+    this.stopHeartbeat();
     if (this.ws) {
-      this.ws.close();
+      this.ws.close(1000, 'Manual disconnect');
       this.ws = null;
     }
+    this.isConnected = false;
   }
 }
 
