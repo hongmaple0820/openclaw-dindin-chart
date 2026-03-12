@@ -32,7 +32,50 @@
 - **私聊功能**：支持用户间私聊、AI 私聊、钉钉私聊集成
 - **消息导出**：支持 JSON/CSV 格式导出聊天记录
 
-## 🚀 快速开始
+---
+
+## 🔄 项目工作流指引
+
+> 本项目采用 `programming-workflow` 技能进行全生命周期管理
+
+### 完整 9 阶段流程
+
+```
+需求发掘与整理 → 产品设计 → UI设计 → 架构规划 → 开发部署 → 测试 → 产品验证 → 上线部署 → 运营推广
+```
+
+### 阶段与 Skills 映射
+
+| 阶段 | 核心Skills | 主要输出 |
+|------|-----------|----------|
+| **需求** | `brainstorming`, `analyze-feature-requests` | 需求清单、优先级 |
+| **产品** | `create-prd`, `business-model` | PRD 文档 |
+| **UI设计** | `ui-ux-pro-max`, `ckm-design` | 设计系统 |
+| **架构** | `planning-with-files` | 技术方案 |
+| **开发** | `coding-agent`, `deploy-to-vercel` | 功能代码 |
+| **测试** | `audit-website` | 测试报告 |
+| **部署** | `healthcheck` | 上线服务 |
+| **推广** | `baoyu-post-to-wechat/weibo` | 营销内容 |
+
+### 多 Agent 协同
+
+| Agent | 专长 | 负责领域 |
+|-------|------|----------|
+| 小琳 | 前端、UI | 前端开发、界面设计 |
+| 小猪 | 后端、运维 | 后端开发、API设计 |
+| 小熊 | 全栈、测试 | 全栈开发、测试 |
+
+### 进度同步
+
+- **任务看板**: `tasks/枫林项目.md`
+- **每日日志**: `memory/YYYY-MM-DD.md`
+- **版本管理**: Git + Tag + CHANGELOG
+
+📖 **详细文档**: [编程项目工作流完整指南](./docs/PROGRAMMING_WORKFLOW.md)
+
+---
+
+## ⚠️ 许可证声明
 
 ```bash
 git clone https://gitee.com/hongmaple/mapleclaw.git
