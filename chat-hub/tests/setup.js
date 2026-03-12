@@ -32,7 +32,8 @@ function initTestDb() {
   }
   
   testDb = new Database(TEST_DB_PATH);
-  testDb.pragma('journal_mode = WAL');
+  // WSL 兼容性：使用 DELETE 模式而非 WAL
+  testDb.pragma('journal_mode = DELETE');
   
   // 创建必要的表
   createTables();
