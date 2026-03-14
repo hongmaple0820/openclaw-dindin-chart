@@ -107,16 +107,12 @@
                 </el-button>
               </div>
             </div>
-          </article>
-                </el-button>
-              </div>
-              <!-- 消息操作 -->
-              <div class="message-actions">
-                <el-button text size="small" @click="replyTo(msg)">回复</el-button>
-                <el-button text size="small" @click="insertMention(msg.sender)">@</el-button>
-              </div>
+            <!-- 消息操作 -->
+            <div class="message-actions">
+              <el-button text size="small" @click="replyTo(msg)">回复</el-button>
+              <el-button text size="small" @click="insertMention(msg.sender)">@</el-button>
             </div>
-          </div>
+          </article>
 
           <div v-if="messages.length === 0 && !loading" class="empty-messages">
             <el-empty description="暂无消息，说点什么吧~" />
@@ -245,7 +241,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
 
     <!-- 用户操作弹窗 -->

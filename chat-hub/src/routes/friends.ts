@@ -356,14 +356,19 @@ router.get('/requests', authenticate, async (req, res) => {
 /**
  * 4. 处理好友申请
  * PUT /api/friends/requests/:id
- * Body: { action: 'accept' | 'reject' }
+ * Body: { status: 'accepted' | 'rejected' } 或 { action: 'accept' | 'reject' }
  */
 router.put('/requests/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { action } = req.body;
+    const { status, action } = req.body;
     
-    if (!['accept', 'reject'].includes(action)) {
+    // 支持两种格式：status: 'accepted'/'rejected' 或 action: 'accept'/'reject'
+    const actualAction = status ? 
+      (status === 'accepted' ? 'accept' : status === 'rejected' ? 'reject' : null) :
+      (['accept', 'reject'].includes(action) ? action : null);
+    
+    if (!actualAction) {
       return res.status(400).json({ 
         success: false, 
         error: '无效的操作，请使用 accept 或 reject' 
@@ -401,18 +406,18 @@ router.put('/requests/:id', authenticate, async (req, res) => {
     
     const now = Date.now();
     
-    if (action === 'accept') {
-      // 同意申请：创建双向好友关系
+    if (actualAction === 'accept') {
+      // 同意申请：创建双向好友关系（使用 INSERT OR IGNORE 避免重复）
       const friendshipId1 = uuidv4();
       const friendshipId2 = uuidv4();
       
       await db.run(`
-        INSERT INTO friends (id, user_id, friend_id, status, source, created_at, updated_at)
+        INSERT OR IGNORE INTO friends (id, user_id, friend_id, status, source, created_at, updated_at)
         VALUES (?, ?, ?, 'accepted', 'request', ?, ?)
       `, [friendshipId1, req.userId, request.from_user_id, now, now]);
       
       await db.run(`
-        INSERT INTO friends (id, user_id, friend_id, status, source, created_at, updated_at)
+        INSERT OR IGNORE INTO friends (id, user_id, friend_id, status, source, created_at, updated_at)
         VALUES (?, ?, ?, 'accepted', 'request', ?, ?)
       `, [friendshipId2, request.from_user_id, req.userId, now, now]);
       
